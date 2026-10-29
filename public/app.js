@@ -1,0 +1,168 @@
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale } from './logic.js';
+
+const CITIES = [
+  { id: 'mexico_city', local: 'Ciudad de México', name: 'Mexico City', accent: '#E4007C', header: 'Tu yo chilango', flag: '🇲🇽' },
+  { id: 'seoul', local: '서울', name: 'Seoul', accent: '#2E8B57', header: '서울의 너', flag: '🇰🇷' },
+  { id: 'paris', local: 'Paris', name: 'Paris', accent: '#1D4E89', header: 'Toi, version parisienne', flag: '🇫🇷' },
+];
+const app = document.getElementById('app');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const S = { favs: [], city: null, results: {}, sound: false };
+const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else if (v != null) el.setAttribute(k, v);
+  for (const k of kids.flat()) if (k != null) el.append(k.nodeType ? k : document.createTextNode(String(k)));
+  return el;
+};
+const show = (...els) => { app.replaceChildren(...els); window.scrollTo(0, 0); };
+const post = (url, body) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ ok: r.ok, body: await r.json().catch(() => ({})) }));
+const track = (body) => post('/api/feedback', { city: S.city?.id, favourites: S.favs.map((f) => f.id), ...body }).catch(() => {});
+
+// Sound: off by default; a quiet synthesised click per flap when enabled.
+let actx; const soundBtn = document.getElementById('sound');
+soundBtn.onclick = () => { S.sound = !S.sound; soundBtn.textContent = S.sound ? '🔈' : '🔇'; soundBtn.setAttribute('aria-pressed', S.sound); };
+function click() {
+  if (!S.sound) return;
+  actx ||= new AudioContext();
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.frequency.value = 1800 + Math.random() * 400; g.gain.value = 0.02;
+  o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.012);
+}
+
+function hello() {
+  document.documentElement.style.setProperty('--accent', '#1B1B1B');
+  show(h('h1', {}, "What you'd love if you grew up there."), h('div', {}, h('button', { onclick: () => favourite() }, 'Start')));
+}
+
+function favourite() {
+  const i = S.favs.length;
+  if (i >= MAX_FAVS) return pickCity();
+  const p = PROMPTS[i];
+  const input = h('input', { 'aria-label': p.label, placeholder: 'Start typing…', autocomplete: 'off' });
+  const sugs = h('ul', { class: 'sugs' }); const msg = h('p', { class: 'muted' });
+  let t, seq = 0;
+  input.addEventListener('input', () => {
+    clearTimeout(t);
+    t = setTimeout(async () => {
+      const q = input.value.trim(); const my = ++seq;
+      if (q.length < 2) return sugs.replaceChildren();
+      msg.textContent = 'Searching…';
+      const r = await fetch(`/api/search?kind=${p.kind}&q=${encodeURIComponent(q)}`);
+      const body = await r.json().catch(() => ({}));
+      if (my !== seq) return;
+      if (!r.ok) { msg.textContent = body.message || 'Search is unavailable right now.'; return; }
+      msg.textContent = body.results.length ? '' : 'Nothing found. Try something like it.';
+      sugs.replaceChildren(...body.results.slice(0, 3).map((e) => h('li', {}, h('button', { onclick: () => { S.favs.push(e); favourite(); } }, e.name, e.year ? ` (${e.year})` : ''))));
+    }, 350);
+  });
+  const shelf = h('div', { class: 'shelf', 'aria-label': 'Your favourites' }, S.favs.map((f) => h('span', { class: 'chip' }, f.name)));
+  show(h('p', { class: 'muted' }, `Favourite ${i + 1} of ${MAX_FAVS}`), h('h2', {}, p.label), input, msg, sugs,
+    canSkip(i) ? h('div', {}, h('button', { class: 'ghost', onclick: pickCity }, 'Skip, that’s enough')) : null, shelf);
+  input.focus();
+}
+
+function pickCity() {
+  show(h('h2', {}, 'Pick a city.'), h('p', { class: 'muted' }, 'Where did the other you grow up?'),
+    h('div', { class: 'cities' }, CITIES.map((c) => h('button', { class: 'postcard', style: `--c:${c.accent}`, onclick: () => { S.city = c; morph(); } },
+      h('span', { class: `serif ${c.id === 'seoul' ? 'ko' : ''}` }, c.local), h('span', {}, c.flag)))));
+}
+
+function flapRow(text, width) {
+  const row = h('div', { class: 'row', 'aria-label': text });
+  row.cells = padTo(text.toUpperCase(), width).map((ch) => { const s = h('span', { class: 'flap' }, ch); row.append(s); return s; });
+  row.flipTo = async (to) => {
+    row.setAttribute('aria-label', to);
+    const target = padTo(to, width);
+    if (reduced) { row.cells.forEach((c, k) => (c.textContent = target[k])); return; }
+    await Promise.all(row.cells.map(async (cell, k) => {
+      for (const ch of flapSteps(cell.textContent, target[k])) {
+        cell.classList.remove('flip'); void cell.offsetWidth; cell.classList.add('flip');
+        cell.textContent = ch; click();
+        await new Promise((r) => setTimeout(r, 60 + k * 2));
+      }
+    }));
+  };
+  return row;
+}
+
+async function morph() {
+  const c = S.city; document.documentElement.style.setProperty('--accent', c.accent);
+  S.results = {};
+  const width = Math.min(22, Math.max(12, ...S.favs.map((f) => f.name.length)));
+  const hdr = h('div', { class: 'hdr' }, 'Your favourites');
+  const rows = S.favs.map((f) => flapRow(f.name, width));
+  const status = h('p', { class: 'muted' }, `Asking people in ${c.name}…`);
+  show(h('div', { class: 'board' }, hdr, rows), status);
+
+  const base = { favourites: S.favs.map(({ id, name, tags }) => ({ id, name, tags })), city: c.id, userCountry: userCountryFromLocale(navigator.language) };
+  let flipped = 0;
+  const land = (cat, r) => {
+    S.results[cat] = r.ok ? r.body : { picks: [], note: r.body.message || 'This part is unavailable right now.', error: true };
+    for (const p of S.results[cat].picks) if (flipped < rows.length) rows[flipped++].flipTo(p.title);
+    renderRevealIfShown();
+  };
+  // Podcasts don't touch Qloo, so they run alongside; Qloo categories go one at a time (server spaces them ~7 s).
+  const podcastP = post('/api/twin', { ...base, category: 'podcast' }).then((r) => land('podcast', r));
+  const qlooP = (async () => { for (const cat of QLOO_ORDER) land(cat, await post('/api/twin', { ...base, category: cat })); })();
+  const all = Promise.all([podcastP, qlooP]);
+  await Promise.race([all, new Promise((r) => setTimeout(r, MORPH_BUDGET_MS))]);
+  hdr.textContent = c.header; hdr.classList.toggle('ko', c.id === 'seoul');
+  await new Promise((r) => setTimeout(r, reduced ? 200 : 1200));
+  reveal(); all.then(() => { status.textContent = ''; });
+}
+
+let revealShown = false;
+function renderRevealIfShown() { if (revealShown) reveal(); }
+
+function pickCard(p, hero = false) {
+  const kind = { tv: 'Show', music: 'Band', podcast: 'Podcast', place: 'Place' }[p.category];
+  const link = p.watch?.url ? h('a', { class: 'btn', href: p.watch.url, target: '_blank', rel: 'noopener', onclick: () => track({ event: 'tap', action: 'watch', pick: p.title }) }, p.watch.provider ? `Where to watch · ${p.watch.provider}` : 'Where to watch')
+    : p.listen ? h('a', { class: 'btn ghost', href: p.listen, target: '_blank', rel: 'noopener', onclick: () => track({ event: 'tap', action: 'listen', pick: p.title }) }, 'Listen')
+    : p.preview ? h('audio', { controls: '', preload: 'none', src: p.preview.url, onplay: () => track({ event: 'tap', action: 'listen', pick: p.title }) }) : null;
+  const flag = (f) => h('button', { onclick: (e) => { track({ event: 'flag', flag: f, pick: p.title, category: p.category }); e.target.textContent = 'Thanks'; e.target.disabled = true; } }, f === 'not_local' ? '👎 Not local' : '👎 Not my taste');
+  return h('article', { class: `card ${hero ? 'hero' : ''}` },
+    h('span', { class: 'kind' }, kind),
+    p.image && hero ? h('img', { class: 'thumb', src: p.image, alt: '' }) : null,
+    h(hero ? 'h2' : 'h3', { class: S.city.id === 'seoul' ? 'ko' : '' }, p.title),
+    p.englishTitle && p.englishTitle !== p.title ? h('p', { class: 'muted' }, p.englishTitle) : null,
+    p.author ? h('p', { class: 'muted' }, p.author) : null,
+    h('p', {}, p.why?.text),
+    h('div', { class: 'meta' }, p.difficulty ? h('span', {}, h('span', { class: `dot ${p.difficulty}` }), p.difficulty) : null,
+      h('span', {}, `made in ${S.city.flag}`), p.neighborhood ? h('span', {}, `📍 ${p.neighborhood}`) : null),
+    hero && p.tip ? h('p', { class: 'muted' }, p.tip) : null,
+    link, p.watch ? h('p', { class: 'muted', style: 'font-size:12px' }, `Availability: ${p.watch.attribution}`) : null,
+    h('div', { class: 'pick-actions' }, flag('not_local'), flag('not_my_taste')));
+}
+
+function reveal() {
+  revealShown = true;
+  const { hero, rest } = rankPicks(S.results);
+  const notes = Object.values(S.results).map((r) => r.note).filter(Boolean);
+  const pending = ['tv', 'music', 'podcast', 'place'].filter((k) => !S.results[k]);
+  const missingKey = Object.values(S.results).find((r) => r.error);
+  const rating = h('section', { class: 'card' }, h('h3', { class: 'serif' }, 'How did we do?'),
+    h('div', { class: 'stamps', role: 'radiogroup' }, [1, 2, 3, 4, 5].map((n) => h('button', { class: 'stamp', 'aria-pressed': 'false', onclick: (e) => {
+      rating.querySelectorAll('.stamp').forEach((s) => s.setAttribute('aria-pressed', 'false')); e.currentTarget.setAttribute('aria-pressed', 'true'); rating.dataset.r = n;
+    } }, n))),
+    h('input', { placeholder: 'Anything off? (optional)', id: 'note' }),
+    h('button', { onclick: (e) => {
+      if (!rating.dataset.r) return;
+      track({ event: 'rating', rating: Number(rating.dataset.r), note: rating.querySelector('#note').value, shown: [hero, ...rest].filter(Boolean).map((p) => ({ title: p.title, category: p.category, verification: p.verification?.source })) });
+      e.target.textContent = 'Thank you'; e.target.disabled = true;
+    } }, 'Send'));
+  const others = CITIES.filter((c) => c.id !== S.city.id);
+  show(
+    h('p', { class: 'kind' }, S.city.header),
+    hero ? pickCard(hero, true) : h('div', { class: 'card' }, h('p', {}, pending.length ? 'Still landing…' : 'Nothing passed our origin checks this time.')),
+    h('div', { class: 'grid' }, rest.map((p) => pickCard(p))),
+    pending.length ? h('p', { class: 'muted' }, `Still flipping in: ${pending.join(', ')}…`) : null,
+    notes.map((n) => h('p', { class: 'note' }, n)),
+    missingKey && !hero ? h('p', { class: 'card error' }, missingKey.note) : null,
+    rating,
+    h('section', { class: 'card' }, h('h3', { class: 'serif' }, `Keep your ${S.city.name} self`),
+      h('button', { onclick: (e) => { e.target.replaceWith(h('p', { class: 'muted' }, 'Saving with an email link is coming soon.')); } }, `Save my ${S.city.name} self`),
+      h('div', {}, others.map((c) => h('button', { class: 'ghost', onclick: () => { track({ event: 'try_city', to: c.id }); S.city = c; revealShown = false; morph(); } }, `Try ${c.name}`)))),
+  );
+}
+
+hello();

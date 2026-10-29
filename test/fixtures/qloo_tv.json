@@ -1,0 +1,6 @@
+{"results":{"entities":[
+ {"entity_id":"q-anime","name":"Attack on Titan","types":["urn:entity:tv_show"],"properties":{"release_year":2013},"tags":[{"tag_id":"urn:tag:keyword:crime","name":"crime"}]},
+ {"entity_id":"q-diablero","name":"Diablero","types":["urn:entity:tv_show"],"properties":{"release_year":2018},"tags":[{"tag_id":"urn:tag:keyword:moral_decay","name":"moral_decay"}]},
+ {"entity_id":"q-dubbed","name":"Narcos","types":["urn:entity:tv_show"],"properties":{"release_year":2015},"tags":[]},
+ {"entity_id":"q-club","name":"Club de Cuervos","types":["urn:entity:tv_show"],"properties":{"release_year":2015},"tags":[]}
+]}}

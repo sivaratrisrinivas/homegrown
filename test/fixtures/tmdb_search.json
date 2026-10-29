@@ -1,0 +1,6 @@
+{
+ "Attack on Titan":[{"id":1429,"name":"Attack on Titan","original_name":"進撃の巨人","original_language":"ja","origin_country":["JP"],"genre_ids":[16]}],
+ "Diablero":[{"id":80000,"name":"Diablero","original_name":"Diablero","original_language":"es","origin_country":["MX"],"genre_ids":[18,10765],"poster_path":"/d.jpg"}],
+ "Narcos":[{"id":63351,"name":"Narcos","original_name":"Narcos","original_language":"en","origin_country":["US"],"genre_ids":[80]}],
+ "Club de Cuervos":[{"id":62000,"name":"Club of Crows","original_name":"Club de Cuervos","original_language":"es","origin_country":["MX"],"genre_ids":[35]}]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "homegrown",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "What you'd love if you grew up there.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "node server.js",
+    "test": "node --test test/*.test.js"
+  }
+}

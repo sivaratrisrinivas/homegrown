@@ -38,3 +38,26 @@ export function createRunGuard() {
   let gen = 0;
   return { start() { const my = ++gen; return () => my === gen; } };
 }
+
+// Option A (captain decision): every Qloo-backed request from this browser is serialised and
+// spaced >= 7 s apart, so separate serverless instances can't burst Qloo together.
+export const CLIENT_QLOO_GAP_MS = 7000;
+export function createSpacer({ gapMs = CLIENT_QLOO_GAP_MS, now = () => Date.now(), sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  let last = -Infinity, chain = Promise.resolve();
+  return (fn) => {
+    const p = chain.then(async () => {
+      const wait = last + gapMs - now();
+      if (wait > 0) await sleep(wait);
+      try { return await fn(); } finally { last = now(); }
+    });
+    chain = p.catch(() => {});
+    return p;
+  };
+}
+// Client-side memo so repeat queries, favourites and cities never re-hit the network.
+export function createMemo() {
+  const m = new Map();
+  return { get: (k) => m.get(k), set: (k, v) => { if (m.size > 300) m.delete(m.keys().next().value); m.set(k, v); } };
+}
+export const searchKey = (kind, q) => `${kind}|${q.trim().toLowerCase()}`;
+export const twinClientKey = (favs, city, category, uc) => `${city}|${category}|${uc}|${favs.map((f) => f.id).sort().join(',')}`;

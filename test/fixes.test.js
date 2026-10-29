@@ -83,3 +83,42 @@ test('MusicBrainz 503 is retried with backoff', async () => {
 test('TV uses Qloo country names for filter.release_country', () => {
   assert.deepEqual(Object.values(CITIES).map((c) => c.releaseCountry), ['Mexico', 'South Korea', 'France']);
 });
+
+import { twinKey } from '../lib/cache.js';
+import { timedFetch } from '../lib/fetch.js';
+import { searchCache } from '../api/search.js';
+test('review 2: tag hash in cache key; order-independent', () => {
+  const a = [{ id: '1', tags: [{ id: 't', name: 'crime' }] }, { id: '2', tags: [] }];
+  const poisoned = [{ id: '1', tags: [{ id: 'evil', name: 'evil' }] }, { id: '2', tags: [] }];
+  assert.notEqual(twinKey(a, 'seoul', 'tv'), twinKey(poisoned, 'seoul', 'tv'));
+  assert.equal(twinKey(a, 'seoul', 'tv'), twinKey([...a].reverse(), 'seoul', 'tv'));
+});
+test('review 2: timeouts map to 504 and never echo the URL', async () => {
+  const hang = (u, init) => new Promise((_, rej) => init.signal.addEventListener('abort', () => rej(init.signal.reason)));
+  await assert.rejects(timedFetch(hang, 'https://x/?api_key=SECRET', {}, { timeoutMs: 20, label: 'TMDB' }), (e) => e.status === 504 && !e.message.includes('SECRET'));
+  await assert.rejects(timedFetch(async () => { throw new TypeError('fetch failed https://x/?api_key=SECRET'); }, 'u', {}, { timeoutMs: 1000, label: 'TMDB' }), (e) => e.status === 502 && !e.message.includes('SECRET'));
+  const q = createQloo({ fetch: hang, env: { QLOO_API_KEY: 'k' }, sleep: async () => {}, timeoutMs: 20 });
+  await assert.rejects(q.search('a'), (e) => e.status === 504);
+  const f = fakeFetch([['/search', fixture('qloo_search')]]);
+  const q2 = createQloo({ fetch: f, env: { QLOO_API_KEY: 'k' }, sleep: async () => {} });
+  assert.equal((await q2.search('a')).length, 1, 'throttle chain not stalled');
+  await assert.rejects(createTmdb({ fetch: hang, env: { TMDB_API_KEY: 'k' }, timeoutMs: 20 }).searchTv('x'), (e) => e.status === 504);
+});
+test('review 2: MusicBrainz retries bounded by budget', async () => {
+  let t = 0, n = 0;
+  const mb = createMusicBrainz({ fetch: async () => { n++; t += 100; return new Response('', { status: 503 }); }, sleep: async (ms) => { t += ms; }, now: () => t, retries: 10, budgetMs: 20000, timeoutMs: 8000 });
+  await assert.rejects(mb.searchArtist('x'));
+  assert.ok(t <= 20000, `took ${t}`); assert.ok(n < 10);
+});
+test('review 2: typeahead cache by (q, kind)', async () => {
+  const { setDeps } = await import('../lib/deps.js');
+  const handler = (await import('../api/search.js')).default;
+  let calls = 0;
+  setDeps({ qloo: { search: async () => { calls++; return [{ id: 'a', name: 'A', tags: [] }]; } } });
+  const res = () => ({ setHeader() {}, end(b) { this.body = b; } });
+  await handler({ query: { q: 'Breaking', kind: 'show' } }, res());
+  await handler({ query: { q: 'breaking', kind: 'show' } }, res());
+  await handler({ query: { q: 'breaking', kind: 'band' } }, res());
+  assert.equal(calls, 2);
+  setDeps(undefined);
+});

@@ -31,3 +31,21 @@ test('run guard drops stale city responses', () => {
   const g = createRunGuard(); const mx = g.start(); assert.equal(mx(), true);
   const kr = g.start(); assert.equal(mx(), false); assert.equal(kr(), true);
 });
+
+import { createSpacer, createMemo, searchKey, twinClientKey, CLIENT_QLOO_GAP_MS } from '../public/logic.js';
+test('client Qloo spacer: serialised, >= 7 s apart', async () => {
+  let t = 0; const starts = [];
+  const gate = createSpacer({ now: () => t, sleep: async (ms) => { t += ms; } });
+  await Promise.all([1, 2, 3].map((i) => gate(async () => { starts.push(t); t += 500; return i; })));
+  assert.equal(CLIENT_QLOO_GAP_MS, 7000);
+  for (let i = 1; i < starts.length; i++) assert.ok(starts[i] - (starts[i - 1] + 500) >= 7000);
+  await assert.rejects(gate(async () => { throw new Error('x'); }));
+  assert.equal(await gate(async () => 'still works'), 'still works');
+});
+test('client memo keys cover repeat queries, favourites and cities', () => {
+  const m = createMemo(); m.set(searchKey('show', ' Breaking Bad '), 1);
+  assert.equal(m.get(searchKey('show', 'breaking bad')), 1);
+  const a = [{ id: 'x' }, { id: 'y' }], b = [{ id: 'y' }, { id: 'x' }];
+  assert.equal(twinClientKey(a, 'seoul', 'tv', 'IN'), twinClientKey(b, 'seoul', 'tv', 'IN'));
+  assert.notEqual(twinClientKey(a, 'seoul', 'tv', 'IN'), twinClientKey(a, 'paris', 'tv', 'IN'));
+});

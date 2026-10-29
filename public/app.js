@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, createMemo, searchKey, twinClientKey } from './logic.js';
 
 const CITIES = [
   { id: 'mexico_city', local: 'Ciudad de México', name: 'Mexico City', accent: '#E4007C', header: 'Tu yo chilango', flag: '🇲🇽' },
@@ -7,6 +7,16 @@ const CITIES = [
 ];
 const app = document.getElementById('app');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const qlooGate = createSpacer();
+const searchMemo = createMemo(), twinMemo = createMemo();
+// Qloo-backed calls go through the 7 s gate; cached answers skip it entirely.
+async function qlooPost(body) {
+  const k = twinClientKey(body.favourites, body.city, body.category, body.userCountry);
+  const hit = twinMemo.get(k); if (hit) return hit;
+  const r = await qlooGate(() => post('/api/twin', body));
+  if (r.ok) twinMemo.set(k, r);
+  return r;
+}
 const S = { favs: [], city: null, results: {}, sound: false };
 const h = (tag, attrs = {}, ...kids) => {
   const el = document.createElement(tag);
@@ -47,13 +57,22 @@ function favourite() {
       const q = input.value.trim(); const my = ++seq;
       if (q.length < 2) return sugs.replaceChildren();
       msg.textContent = 'Searching…';
-      const r = await fetch(`/api/search?kind=${p.kind}&q=${encodeURIComponent(q)}`);
-      const body = await r.json().catch(() => ({}));
-      if (my !== seq) return;
+      const sk = searchKey(p.kind, q);
+      let r = searchMemo.get(sk);
+      if (!r) {
+        r = await qlooGate(async () => {
+          if (my !== seq) return null; // superseded while waiting for the gate: don't spend a Qloo call
+          const res = await fetch(`/api/search?kind=${p.kind}&q=${encodeURIComponent(q)}`);
+          return { ok: res.ok, body: await res.json().catch(() => ({})) };
+        });
+        if (r?.ok) searchMemo.set(sk, r);
+      }
+      if (!r || my !== seq) return;
+      const body = r.body;
       if (!r.ok) { msg.textContent = body.message || 'Search is unavailable right now.'; return; }
       msg.textContent = body.results.length ? '' : 'Nothing found. Try something like it.';
       sugs.replaceChildren(...body.results.slice(0, 3).map((e) => h('li', {}, h('button', { onclick: () => { S.favs.push(e); favourite(); } }, e.name, e.year ? ` (${e.year})` : ''))));
-    }, 350);
+    }, 600);
   });
   const shelf = h('div', { class: 'shelf', 'aria-label': 'Your favourites' }, S.favs.map((f) => h('span', { class: 'chip' }, f.name)));
   show(h('p', { class: 'muted' }, `Favourite ${i + 1} of ${MAX_FAVS}`), h('h2', {}, p.label), input, msg, sugs,
@@ -106,7 +125,7 @@ async function morph() {
   };
   // Podcasts don't touch Qloo, so they run alongside; Qloo categories go one at a time (server spaces them ~7 s).
   const podcastP = post('/api/twin', { ...base, category: 'podcast' }).then((r) => land('podcast', r));
-  const qlooP = (async () => { for (const cat of QLOO_ORDER) land(cat, await post('/api/twin', { ...base, category: cat })); })();
+  const qlooP = (async () => { for (const cat of QLOO_ORDER) land(cat, await qlooPost({ ...base, category: cat })); })();
   const all = Promise.all([podcastP, qlooP]);
   await Promise.race([all, new Promise((r) => setTimeout(r, MORPH_BUDGET_MS))]);
   if (!current()) return;

@@ -33,8 +33,9 @@ test('TMDB: native accepted, anime and US shows rejected', async () => {
 test('difficulty + watch link', () => {
   assert.equal(showDifficulty([16]), 'easy'); assert.equal(showDifficulty([80]), 'hard'); assert.equal(showDifficulty([18]), 'medium');
   const p = { IN: { link: 'https://tmdb/in', flatrate: [{ provider_name: 'Netflix' }] }, US: { link: 'https://tmdb/us' } };
-  assert.deepEqual(pickWatchLink(p, 'IN'), { url: 'https://tmdb/in', provider: 'Netflix', country: 'IN', attribution: 'JustWatch via TMDB' });
+  assert.deepEqual(pickWatchLink(p, 'IN'), { url: 'https://tmdb/in', provider: 'Netflix', country: 'IN', fallback: false, label: null, attribution: 'JustWatch via TMDB' });
   assert.equal(pickWatchLink(p, 'GB').country, 'US');
+  assert.equal(pickWatchLink(p, 'GB').label, 'US link');
   assert.equal(pickWatchLink({}, 'GB'), null);
 });
 

@@ -139,7 +139,7 @@ let revealEls = null;
 
 function pickCard(p, hero = false) {
   const kind = { tv: 'Show', movie: 'Film', music: 'Band' }[p.category];
-  const link = p.watch?.url ? h('a', { class: 'btn', href: p.watch.url, target: '_blank', rel: 'noopener', onclick: () => track({ event: 'tap', action: 'watch', pick: p.title }) }, p.watch.provider ? `Where to watch · ${p.watch.provider}` : 'Where to watch')
+  const link = p.watch?.url ? h('a', { class: 'btn', href: p.watch.url, target: '_blank', rel: 'noopener', onclick: () => track({ event: 'tap', action: 'watch', pick: p.title }) }, `Where to watch${p.watch.provider ? ` · ${p.watch.provider}` : ''}${p.watch.label ? ` (${p.watch.label})` : ''}`)
     : p.preview ? h('audio', { controls: '', preload: 'none', src: p.preview.url, onplay: () => track({ event: 'tap', action: 'listen', pick: p.title }) }) : null;
   const flag = (f) => h('button', { onclick: (e) => { track({ event: 'flag', flag: f, pick: p.title, category: p.category }); e.target.textContent = 'Thanks'; e.target.disabled = true; } }, f === 'not_local' ? '👎 Not local' : '👎 Not my taste');
   return h('article', { class: `card ${hero ? 'hero' : ''}` },

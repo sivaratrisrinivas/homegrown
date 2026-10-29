@@ -72,10 +72,11 @@ test('TV uses Qloo country names for filter.release_country', () => {
 import { twinKey } from '../lib/cache.js';
 import { timedFetch } from '../lib/fetch.js';
 import { searchCache } from '../api/search.js';
-test('review 2: tag hash in cache key; order-independent', () => {
-  const a = [{ id: '1', tags: [{ id: 't', name: 'crime' }] }, { id: '2', tags: [] }];
-  const poisoned = [{ id: '1', tags: [{ id: 'evil', name: 'evil' }] }, { id: '2', tags: [] }];
-  assert.notEqual(twinKey(a, 'seoul', 'tv'), twinKey(poisoned, 'seoul', 'tv'));
+test('review 7: cache key hashes ids only; order-independent', () => {
+  const a = [{ id: '1', name: 'A', tags: [{ id: 't', name: 'crime' }] }, { id: '2', tags: [] }];
+  const other = [{ id: '1', name: 'EVIL', tags: [{ id: 'evil', name: 'evil' }] }, { id: '2', tags: [] }];
+  assert.equal(twinKey(a, 'seoul', 'tv'), twinKey(other, 'seoul', 'tv'));
+  assert.notEqual(twinKey(a, 'seoul', 'tv'), twinKey([{ id: '1' }, { id: '3' }], 'seoul', 'tv'));
   assert.equal(twinKey(a, 'seoul', 'tv'), twinKey([...a].reverse(), 'seoul', 'tv'));
 });
 test('review 2: timeouts map to 504 and never echo the URL', async () => {

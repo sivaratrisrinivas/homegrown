@@ -69,7 +69,7 @@ test('movie: per-candidate errors + short TTL', async () => {
   let t = 0; const cache = createCache({ now: () => t });
   const bad = fakeFetch([['query=Coco', () => json({}, 500)], ['/search/movie', (u) => json({ results: MOVIES[new URL(u).searchParams.get('query')]?.s || [] })],
     ['/watch/providers', () => json({}, 500)], ['/movie/', () => json(MOVIES.Roma.d)]]);
-  const { s } = movieSvc({ ents: ['Coco', 'Roma'], cache, now: () => t, tmdbImpl: createTmdb({ fetch: bad, env: { TMDB_API_KEY: 'k' } }) });
+  const { s } = movieSvc({ ents: ['Coco', 'Roma'], cache, now: () => t, tmdbImpl: createTmdb({ fetch: bad, env: { TMDB_API_KEY: 'k' }, now: () => t }) });
   const r = await s.category({ ...base, category: 'movie' });
   assert.deepEqual(r.picks.map((p) => p.title), ['Roma']); assert.equal(r.picks[0].watch, null);
   assert.equal(r.rejected[0].reason, 'verify_error');

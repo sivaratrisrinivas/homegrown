@@ -149,3 +149,12 @@ test('measure retries MusicBrainz errors and keeps leftover errors out of the de
   assert.equal(calls.A, 1, 'no retry at runtime');
   assert.ok(app.rejected?.some?.((r) => r.reason === 'verify_error') ?? true);
 });
+
+test('review 10: getCity uses own keys only; culture lead ranks by pct like the gate', async () => {
+  const { getCity } = await import('../lib/cities.js');
+  for (const id of ['toString', '__proto__', 'constructor', ['seoul']]) assert.throws(() => getCity(id), (e) => e.status === 400);
+  assert.equal(getCity('seoul').id, 'seoul');
+  // By counts TV/films (8) would lead; by pct music (5/6 = 83%) does.
+  const g = gate({ buenos_aires: { tv: r(15, 8), movie: r(15, 8), music: r(6, 5) } });
+  assert.equal(cultureLead(g, 'buenos_aires').text, 'Buenos Aires: music leads');
+});

@@ -40,3 +40,16 @@ test('feedback validates and separates not_local from not_my_taste', async () =>
   assert.equal((await post('/api/feedback', { event: 'flag', flag: 'meh' })).status, 400);
   assert.equal((await post('/api/feedback', { event: 'hack' })).status, 400);
 });
+
+test('review 10: a non-string city never bypasses the live-city gate', async () => {
+  for (const city of [['chennai'], { id: 'chennai' }, 7, null, undefined]) {
+    const r = await post('/api/twin', { favourites: FAVS, city, category: 'tv' });
+    assert.equal(r.status, 400, JSON.stringify(city));
+  }
+  for (const city of ['chennai', 'paris', 'toString', '__proto__', 'nowhere']) {
+    assert.equal((await post('/api/twin', { favourites: FAVS, city, category: 'tv' })).status, 403, city);
+  }
+  assert.equal((await post('/api/feedback', { event: 'rating', rating: 4, city: ['seoul'] })).status, 400);
+  assert.equal((await post('/api/feedback', { event: 'try_city', city: 'seoul', to: ['madrid'] })).status, 400);
+  assert.equal((await post('/api/feedback', { event: 'try_city', city: 'seoul', to: 'madrid' })).status, 200);
+});

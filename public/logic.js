@@ -23,11 +23,23 @@ export function flapSteps(from, to, max = 8) {
 }
 export const padTo = (s, n) => [...String(s)].slice(0, n).concat(Array(Math.max(0, n - [...String(s)].length)).fill(' '));
 
+export const SCARCE_BELOW = 3;
+// Postcard = the categories with at least 3 strict-local picks; scarce ones are shown but left off.
+export const isScarce = (r) => !r || (r.picks || []).length < SCARCE_BELOW;
+export const postcardCategories = (byCat) => QLOO_ORDER.filter((c) => byCat[c] && !isScarce(byCat[c]));
+
 export function rankPicks(byCat) {
-  // Hero = first show; then 2nd show, film, band.
-  const tv = byCat.tv?.picks || [];
-  const order = [tv[0], tv[1], byCat.movie?.picks?.[0], byCat.music?.picks?.[0]].filter(Boolean);
+  // Hero = first pick of the first postcard category; then the rest of the postcard, category by category.
+  const order = postcardCategories(byCat).flatMap((c) => byCat[c].picks);
   return { hero: order[0] || null, rest: order.slice(1) };
+}
+export const scarcePicks = (byCat) => QLOO_ORDER.filter((c) => byCat[c] && isScarce(byCat[c])).flatMap((c) => byCat[c].picks || []);
+
+// Step 1 is the language; step 2 is the suggested live city for it (from /api/cities).
+export function cityForLanguage(catalogue, languageId) {
+  const lang = catalogue.languages.find((l) => l.id === languageId);
+  if (!lang?.suggested) return null;
+  return catalogue.cities.find((c) => c.id === lang.suggested && c.live) || null;
 }
 export function userCountryFromLocale(locale) {
   const m = /[-_]([A-Za-z]{2})\b/.exec(locale || '');

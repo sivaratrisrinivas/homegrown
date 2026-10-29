@@ -28,6 +28,13 @@ When a key is missing, the API returns `503 {"error":"missing_key","key":"..."}`
 - Each request logs its native rate per category (candidates checked, accepted, %), with no secrets or user text.
 - Results are cached in memory per (favourites set, city, category) for 7 days.
 
+## Captain rules (v1)
+
+- **Picks:** 5 strict-local picks per category from a Qloo top 15. Fewer than 3 is "scarce": the category is shown with a plain note but left off the postcard.
+- **City gate:** a city is live only with ≥ 60% local picks in TV, movies and music. See `config/gate.json`, refreshed by `npm run measure`, which needs `QLOO_API_KEY` and `TMDB_API_KEY` and takes ~3 min because Qloo calls are ~7 s apart.
+- **Flow:** language first, then the suggested city.
+- **Reveal:** one "culture leads in" line, computed from the measured native counts.
+
 ## Deployment
 
 `vercel.json` sets `maxDuration: 60` for `api/twin.js`. Vercel Hobby with Fluid compute (the default) allows up to 300 s, so 60 s fits; the request deadlines (45 s / 50 s) keep each call inside it.

@@ -13,9 +13,10 @@ test('split-flap steps land on target', () => {
   assert.equal(flapSteps('A', 'Z', 5).at(-1), 'Z');
   assert.deepEqual(padTo('ab', 4), ['a', 'b', ' ', ' ']);
 });
-test('rankPicks: hero is top show, then show/film/band', () => {
-  const r = rankPicks({ tv: { picks: [{ t: 1 }, { t: 2 }] }, movie: { picks: [{ t: 3 }] }, music: { picks: [{ t: 4 }] }, place: { picks: [{ t: 5 }] } });
-  assert.deepEqual(r.hero, { t: 1 }); assert.deepEqual(r.rest.map((x) => x.t), [2, 3, 4]);
+test('rankPicks: postcard categories only (>= 3 picks), in tv/movie/music order', () => {
+  const p = (...ts) => ({ picks: ts.map((t) => ({ t })) });
+  const r = rankPicks({ tv: p(1, 2, 3), movie: p(4), music: p(5, 6, 7), place: p(9, 9, 9) });
+  assert.deepEqual(r.hero, { t: 1 }); assert.deepEqual(r.rest.map((x) => x.t), [2, 3, 5, 6, 7]);
   assert.equal(rankPicks({}).hero, null);
 });
 test('locale -> country', () => { assert.equal(userCountryFromLocale('en-IN'), 'IN'); assert.equal(userCountryFromLocale('fr'), 'US'); });

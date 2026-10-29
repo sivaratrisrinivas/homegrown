@@ -1,0 +1,11 @@
+{
+  "threshold": 0.6,
+  "categories": ["tv", "movie", "music"],
+  "measuredAt": "2026-10-30T01:13:00+05:30",
+  "source": "Full top-10 sweep (every candidate checked) with favourites Breaking Bad, Radiohead, Parasite. Re-run with `npm run measure` (top 15) to refresh.",
+  "results": {
+    "mexico_city": { "tv": { "seen": 10, "accepted": 7 }, "movie": { "seen": 10, "accepted": 3 }, "music": { "seen": 10, "accepted": 3 } },
+    "seoul": { "tv": { "seen": 10, "accepted": 7 }, "movie": { "seen": 10, "accepted": 8 }, "music": { "seen": 10, "accepted": 8 } },
+    "paris": { "tv": { "seen": 10, "accepted": 7 }, "movie": { "seen": 10, "accepted": 4 }, "music": { "seen": 10, "accepted": 9 } }
+  }
+}

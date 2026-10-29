@@ -40,3 +40,4 @@ input{font:400 20px Inter,sans-serif;padding:16px;border:2px solid var(--ink);bo
 .error{border-left:6px solid #d0453a}
 img.thumb{width:100%;border-radius:10px;aspect-ratio:16/9;object-fit:cover;background:#eee}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:opacity .3s!important}}
+.lead{font-family:var(--serif,serif);font-size:18px;margin:4px 0}

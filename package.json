@@ -4,9 +4,12 @@
   "private": true,
   "type": "module",
   "description": "What you'd love if you grew up there.",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "node server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "measure": "node scripts/measure.mjs"
   }
 }

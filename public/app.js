@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage } from './logic.js';
 
 const CITIES = [
   { id: 'mexico_city', local: 'Ciudad de México', name: 'Mexico City', accent: '#E4007C', header: 'Tu yo chilango', flag: '🇲🇽' },
@@ -17,7 +17,7 @@ async function qlooPost(body, isCurrent = () => true) {
   if (shouldMemoTwin(r)) twinMemo.set(k, r);
   return r;
 }
-const S = { favs: [], city: null, results: {}, sound: false };
+const S = { favs: [], city: null, results: {}, sound: false, catalogue: null, lang: null };
 const h = (tag, attrs = {}, ...kids) => {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else if (v != null) el.setAttribute(k, v);
@@ -41,12 +41,40 @@ function click() {
 
 function hello() {
   document.documentElement.style.setProperty('--accent', '#1B1B1B');
-  show(h('h1', {}, "What you'd love if you grew up there."), h('div', {}, h('button', { onclick: () => favourite() }, 'Start')));
+  show(h('h1', {}, "What you'd love if you grew up there."), h('div', {}, h('button', { onclick: () => pickLanguage() }, 'Start')));
+}
+
+// Step 1: the language you're learning.
+async function pickLanguage() {
+  if (!S.catalogue) {
+    const r = await fetch('/api/cities').then((x) => x.json()).catch(() => null);
+    if (!r?.languages) return show(h('p', { class: 'note' }, 'Cities are unavailable right now. Please try again in a minute.'));
+    S.catalogue = r;
+  }
+  show(h('h2', {}, 'Which language are you learning?'),
+    h('div', { class: 'cities' }, S.catalogue.languages.map((l) => h('button', { class: 'postcard', onclick: () => { S.lang = l; suggestCity(); } },
+      h('span', { class: `serif ${l.id === 'ko' ? 'ko' : ''}` }, l.local), h('span', {}, l.name)))));
+}
+
+// Step 2: we suggest the best live city for that language.
+function suggestCity() {
+  const live = cityForLanguage(S.catalogue, S.lang.id);
+  if (!live) {
+    return show(h('h2', {}, `${S.lang.name} isn't live yet.`),
+      h('p', { class: 'muted' }, `A city opens only when at least ${Math.round(S.catalogue.threshold * 100)}% of its picks in music, TV and movies are verified local. Its city hasn't reached that yet.`),
+      h('button', { class: 'ghost', onclick: pickLanguage }, 'Pick another language'));
+  }
+  const c = CITIES.find((x) => x.id === live.id);
+  show(h('p', { class: 'muted' }, `For ${S.lang.name}, we suggest`),
+    h('h2', { class: `serif ${c.id === 'seoul' ? 'ko' : ''}` }, `${c.local} ${c.flag}`),
+    live.lead ? h('p', { class: 'lead' }, live.lead.text) : null,
+    h('button', { onclick: () => { S.city = c; favourite(); } }, `Go to ${c.name}`),
+    h('button', { class: 'ghost', onclick: pickLanguage }, 'Change language'));
 }
 
 function favourite() {
   const i = S.favs.length;
-  if (i >= MAX_FAVS) return pickCity();
+  if (i >= MAX_FAVS) return morph();
   const p = PROMPTS[i];
   const input = h('input', { 'aria-label': p.label, placeholder: 'Start typing…', autocomplete: 'off' });
   const sugs = h('ul', { class: 'sugs' }); const msg = h('p', { class: 'muted' });
@@ -77,15 +105,10 @@ function favourite() {
   });
   const shelf = h('div', { class: 'shelf', 'aria-label': 'Your favourites' }, S.favs.map((f) => h('span', { class: 'chip' }, f.name)));
   show(h('p', { class: 'muted' }, `Favourite ${i + 1} of ${MAX_FAVS}`), h('h2', {}, p.label), input, msg, sugs,
-    canSkip(i) ? h('div', {}, h('button', { class: 'ghost', onclick: pickCity }, 'Skip, that’s enough')) : null, shelf);
+    canSkip(i) ? h('div', {}, h('button', { class: 'ghost', onclick: () => morph() }, 'Skip, that’s enough')) : null, shelf);
   input.focus();
 }
 
-function pickCity() {
-  show(h('h2', {}, 'Pick a city.'), h('p', { class: 'muted' }, 'Where did the other you grow up?'),
-    h('div', { class: 'cities' }, CITIES.map((c) => h('button', { class: 'postcard', style: `--c:${c.accent}`, onclick: () => { S.city = c; morph(); } },
-      h('span', { class: `serif ${c.id === 'seoul' ? 'ko' : ''}` }, c.local), h('span', {}, c.flag)))));
-}
 
 function flapRow(text, width) {
   const row = h('div', { class: 'row', 'aria-label': text });
@@ -159,11 +182,18 @@ function picksView() {
   const { hero, rest } = rankPicks(S.results);
   const notes = Object.values(S.results).map((r) => r.note).filter(Boolean);
   const pending = QLOO_ORDER.filter((k) => !S.results[k]);
+  const scarce = scarcePicks(S.results);
+  const lead = S.catalogue?.cities.find((x) => x.id === S.city.id)?.lead;
   return [
+    lead ? h('p', { class: 'lead' }, lead.text) : null,
+    pending.length ? null : h('p', { class: 'muted' }, postcardCategories(S.results).length
+      ? `On your postcard: ${postcardCategories(S.results).map((c) => ({ tv: 'shows', movie: 'films', music: 'bands' })[c]).join(', ')}`
+      : 'Local picks are scarce for your taste here, so your postcard is empty this time.'),
     hero ? pickCard(hero, true) : h('div', { class: 'card' }, h('p', {}, pending.length ? 'Still landing…' : 'Nothing passed our origin checks this time.')),
     h('div', { class: 'grid' }, rest.map((p) => pickCard(p))),
     pending.length ? h('p', { class: 'muted' }, `Still flipping in: ${pending.join(', ')}…`) : null,
     notes.map((n) => h('p', { class: 'note' }, n)),
+    scarce.length ? h('section', {}, h('h3', { class: 'serif' }, 'Also local, but scarce here'), h('div', { class: 'grid' }, scarce.map((p) => pickCard(p)))) : null,
   ].flat().filter(Boolean);
 }
 // Only the picks region re-renders as categories land; the rating/note form keeps its state.
@@ -183,9 +213,11 @@ function reveal() {
       track({ event: 'rating', rating: Number(rating.dataset.r), note: rating.querySelector('#note').value, shown: shownPicks().map((p) => `${p.category}:${p.title}:${p.verification?.source || ''}`.slice(0, 200)) });
       e.target.textContent = 'Thank you'; e.target.disabled = true;
     } }, 'Send'));
-  const others = CITIES.filter((c) => c.id !== S.city.id);
+  // Only other live cities are offered.
+  const liveIds = new Set((S.catalogue?.cities || []).filter((c) => c.live).map((c) => c.id));
+  const others = CITIES.filter((c) => c.id !== S.city.id && liveIds.has(c.id));
   show(h('p', { class: 'kind' }, S.city.header), picks, rating,
-    h('section', { class: 'card' }, h('h3', { class: 'serif' }, `Keep your ${S.city.name} self`),
+    h('section', { class: 'card postcard-summary' }, h('h3', { class: 'serif' }, `Keep your ${S.city.name} self`),
       h('button', { onclick: (e) => { e.target.replaceWith(h('p', { class: 'muted' }, 'Saving with an email link is coming soon.')); } }, `Save my ${S.city.name} self`),
       h('div', {}, others.map((c) => h('button', { class: 'ghost', onclick: () => { track({ event: 'try_city', to: c.id }); S.city = c; morph(); } }, `Try ${c.name}`)))));
   updateReveal();

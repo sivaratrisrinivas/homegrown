@@ -29,7 +29,7 @@ test('TV: keeps only TMDB-native, applies country filter, grounded why-line', as
   assert.match(r.picks[0].why.text, /Breaking Bad.*moral decay/);
   assert.equal(r.picks[1].difficulty, 'easy');
   assert.equal(r.picks[0].watch.provider, 'Netflix');
-  assert.equal(r.note, null);
+  assert.equal(r.scarce, true); assert.match(r.note, /scarce in Mexico City.*left off your postcard/);
   assert.equal(qcalls[0].extra['filter.release_country'], 'Mexico');
   assert.equal(qcalls[0].extra['signal.location.query'], 'Mexico City');
   assert.deepEqual(r.rejected.map((x) => x.name), ['Attack on Titan', 'Narcos']);
@@ -40,7 +40,7 @@ test('never pads: fewer native picks -> fewer results + honest note', async () =
   const { s } = svc({ qlooEntities: { 'urn:entity:tv_show': ents } });
   const r = await s.category({ ...base, category: 'tv' });
   assert.equal(r.picks.length, 1);
-  assert.match(r.note, /Few Spanish shows/);
+  assert.match(r.note, /Local shows are scarce/); assert.equal(r.scarce, true);
   const { s: s0 } = svc({ qlooEntities: { 'urn:entity:tv_show': ents.filter((e) => e.name !== 'Diablero') } });
   const r0 = await s0.category({ ...base, category: 'tv' });
   assert.equal(r0.picks.length, 0); assert.match(r0.note, /not showing a fake/);

@@ -151,3 +151,12 @@ Rule: any motion that doesn't explain or make you feel something is cut. Everyth
 9. **Can a reveal be shared?** *Default:* yes. A public read-only link with an OG image of the split-flap board.
 10. **Which LLM writes the why-lines?** *Default:* whatever free or cheapest tier is available through the existing gateway. The why-line must quote a real shared Qloo tag (no made-up reasons).
 11. **Do co-productions count as native (e.g. Lupin, France and US)?** *Default:* yes, only if TMDB `original_language` matches. Otherwise no.
+
+## Captain decisions (2026-10-30)
+
+These override anything above that conflicts with them.
+
+1. **Thin categories.** Aim for 5 strict-local picks per category, screened from a Qloo top 15. If a city has fewer than 3 for a category, show what was found, say plainly that local picks are scarce there, and leave that category off the city's postcard. The strict native rule is unchanged: never pad.
+2. **Data-gated cities.** A city goes live only if it reaches at least 60% local picks in all three categories (music, TV, movies) in the measuring run. The threshold and the measured counts live in `config/gate.json`. `npm run measure` writes that file: it checks every Qloo candidate (top 15) per city and category through the app's real code path, with no early stop. The server refuses non-live cities (403), and the UI never offers them.
+3. **Flow.** Step 1: the learner picks a language (Spanish, Korean, French). Step 2: we suggest the best live city for it (the live city with the highest weakest-category %). If no city for that language is live, we say so plainly. Favourites come after that.
+4. **Culture leads in.** Each reveal gets one line, e.g. "Seoul: dramas lead". It is computed only from Qloo's own native counts per category in the measuring run, never hand-written. Ties share the lead ("dramas and films lead").

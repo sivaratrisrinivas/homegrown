@@ -28,9 +28,9 @@ test('search without key -> 503 missing_key, no secret leakage', async () => {
   const b = await r.json(); assert.equal(b.error, 'missing_key'); assert.equal(b.key, 'QLOO_API_KEY');
 });
 test('twin TV without keys -> 503', async () => {
-  const r = await post('/api/twin', { favourites: FAVS, city: 'mexico_city', category: 'tv' });
+  const r = await post('/api/twin', { favourites: FAVS, city: 'seoul', category: 'tv' });
   assert.equal(r.status, 503); assert.equal((await r.json()).key, 'QLOO_API_KEY');
-  assert.equal((await post('/api/twin', { favourites: FAVS.slice(0, 1), city: 'mexico_city', category: 'tv' })).status, 400);
+  assert.equal((await post('/api/twin', { favourites: FAVS.slice(0, 1), city: 'seoul', category: 'tv' })).status, 400);
   assert.equal((await fetch(base + '/api/twin')).status, 405);
 });
 test('feedback validates and separates not_local from not_my_taste', async () => {

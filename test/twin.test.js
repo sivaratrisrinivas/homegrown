@@ -55,7 +55,7 @@ test('music: genre tag filter + MusicBrainz country', async () => {
   assert.deepEqual(r.picks.map((p) => p.title), ['Café Tacvba']);
   assert.equal(r.picks[0].preview.url, 'https://p.m4a');
   assert.match(r.picks[0].why.text, /Radiohead/);
-  assert.equal(qcalls[0].extra['filter.tags'], 'urn:tag:genre:music:latin');
+  assert.equal(qcalls[0].extra['filter.tags'], 'urn:tag:genre:music:mexican');
 });
 
 test('results cached per (favourites set, city, category)', async () => {

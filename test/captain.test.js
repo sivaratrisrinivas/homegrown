@@ -123,3 +123,29 @@ test('measure script covers every configured city x tv, movie, music', () => {
   const src = readFileSync('scripts/measure.mjs', 'utf8');
   assert.match(src, /Object\.keys\(CITIES\)/); assert.match(src, /CATEGORIES/);
 });
+
+test('music tags are the Qloo tag ids found via /v2/tags (see docs/qloo-music-tags.md)', () => {
+  const want = { mexico_city: 'mexican', madrid: 'spanish', buenos_aires: 'argentine', seoul: 'k_pop', paris: 'french', chennai: 'tamil' };
+  for (const [id, tag] of Object.entries(want)) assert.equal(CITIES[id].musicTag, tag);
+  const doc = readFileSync('docs/qloo-music-tags.md', 'utf8');
+  for (const tag of Object.values(want)) assert.match(doc, new RegExp(`urn:tag:genre:music:${tag}\\b`));
+});
+
+test('measure retries MusicBrainz errors and keeps leftover errors out of the denominator; app stays strict', async () => {
+  const names = ['A', 'B', 'C', 'D'].map((n, i) => ({ id: 'q' + i, name: n, tags: [] }));
+  const fails = { A: 1, B: 9 }; const calls = {};
+  const mb = { searchArtist: async (n) => {
+    calls[n] = (calls[n] || 0) + 1;
+    if (calls[n] <= (fails[n] || 0)) { const e = new Error('x'); e.status = 502; throw e; }
+    return [{ id: n, name: n, score: 100, country: n === 'D' ? 'US' : 'KR' }];
+  } };
+  const mk = () => createTwinService({ qloo: { insights: async () => names }, tmdb: {}, mb, itunes: { previewForArtist: async () => null } });
+  const waits = [];
+  const m = await mk().measure({ favourites: FAVS, cityId: 'seoul', category: 'music', sleep: async (ms) => waits.push(ms) });
+  assert.deepEqual([m.accepted, m.seen, m.errors, m.pct], [2, 3, 1, 67], 'A recovered on retry, B errored out, D not native');
+  assert.deepEqual(waits.slice(0, 3), [1100, 1100, 2200]);
+  for (const k in calls) delete calls[k];
+  const app = await mk().category({ favourites: FAVS, cityId: 'seoul', category: 'music' });
+  assert.equal(calls.A, 1, 'no retry at runtime');
+  assert.ok(app.rejected?.some?.((r) => r.reason === 'verify_error') ?? true);
+});

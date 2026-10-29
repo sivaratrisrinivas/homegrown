@@ -15,7 +15,7 @@ Deployable as-is on Vercel Hobby: `public/` is static and `api/*.js` are Node fu
 
 | Var | Needed for |
 |---|---|
-| `QLOO_API_KEY` | typeahead and all four categories |
+| `QLOO_API_KEY` | typeahead and all three categories |
 | `TMDB_API_KEY` | show and film origin checks and where-to-watch (v3 key or v4 read token) |
 
 When a key is missing, the API returns `503 {"error":"missing_key","key":"..."}` and the UI says so. `/api/health` reports only whether each key is present.
@@ -28,6 +28,10 @@ When a key is missing, the API returns `503 {"error":"missing_key","key":"..."}`
 - Each request logs its native rate per category (candidates checked, accepted, %), with no secrets or user text.
 - Results are cached in memory per (favourites set, city, category) for 7 days.
 
+## Deployment
+
+`vercel.json` sets `maxDuration: 60` for `api/twin.js`. Vercel Hobby with Fluid compute (the default) allows up to 300 s, so 60 s fits; the request deadlines (45 s / 50 s) keep each call inside it.
+
 ## Deviations from the design brief
 
-- **Qloo 429 backoff.** The brief ([docs/design-brief.md](docs/design-brief.md)) says 20 s, then 40 s, then 80 s, max 3 tries. We keep calls about 7 s apart, honour `Retry-After`, and otherwise back off 14 s, 28 s, then 56 s, each capped at 30 s (`QLOO_MAX_BACKOFF_MS`). Retries also stop at a request deadline fixed when the request arrives (50 s for Qloo, 45 s for verification). An 80 s wait cannot fit inside a 60 s serverless function, so the request returns 429/504 instead of hanging.
+- **Qloo 429 backoff.** The brief ([docs/design-brief.md](docs/design-brief.md)) says 20 s, then 40 s, then 80 s, max 3 tries. We keep calls about 7 s apart, honour `Retry-After`, and otherwise back off 14 s, 28 s, then 30 s (capped by `QLOO_MAX_BACKOFF_MS`). Retries also stop at a request deadline fixed when the request arrives (50 s for Qloo, 45 s for verification). An 80 s wait cannot fit inside a 60 s serverless function, so the request returns 429/504 instead of hanging.

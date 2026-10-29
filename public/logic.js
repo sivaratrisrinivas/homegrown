@@ -79,3 +79,6 @@ export async function gatedIfCurrent(gate, isCurrent, send) {
   const r = await gate(() => (isCurrent() ? send() : SKIP));
   return r === SKIP ? { ok: false, stale: true, body: {} } : r;
 }
+
+// Incomplete answers (a check errored or hit the deadline) are not memoised, so a retry asks again.
+export const shouldMemoTwin = (r) => Boolean(r?.ok && !r.body?.incomplete);

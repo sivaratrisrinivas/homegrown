@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey, runCategories, gatedIfCurrent } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin } from './logic.js';
 
 const CITIES = [
   { id: 'mexico_city', local: 'Ciudad de México', name: 'Mexico City', accent: '#E4007C', header: 'Tu yo chilango', flag: '🇲🇽' },
@@ -14,7 +14,7 @@ async function qlooPost(body, isCurrent = () => true) {
   const k = twinClientKey(body.favourites, body.city, body.category, body.userCountry);
   const hit = twinMemo.get(k); if (hit) return hit;
   const r = await gatedIfCurrent(qlooGate, isCurrent, () => post('/api/twin', body));
-  if (r.ok) twinMemo.set(k, r);
+  if (shouldMemoTwin(r)) twinMemo.set(k, r);
   return r;
 }
 const S = { favs: [], city: null, results: {}, sound: false };

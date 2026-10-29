@@ -124,10 +124,9 @@ async function morph() {
     for (const p of S.results[cat].picks) if (flipped < rows.length) rows[flipped++].flipTo(p.title);
     if (revealEls) updateReveal();
   };
-  // Podcasts don't touch Qloo, so they run alongside; Qloo categories go one at a time (server spaces them ~7 s).
-  const podcastP = post('/api/twin', { ...base, category: 'podcast' }).then((r) => land('podcast', r));
+  // Every category is Qloo-backed, so they go one at a time through the 7 s browser gate.
   const qlooP = (async () => { for (const cat of QLOO_ORDER) land(cat, await qlooPost({ ...base, category: cat })); })();
-  const all = Promise.all([podcastP, qlooP]);
+  const all = qlooP;
   await Promise.race([all, new Promise((r) => setTimeout(r, MORPH_BUDGET_MS))]);
   if (!current()) return;
   hdr.textContent = c.header; hdr.classList.toggle('ko', c.id === 'seoul');
@@ -139,9 +138,8 @@ async function morph() {
 let revealEls = null;
 
 function pickCard(p, hero = false) {
-  const kind = { tv: 'Show', music: 'Band', podcast: 'Podcast', place: 'Place' }[p.category];
+  const kind = { tv: 'Show', movie: 'Film', music: 'Band' }[p.category];
   const link = p.watch?.url ? h('a', { class: 'btn', href: p.watch.url, target: '_blank', rel: 'noopener', onclick: () => track({ event: 'tap', action: 'watch', pick: p.title }) }, p.watch.provider ? `Where to watch · ${p.watch.provider}` : 'Where to watch')
-    : p.listen ? h('a', { class: 'btn ghost', href: p.listen, target: '_blank', rel: 'noopener', onclick: () => track({ event: 'tap', action: 'listen', pick: p.title }) }, 'Listen')
     : p.preview ? h('audio', { controls: '', preload: 'none', src: p.preview.url, onplay: () => track({ event: 'tap', action: 'listen', pick: p.title }) }) : null;
   const flag = (f) => h('button', { onclick: (e) => { track({ event: 'flag', flag: f, pick: p.title, category: p.category }); e.target.textContent = 'Thanks'; e.target.disabled = true; } }, f === 'not_local' ? '👎 Not local' : '👎 Not my taste');
   return h('article', { class: `card ${hero ? 'hero' : ''}` },
@@ -152,7 +150,7 @@ function pickCard(p, hero = false) {
     p.author ? h('p', { class: 'muted' }, p.author) : null,
     h('p', {}, p.why?.text),
     h('div', { class: 'meta' }, p.difficulty ? h('span', {}, h('span', { class: `dot ${p.difficulty}` }), p.difficulty) : null,
-      h('span', {}, `made in ${S.city.flag}`), p.neighborhood ? h('span', {}, `📍 ${p.neighborhood}`) : null),
+      h('span', {}, `made in ${S.city.flag}`)),
     hero && p.tip ? h('p', { class: 'muted' }, p.tip) : null,
     link, p.watch ? h('p', { class: 'muted', style: 'font-size:12px' }, `Availability: ${p.watch.attribution}`) : null,
     h('div', { class: 'pick-actions' }, flag('not_local'), flag('not_my_taste')));
@@ -161,7 +159,7 @@ function pickCard(p, hero = false) {
 function picksView() {
   const { hero, rest } = rankPicks(S.results);
   const notes = Object.values(S.results).map((r) => r.note).filter(Boolean);
-  const pending = ['tv', 'music', 'podcast', 'place'].filter((k) => !S.results[k]);
+  const pending = QLOO_ORDER.filter((k) => !S.results[k]);
   return [
     hero ? pickCard(hero, true) : h('div', { class: 'card' }, h('p', {}, pending.length ? 'Still landing…' : 'Nothing passed our origin checks this time.')),
     h('div', { class: 'grid' }, rest.map((p) => pickCard(p))),
@@ -183,7 +181,7 @@ function reveal() {
     h('input', { placeholder: 'Anything off? (optional)', id: 'note' }),
     h('button', { onclick: (e) => {
       if (!rating.dataset.r) return;
-      track({ event: 'rating', rating: Number(rating.dataset.r), note: rating.querySelector('#note').value, shown: shownPicks().map((p) => ({ title: p.title, category: p.category, verification: p.verification?.source })) });
+      track({ event: 'rating', rating: Number(rating.dataset.r), note: rating.querySelector('#note').value, shown: shownPicks().map((p) => `${p.category}:${p.title}:${p.verification?.source || ''}`.slice(0, 200)) });
       e.target.textContent = 'Thank you'; e.target.disabled = true;
     } }, 'Send'));
   const others = CITIES.filter((c) => c.id !== S.city.id);

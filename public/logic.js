@@ -2,13 +2,13 @@
 export const PROMPTS = [
   { kind: 'show', label: "A show you'd rewatch" },
   { kind: 'band', label: 'A band you always come back to' },
-  { kind: 'place', label: 'A place you love to eat' },
+  { kind: 'movie', label: 'A film you could quote' },
   { kind: 'book', label: 'A book you pressed on a friend' },
   { kind: 'any', label: 'Wildcard: anything you love' },
 ];
 export const MIN_FAVS = 3, MAX_FAVS = 5;
 export const canSkip = (n) => n >= MIN_FAVS && n < MAX_FAVS;
-export const QLOO_ORDER = ['tv', 'music', 'place'];
+export const QLOO_ORDER = ['tv', 'movie', 'music'];
 export const MORPH_BUDGET_MS = 8000;
 
 export const FLAP_CHARS = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -24,9 +24,9 @@ export function flapSteps(from, to, max = 8) {
 export const padTo = (s, n) => [...String(s)].slice(0, n).concat(Array(Math.max(0, n - [...String(s)].length)).fill(' '));
 
 export function rankPicks(byCat) {
-  // Hero = first TV pick; then 2nd show, band, podcast, place.
+  // Hero = first show; then 2nd show, film, band.
   const tv = byCat.tv?.picks || [];
-  const order = [tv[0], tv[1], byCat.music?.picks?.[0], byCat.podcast?.picks?.[0], byCat.place?.picks?.[0]].filter(Boolean);
+  const order = [tv[0], tv[1], byCat.movie?.picks?.[0], byCat.music?.picks?.[0]].filter(Boolean);
   return { hero: order[0] || null, rest: order.slice(1) };
 }
 export function userCountryFromLocale(locale) {

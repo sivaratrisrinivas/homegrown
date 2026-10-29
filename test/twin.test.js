@@ -7,7 +7,7 @@ import { normaliseEntity } from '../lib/qloo.js';
 import { fakeFetch, json, fixture, FAVS } from './helpers.js';
 
 const tmdbFix = fixture('tmdb_search');
-function svc({ qlooEntities = {}, mbArtists = {}, podcasts = [], feeds = {}, cache } = {}) {
+function svc({ qlooEntities = {}, mbArtists = {}, cache } = {}) {
   const qcalls = [];
   const qloo = { insights: async (a) => { qcalls.push(a); return (qlooEntities[a.type] || []).map(normaliseEntity); } };
   const tmdb = createTmdb({ env: { TMDB_API_KEY: 'k' }, fetch: fakeFetch([
@@ -15,7 +15,7 @@ function svc({ qlooEntities = {}, mbArtists = {}, podcasts = [], feeds = {}, cac
     ['/watch/providers', { results: { US: { link: 'https://w', flatrate: [{ provider_name: 'Netflix' }] } } }],
   ]) });
   const mb = { searchArtist: async (n) => mbArtists[n] || [] };
-  const itunes = { searchPodcasts: async () => podcasts, feedLanguage: async (u) => feeds[u] ?? null, previewForArtist: async () => ({ url: 'https://p.m4a' }) };
+  const itunes = { previewForArtist: async () => ({ url: 'https://p.m4a' }) };
   return { s: createTwinService({ qloo, tmdb, mb, itunes, cache }), qcalls };
 }
 const base = { favourites: FAVS, cityId: 'mexico_city' };
@@ -56,32 +56,6 @@ test('music: genre tag filter + MusicBrainz country', async () => {
   assert.equal(r.picks[0].preview.url, 'https://p.m4a');
   assert.match(r.picks[0].why.text, /Radiohead/);
   assert.equal(qcalls[0].extra['filter.tags'], 'urn:tag:genre:music:latin');
-});
-
-test('podcast: feed language must match', async () => {
-  const { s } = svc({
-    podcasts: [
-      { collectionId: 1, collectionName: 'English Pod', feedUrl: 'f1', genres: ['True Crime'] },
-      { collectionId: 2, collectionName: 'Leyendas Legendarias', feedUrl: 'f2', genres: ['Comedy'], collectionViewUrl: 'https://apple/2' },
-    ],
-    feeds: { f1: 'en', f2: 'es-mx' },
-  });
-  const r = await s.category({ ...base, category: 'podcast' });
-  assert.deepEqual(r.picks.map((p) => p.title), ['Leyendas Legendarias']);
-  assert.equal(r.picks[0].listen, 'https://apple/2');
-  const { s: none } = svc({ podcasts: [{ collectionId: 1, collectionName: 'E', feedUrl: 'f1' }], feeds: { f1: 'en' } });
-  const r0 = await none.category({ ...base, category: 'podcast' });
-  assert.equal(r0.picks.length, 0); assert.ok(r0.note);
-});
-
-test('place: location filter, chains and out-of-country dropped', async () => {
-  const { s, qcalls } = svc({ qlooEntities: { 'urn:entity:place': [
-    { entity_id: 'p1', name: 'Starbucks', properties: { address: 'Reforma, CDMX, Mexico' } },
-    { entity_id: 'p2', name: 'Contramar', properties: { address: 'Durango 200, CDMX, Mexico', neighborhood: 'Roma Norte' } },
-  ] } });
-  const r = await s.category({ ...base, category: 'place' });
-  assert.deepEqual(r.picks.map((p) => [p.title, p.neighborhood]), [['Contramar', 'Roma Norte']]);
-  assert.equal(qcalls[0].extra['filter.location.query'], 'Mexico City');
 });
 
 test('results cached per (favourites set, city, category)', async () => {

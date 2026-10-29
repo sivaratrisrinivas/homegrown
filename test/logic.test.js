@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { PROMPTS, canSkip, flapSteps, padTo, rankPicks, userCountryFromLocale } from '../public/logic.js';
 import { sharedTags, whyLine } from '../lib/why.js';
 
-test('prompts rotate show, band, place, book, wildcard; skip only after 3', () => {
-  assert.deepEqual(PROMPTS.map((p) => p.kind), ['show', 'band', 'place', 'book', 'any']);
+test('prompts rotate show, band, film, book, wildcard; skip only after 3', () => {
+  assert.deepEqual(PROMPTS.map((p) => p.kind), ['show', 'band', 'movie', 'book', 'any']);
   assert.deepEqual([0, 1, 2, 3, 4, 5].map(canSkip), [false, false, false, true, true, false]);
 });
 test('split-flap steps land on target', () => {
@@ -13,9 +13,9 @@ test('split-flap steps land on target', () => {
   assert.equal(flapSteps('A', 'Z', 5).at(-1), 'Z');
   assert.deepEqual(padTo('ab', 4), ['a', 'b', ' ', ' ']);
 });
-test('rankPicks: hero is top show, then show/band/podcast/place', () => {
-  const r = rankPicks({ tv: { picks: [{ t: 1 }, { t: 2 }] }, music: { picks: [{ t: 3 }] }, podcast: { picks: [] }, place: { picks: [{ t: 5 }] } });
-  assert.deepEqual(r.hero, { t: 1 }); assert.deepEqual(r.rest.map((x) => x.t), [2, 3, 5]);
+test('rankPicks: hero is top show, then show/film/band', () => {
+  const r = rankPicks({ tv: { picks: [{ t: 1 }, { t: 2 }] }, movie: { picks: [{ t: 3 }] }, music: { picks: [{ t: 4 }] }, place: { picks: [{ t: 5 }] } });
+  assert.deepEqual(r.hero, { t: 1 }); assert.deepEqual(r.rest.map((x) => x.t), [2, 3, 4]);
   assert.equal(rankPicks({}).hero, null);
 });
 test('locale -> country', () => { assert.equal(userCountryFromLocale('en-IN'), 'IN'); assert.equal(userCountryFromLocale('fr'), 'US'); });

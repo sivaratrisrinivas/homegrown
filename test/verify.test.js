@@ -2,8 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTmdb, verifyShow, showDifficulty, pickWatchLink } from '../lib/tmdb.js';
 import { createMusicBrainz, verifyArtist, MB_USER_AGENT } from '../lib/musicbrainz.js';
-import { parseFeedLanguage, podcastDifficulty, createItunes } from '../lib/itunes.js';
-import { verifyPlace, isChain } from '../lib/places.js';
+import { createItunes } from '../lib/itunes.js';
 import { CITIES } from '../lib/cities.js';
 import { fakeFetch, json, fixture } from './helpers.js';
 
@@ -59,22 +58,9 @@ test('MusicBrainz: User-Agent, <=1 req/s, country check', async () => {
   assert.ok(sleeps.length >= 4 && sleeps.every((s) => s >= 1000), 'spaced at least 1 s');
 });
 
-test('iTunes: feed language parse, difficulty, search params', async () => {
-  assert.equal(parseFeedLanguage('<rss><channel><language>es-MX</language>'), 'es-mx');
-  assert.equal(parseFeedLanguage('<rss/>'), null);
-  assert.equal(parseFeedLanguage('<language><![CDATA[ko]]></language>'), 'ko');
-  assert.equal(podcastDifficulty(['News']), 'hard'); assert.equal(podcastDifficulty(['Fiction']), 'easy'); assert.equal(podcastDifficulty(['Music']), 'medium');
-  const f = fakeFetch([['itunes.apple.com', { results: [{ collectionId: 1 }] }]]);
-  await createItunes({ fetch: f }).searchPodcasts('crime', 'mx');
+test('iTunes: preview search params', async () => {
+  const f = fakeFetch([['itunes.apple.com', { results: [{ previewUrl: 'https://p', trackName: 'T' }] }]]);
+  assert.deepEqual(await createItunes({ fetch: f }).previewForArtist('IU', 'kr'), { url: 'https://p', track: 'T' });
   const u = new URL(f.calls[0].url);
-  assert.equal(u.searchParams.get('media'), 'podcast'); assert.equal(u.searchParams.get('country'), 'mx');
-});
-
-test('places: chains dropped, country checked', () => {
-  assert.equal(isChain('Starbucks'), true); assert.equal(isChain('Contramar'), false);
-  assert.equal(verifyPlace({ name: 'Contramar', address: 'Durango 200, Roma Nte., CDMX, Mexico' }, MX).ok, true);
-  assert.equal(verifyPlace({ name: 'Contramar', countryCode: 'mx' }, MX).ok, true);
-  assert.equal(verifyPlace({ name: 'Joe', address: 'Austin, TX, USA' }, MX).ok, false);
-  assert.equal(verifyPlace({ name: 'Starbucks', countryCode: 'MX' }, MX).reason, 'chain');
-  assert.equal(verifyPlace({ name: 'X' }, MX).reason, 'no_address');
+  assert.equal(u.searchParams.get('media'), 'music'); assert.equal(u.searchParams.get('country'), 'kr');
 });

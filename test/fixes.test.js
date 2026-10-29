@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { createTmdb, verifyShow } from '../lib/tmdb.js';
 import { createQloo, QLOO_MAX_BACKOFF_MS } from '../lib/qloo.js';
 import { createItunes } from '../lib/itunes.js';
-import { verifyPlace } from '../lib/places.js';
 import { createTwinService } from '../lib/twin.js';
 import { createCache } from '../lib/cache.js';
 import { normaliseEntity } from '../lib/qloo.js';
@@ -24,20 +23,6 @@ test('Qloo backoff is capped', async () => {
   const f = fakeFetch([['/search', () => (++n === 1 ? json({}, 429, { 'retry-after': '3600' }) : json(fixture('qloo_search')))]]);
   await createQloo({ fetch: f, env: { QLOO_API_KEY: 'k' }, sleep: async (ms) => sleeps.push(ms), gapMs: 0 }).search('a');
   assert.ok(sleeps.every((s) => s <= QLOO_MAX_BACKOFF_MS)); assert.ok(sleeps.includes(QLOO_MAX_BACKOFF_MS));
-});
-
-test('iTunes: Range retry gets its own timeout signal', async () => {
-  const signals = [];
-  const f = async (u, init) => { signals.push(init.signal); return signals.length === 1 ? new Response('', { status: 500 }) : new Response('<language>fr</language>'); };
-  assert.equal(await createItunes({ fetch: f, timeoutMs: 1000 }).feedLanguage('http://feed'), 'fr');
-  assert.equal(signals.length, 2); assert.notEqual(signals[0], signals[1]); assert.equal(signals[1].aborted, false);
-});
-
-test('places: "New Mexico" does not pass for Mexico City', () => {
-  assert.equal(verifyPlace({ name: 'Taco Hut', address: '1 Main St, Santa Fe, New Mexico 87501' }, MX).ok, false);
-  assert.equal(verifyPlace({ name: 'Taco Hut', address: 'Albuquerque, NM, USA' }, MX).ok, false);
-  assert.equal(verifyPlace({ name: 'Contramar', address: 'Durango 200, Roma Nte., 06700 Ciudad de México, CDMX, Mexico' }, MX).ok, true);
-  assert.equal(verifyPlace({ name: 'Le Comptoir', address: '9 Carrefour de l\'Odéon, 75006 Paris, France' }, CITIES.paris).ok, true);
 });
 
 function svc(tmdbFetch, cache) {

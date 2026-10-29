@@ -5,7 +5,7 @@ import { createCache } from '../lib/cache.js';
 // Short-lived typeahead cache by (q, kind): saves scarce Qloo calls while the user types.
 export const searchCache = createCache({ ttlMs: 10 * 60 * 1000, max: 1000 });
 
-// GET /api/search?q=...&kind=show|band|place|book|any  (Qloo typeahead)
+// GET /api/search?q=...&kind=show|movie|band|book|any  (Qloo typeahead)
 export default async function handler(req, res) {
   try {
     const q = String(req.query?.q || '').trim().slice(0, 100);

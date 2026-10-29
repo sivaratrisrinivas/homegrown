@@ -43,26 +43,9 @@ test('music: deadline and verified-candidate cap', async () => {
   assert.equal(checks, 3, 'stops once past 45 s');
 });
 
-test('podcast: feeds checked in bounded parallel batches with a deadline', async () => {
-  let inflight = 0, peak = 0, t = 0;
-  const pods = Array.from({ length: 8 }, (_, i) => ({ collectionId: i, collectionName: 'P' + i, feedUrl: 'f' + i }));
-  const itunes = {
-    searchPodcasts: async () => pods,
-    feedLanguage: async (u) => { inflight++; peak = Math.max(peak, inflight); await new Promise((r) => setTimeout(r, 5)); inflight--; t += 30000; return u === 'f6' ? 'es-MX' : 'en'; },
-  };
-  const r = await createTwinService({ qloo: {}, itunes, now: () => t }).category({ ...base, category: 'podcast' });
-  assert.ok(peak > 1 && peak <= 4, `peak ${peak}`);
-  assert.equal(r.picks.length, 0, 'second batch skipped after deadline');
-  assert.equal(r.rejected.filter((x) => x.reason === 'deadline').length, 4);
-  t = 0;
-  const r2 = await createTwinService({ qloo: {}, itunes, now: () => 0 }).category({ ...base, category: 'podcast' });
-  assert.deepEqual(r2.picks.map((p) => p.title), ['P6'], 'rank order kept within batches');
-});
-
-test('iTunes search and preview time out', async () => {
+test('iTunes preview times out', async () => {
   const hang = (u, init) => new Promise((_, rej) => init.signal.addEventListener('abort', () => rej(init.signal.reason)));
   const it = createItunes({ fetch: hang, timeoutMs: 20 });
-  await assert.rejects(it.searchPodcasts('x', 'mx'), (e) => e.status === 504);
   assert.equal(await it.previewForArtist('x', 'mx'), null);
 });
 

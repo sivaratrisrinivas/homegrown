@@ -26,3 +26,8 @@ test('why-line only quotes real shared tags', () => {
   const w = whyLine(favs, { tags: [{ id: 't2', name: 'x' }] });
   assert.equal(w.grounded, false); assert.doesNotMatch(w.text, /Because/);
 });
+import { createRunGuard } from '../public/logic.js';
+test('run guard drops stale city responses', () => {
+  const g = createRunGuard(); const mx = g.start(); assert.equal(mx(), true);
+  const kr = g.start(); assert.equal(mx(), false); assert.equal(kr(), true);
+});

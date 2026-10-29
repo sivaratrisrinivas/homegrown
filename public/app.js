@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard } from './logic.js';
 
 const CITIES = [
   { id: 'mexico_city', local: 'Ciudad de México', name: 'Mexico City', accent: '#E4007C', header: 'Tu yo chilango', flag: '🇲🇽' },
@@ -85,7 +85,9 @@ function flapRow(text, width) {
   return row;
 }
 
+const runs = createRunGuard();
 async function morph() {
+  const current = runs.start(); revealEls = null;
   const c = S.city; document.documentElement.style.setProperty('--accent', c.accent);
   S.results = {};
   const width = Math.min(22, Math.max(12, ...S.favs.map((f) => f.name.length)));
@@ -97,22 +99,24 @@ async function morph() {
   const base = { favourites: S.favs.map(({ id, name, tags }) => ({ id, name, tags })), city: c.id, userCountry: userCountryFromLocale(navigator.language) };
   let flipped = 0;
   const land = (cat, r) => {
+    if (!current()) return; // a newer city run started: drop stale responses
     S.results[cat] = r.ok ? r.body : { picks: [], note: r.body.message || 'This part is unavailable right now.', error: true };
     for (const p of S.results[cat].picks) if (flipped < rows.length) rows[flipped++].flipTo(p.title);
-    renderRevealIfShown();
+    if (revealEls) updateReveal();
   };
   // Podcasts don't touch Qloo, so they run alongside; Qloo categories go one at a time (server spaces them ~7 s).
   const podcastP = post('/api/twin', { ...base, category: 'podcast' }).then((r) => land('podcast', r));
   const qlooP = (async () => { for (const cat of QLOO_ORDER) land(cat, await post('/api/twin', { ...base, category: cat })); })();
   const all = Promise.all([podcastP, qlooP]);
   await Promise.race([all, new Promise((r) => setTimeout(r, MORPH_BUDGET_MS))]);
+  if (!current()) return;
   hdr.textContent = c.header; hdr.classList.toggle('ko', c.id === 'seoul');
   await new Promise((r) => setTimeout(r, reduced ? 200 : 1200));
-  reveal(); all.then(() => { status.textContent = ''; });
+  if (!current()) return;
+  reveal();
 }
 
-let revealShown = false;
-function renderRevealIfShown() { if (revealShown) reveal(); }
+let revealEls = null;
 
 function pickCard(p, hero = false) {
   const kind = { tv: 'Show', music: 'Band', podcast: 'Podcast', place: 'Place' }[p.category];
@@ -134,35 +138,40 @@ function pickCard(p, hero = false) {
     h('div', { class: 'pick-actions' }, flag('not_local'), flag('not_my_taste')));
 }
 
-function reveal() {
-  revealShown = true;
+function picksView() {
   const { hero, rest } = rankPicks(S.results);
   const notes = Object.values(S.results).map((r) => r.note).filter(Boolean);
   const pending = ['tv', 'music', 'podcast', 'place'].filter((k) => !S.results[k]);
-  const missingKey = Object.values(S.results).find((r) => r.error);
-  const rating = h('section', { class: 'card' }, h('h3', { class: 'serif' }, 'How did we do?'),
-    h('div', { class: 'stamps', role: 'radiogroup' }, [1, 2, 3, 4, 5].map((n) => h('button', { class: 'stamp', 'aria-pressed': 'false', onclick: (e) => {
-      rating.querySelectorAll('.stamp').forEach((s) => s.setAttribute('aria-pressed', 'false')); e.currentTarget.setAttribute('aria-pressed', 'true'); rating.dataset.r = n;
-    } }, n))),
-    h('input', { placeholder: 'Anything off? (optional)', id: 'note' }),
-    h('button', { onclick: (e) => {
-      if (!rating.dataset.r) return;
-      track({ event: 'rating', rating: Number(rating.dataset.r), note: rating.querySelector('#note').value, shown: [hero, ...rest].filter(Boolean).map((p) => ({ title: p.title, category: p.category, verification: p.verification?.source })) });
-      e.target.textContent = 'Thank you'; e.target.disabled = true;
-    } }, 'Send'));
-  const others = CITIES.filter((c) => c.id !== S.city.id);
-  show(
-    h('p', { class: 'kind' }, S.city.header),
+  return [
     hero ? pickCard(hero, true) : h('div', { class: 'card' }, h('p', {}, pending.length ? 'Still landing…' : 'Nothing passed our origin checks this time.')),
     h('div', { class: 'grid' }, rest.map((p) => pickCard(p))),
     pending.length ? h('p', { class: 'muted' }, `Still flipping in: ${pending.join(', ')}…`) : null,
     notes.map((n) => h('p', { class: 'note' }, n)),
-    missingKey && !hero ? h('p', { class: 'card error' }, missingKey.note) : null,
-    rating,
+  ].flat().filter(Boolean);
+}
+// Only the picks region re-renders as categories land; the rating/note form keeps its state.
+function updateReveal() { revealEls.picks.replaceChildren(...picksView()); }
+function shownPicks() { const { hero, rest } = rankPicks(S.results); return [hero, ...rest].filter(Boolean); }
+
+function reveal() {
+  const picks = h('div', { style: 'display:flex;flex-direction:column;gap:16px' });
+  revealEls = { picks };
+  const rating = h('section', { class: 'card' }, h('h3', { class: 'serif' }, 'How did we do?'),
+    h('div', { class: 'stamps', role: 'radiogroup' }, [1, 2, 3, 4, 5].map((n) => h('button', { class: 'stamp', 'aria-pressed': 'false', onclick: (e) => {
+      rating.querySelectorAll('.stamp').forEach((x) => x.setAttribute('aria-pressed', 'false')); e.currentTarget.setAttribute('aria-pressed', 'true'); rating.dataset.r = n;
+    } }, n))),
+    h('input', { placeholder: 'Anything off? (optional)', id: 'note' }),
+    h('button', { onclick: (e) => {
+      if (!rating.dataset.r) return;
+      track({ event: 'rating', rating: Number(rating.dataset.r), note: rating.querySelector('#note').value, shown: shownPicks().map((p) => ({ title: p.title, category: p.category, verification: p.verification?.source })) });
+      e.target.textContent = 'Thank you'; e.target.disabled = true;
+    } }, 'Send'));
+  const others = CITIES.filter((c) => c.id !== S.city.id);
+  show(h('p', { class: 'kind' }, S.city.header), picks, rating,
     h('section', { class: 'card' }, h('h3', { class: 'serif' }, `Keep your ${S.city.name} self`),
       h('button', { onclick: (e) => { e.target.replaceWith(h('p', { class: 'muted' }, 'Saving with an email link is coming soon.')); } }, `Save my ${S.city.name} self`),
-      h('div', {}, others.map((c) => h('button', { class: 'ghost', onclick: () => { track({ event: 'try_city', to: c.id }); S.city = c; revealShown = false; morph(); } }, `Try ${c.name}`)))),
-  );
+      h('div', {}, others.map((c) => h('button', { class: 'ghost', onclick: () => { track({ event: 'try_city', to: c.id }); S.city = c; morph(); } }, `Try ${c.name}`)))));
+  updateReveal();
 }
 
 hello();

@@ -33,3 +33,8 @@ export function userCountryFromLocale(locale) {
   const m = /[-_]([A-Za-z]{2})\b/.exec(locale || '');
   return m ? m[1].toUpperCase() : 'US';
 }
+// Generation guard: responses from an older run (e.g. a previous city) are ignored.
+export function createRunGuard() {
+  let gen = 0;
+  return { start() { const my = ++gen; return () => my === gen; } };
+}

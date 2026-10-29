@@ -30,7 +30,7 @@ test('TV: keeps only TMDB-native, applies country filter, grounded why-line', as
   assert.equal(r.picks[1].difficulty, 'easy');
   assert.equal(r.picks[0].watch.provider, 'Netflix');
   assert.equal(r.note, null);
-  assert.equal(qcalls[0].extra['filter.release_country'], 'MX');
+  assert.equal(qcalls[0].extra['filter.release_country'], 'Mexico');
   assert.equal(qcalls[0].extra['signal.location.query'], 'Mexico City');
   assert.deepEqual(r.rejected.map((x) => x.name), ['Attack on Titan', 'Narcos']);
 });

@@ -48,7 +48,7 @@ test('podcast: feeds checked in bounded parallel batches with a deadline', async
   const pods = Array.from({ length: 8 }, (_, i) => ({ collectionId: i, collectionName: 'P' + i, feedUrl: 'f' + i }));
   const itunes = {
     searchPodcasts: async () => pods,
-    feedLanguage: async (u) => { inflight++; peak = Math.max(peak, inflight); await new Promise((r) => setTimeout(r, 5)); inflight--; t += 30000; return u === 'f6' ? 'es' : 'en'; },
+    feedLanguage: async (u) => { inflight++; peak = Math.max(peak, inflight); await new Promise((r) => setTimeout(r, 5)); inflight--; t += 30000; return u === 'f6' ? 'es-MX' : 'en'; },
   };
   const r = await createTwinService({ qloo: {}, itunes, now: () => t }).category({ ...base, category: 'podcast' });
   assert.ok(peak > 1 && peak <= 4, `peak ${peak}`);

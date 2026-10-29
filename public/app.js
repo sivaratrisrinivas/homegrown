@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey, runCategories } from './logic.js';
 
 const CITIES = [
   { id: 'mexico_city', local: 'Ciudad de México', name: 'Mexico City', accent: '#E4007C', header: 'Tu yo chilango', flag: '🇲🇽' },
@@ -125,9 +125,9 @@ async function morph() {
     if (revealEls) updateReveal();
   };
   // Every category is Qloo-backed, so they go one at a time through the 7 s browser gate.
-  const qlooP = (async () => { for (const cat of QLOO_ORDER) land(cat, await qlooPost({ ...base, category: cat })); })();
-  const all = qlooP;
-  await Promise.race([all, new Promise((r) => setTimeout(r, MORPH_BUDGET_MS))]);
+  // One failed category must not stop the ones after it.
+  const qlooP = runCategories(QLOO_ORDER, (cat) => qlooPost({ ...base, category: cat }), land);
+  await Promise.race([qlooP, new Promise((r) => setTimeout(r, MORPH_BUDGET_MS))]);
   if (!current()) return;
   hdr.textContent = c.header; hdr.classList.toggle('ko', c.id === 'seoul');
   await new Promise((r) => setTimeout(r, reduced ? 200 : 1200));
@@ -147,7 +147,6 @@ function pickCard(p, hero = false) {
     p.image && hero ? h('img', { class: 'thumb', src: p.image, alt: '' }) : null,
     h(hero ? 'h2' : 'h3', { class: S.city.id === 'seoul' ? 'ko' : '' }, p.title),
     p.englishTitle && p.englishTitle !== p.title ? h('p', { class: 'muted' }, p.englishTitle) : null,
-    p.author ? h('p', { class: 'muted' }, p.author) : null,
     h('p', {}, p.why?.text),
     h('div', { class: 'meta' }, p.difficulty ? h('span', {}, h('span', { class: `dot ${p.difficulty}` }), p.difficulty) : null,
       h('span', {}, `made in ${S.city.flag}`)),

@@ -64,3 +64,12 @@ export function createMemo() {
 }
 export const searchKey = (kind, q) => `${kind}|${q.trim().toLowerCase()}`;
 export const twinClientKey = (favs, city, category, uc) => `${city}|${category}|${uc}|${favs.map((f) => f.id).sort().join(',')}`;
+
+// Runs categories in order; a thrown request lands as {ok:false} so later categories still run.
+export async function runCategories(order, request, land) {
+  for (const cat of order) {
+    let r;
+    try { r = await request(cat); } catch { r = { ok: false, body: {} }; }
+    land(cat, r);
+  }
+}

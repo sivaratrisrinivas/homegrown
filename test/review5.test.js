@@ -60,8 +60,8 @@ test('review 5: MusicBrainz exact matches that disagree on country are ambiguous
   assert.deepEqual(await verifyArtist(mb(agree), band, MX), { ok: true, mbid: 'a' });
   const lowScore = [{ id: 'a', name: 'Molotov', score: 100, country: 'MX' }, { id: 'b', name: 'Molotov', score: 40, country: 'US' }];
   assert.equal((await verifyArtist(mb(lowScore), band, MX)).ok, true);
-  const prefer = [{ id: 'x', name: 'Molotov', score: 100 }, { id: 'y', name: 'Molotov', score: 92, country: 'MX' }];
-  assert.deepEqual(await verifyArtist(mb(prefer), band, MX), { ok: true, mbid: 'y' });
+  const prefer = [{ id: 'x', name: 'Molotov', score: 100, country: 'MX', area: { 'iso-3166-1-codes': ['MX'] } }, { id: 'y', name: 'Molotov', score: 92, country: 'MX' }];
+  assert.deepEqual(await verifyArtist(mb(prefer), band, MX), { ok: true, mbid: 'x' });
 });
 
 test('review 5: no places/podcast leftovers', () => {

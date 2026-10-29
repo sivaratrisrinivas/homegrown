@@ -59,7 +59,7 @@ test('MusicBrainz: User-Agent, <=1 req/s, country check', async () => {
 });
 
 test('iTunes: preview search params', async () => {
-  const f = fakeFetch([['itunes.apple.com', { results: [{ previewUrl: 'https://p', trackName: 'T' }] }]]);
+  const f = fakeFetch([['itunes.apple.com', { results: [{ artistName: 'IU', previewUrl: 'https://p', trackName: 'T' }] }]]);
   assert.deepEqual(await createItunes({ fetch: f }).previewForArtist('IU', 'kr'), { url: 'https://p', track: 'T' });
   const u = new URL(f.calls[0].url);
   assert.equal(u.searchParams.get('media'), 'music'); assert.equal(u.searchParams.get('country'), 'kr');

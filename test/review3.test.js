@@ -35,7 +35,7 @@ test('music: deadline and verified-candidate cap', async () => {
   const s = createTwinService({ qloo: { insights: async () => artists(10) }, mb, itunes: {}, now: () => t });
   const r = await s.category({ ...base, category: 'music' });
   assert.equal(checks, MAX_MUSIC_CHECKS);
-  assert.equal(r.rejected.filter((x) => x.reason === 'deadline').length, 10 - MAX_MUSIC_CHECKS);
+  assert.equal(r.rejected.filter((x) => x.reason === 'check_cap').length, 10 - MAX_MUSIC_CHECKS);
   t = 0; checks = 0;
   const slow = { searchArtist: async () => { checks++; t += 20000; return []; } };
   const s2 = createTwinService({ qloo: { insights: async () => artists(10) }, mb: slow, itunes: {}, now: () => t, budgetMs: 45000 });

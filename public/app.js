@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey, runCategories } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey, runCategories, gatedIfCurrent } from './logic.js';
 
 const CITIES = [
   { id: 'mexico_city', local: 'Ciudad de México', name: 'Mexico City', accent: '#E4007C', header: 'Tu yo chilango', flag: '🇲🇽' },
@@ -10,10 +10,10 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const qlooGate = createSpacer();
 const searchMemo = createMemo(), twinMemo = createMemo();
 // Qloo-backed calls go through the 7 s gate; cached answers skip it entirely.
-async function qlooPost(body) {
+async function qlooPost(body, isCurrent = () => true) {
   const k = twinClientKey(body.favourites, body.city, body.category, body.userCountry);
   const hit = twinMemo.get(k); if (hit) return hit;
-  const r = await qlooGate(() => post('/api/twin', body));
+  const r = await gatedIfCurrent(qlooGate, isCurrent, () => post('/api/twin', body));
   if (r.ok) twinMemo.set(k, r);
   return r;
 }
@@ -126,7 +126,7 @@ async function morph() {
   };
   // Every category is Qloo-backed, so they go one at a time through the 7 s browser gate.
   // One failed category must not stop the ones after it.
-  const qlooP = runCategories(QLOO_ORDER, (cat) => qlooPost({ ...base, category: cat }), land);
+  const qlooP = runCategories(QLOO_ORDER, (cat) => qlooPost({ ...base, category: cat }, current), land);
   await Promise.race([qlooP, new Promise((r) => setTimeout(r, MORPH_BUDGET_MS))]);
   if (!current()) return;
   hdr.textContent = c.header; hdr.classList.toggle('ko', c.id === 'seoul');

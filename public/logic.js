@@ -73,3 +73,9 @@ export async function runCategories(order, request, land) {
     land(cat, r);
   }
 }
+
+// A stale city run returns SKIP inside the gate, so it spends no Qloo call and doesn't push back the next slot.
+export async function gatedIfCurrent(gate, isCurrent, send) {
+  const r = await gate(() => (isCurrent() ? send() : SKIP));
+  return r === SKIP ? { ok: false, stale: true, body: {} } : r;
+}

@@ -27,3 +27,7 @@ When a key is missing, the API returns `503 {"error":"missing_key","key":"..."}`
 - Why-lines quote a real shared Qloo tag, or fall back to a neutral "taste-matched" line.
 - Each request logs its native rate per category (candidates checked, accepted, %), with no secrets or user text.
 - Results are cached in memory per (favourites set, city, category) for 7 days.
+
+## Deviations from the design brief
+
+- **Qloo 429 backoff.** The brief ([docs/design-brief.md](docs/design-brief.md)) says 20 s, then 40 s, then 80 s, max 3 tries. We keep calls about 7 s apart, honour `Retry-After`, and otherwise back off 14 s, 28 s, then 56 s, each capped at 30 s (`QLOO_MAX_BACKOFF_MS`). Retries also stop at a request deadline fixed when the request arrives (50 s for Qloo, 45 s for verification). An 80 s wait cannot fit inside a 60 s serverless function, so the request returns 429/504 instead of hanging.

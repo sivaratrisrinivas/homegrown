@@ -41,6 +41,11 @@ export function cityForLanguage(catalogue, languageId) {
   if (!lang?.suggested) return null;
   return catalogue.cities.find((c) => c.id === lang.suggested && c.live) || null;
 }
+export function liveCitiesForLanguage(catalogue, languageId) {
+  const lang = catalogue.languages.find((l) => l.id === languageId);
+  return (lang?.liveCities || []).map((id) => catalogue.cities.find((c) => c.id === id && c.live)).filter(Boolean);
+}
+export const languageGroups = (catalogue) => ({ live: catalogue.languages.filter((l) => l.live), soon: catalogue.languages.filter((l) => !l.live) });
 export function userCountryFromLocale(locale) {
   const m = /[-_]([A-Za-z]{2})\b/.exec(locale || '');
   return m ? m[1].toUpperCase() : 'US';

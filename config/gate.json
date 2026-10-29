@@ -1,11 +1,96 @@
 {
   "threshold": 0.6,
-  "categories": ["tv", "movie", "music"],
-  "measuredAt": "2026-10-30T01:13:00+05:30",
-  "source": "Full top-10 sweep (every candidate checked) with favourites Breaking Bad, Radiohead, Parasite. Re-run with `npm run measure` (top 15) to refresh.",
+  "categories": [
+    "tv",
+    "movie",
+    "music"
+  ],
+  "measuredAt": "2026-10-29T20:13:42.860Z",
+  "source": "npm run measure: top 15 per category, every candidate checked; seeds Breaking Bad, Radiohead, Parasite",
   "results": {
-    "mexico_city": { "tv": { "seen": 10, "accepted": 7 }, "movie": { "seen": 10, "accepted": 3 }, "music": { "seen": 10, "accepted": 3 } },
-    "seoul": { "tv": { "seen": 10, "accepted": 7 }, "movie": { "seen": 10, "accepted": 8 }, "music": { "seen": 10, "accepted": 8 } },
-    "paris": { "tv": { "seen": 10, "accepted": 7 }, "movie": { "seen": 10, "accepted": 4 }, "music": { "seen": 10, "accepted": 9 } }
+    "mexico_city": {
+      "tv": {
+        "seen": 15,
+        "accepted": 9
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 6
+      },
+      "music": {
+        "seen": 15,
+        "accepted": 5
+      }
+    },
+    "madrid": {
+      "tv": {
+        "seen": 15,
+        "accepted": 13
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 12
+      },
+      "music": {
+        "seen": 15,
+        "accepted": 0
+      }
+    },
+    "buenos_aires": {
+      "tv": {
+        "seen": 11,
+        "accepted": 8
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 13
+      },
+      "music": {
+        "seen": 15,
+        "accepted": 3
+      }
+    },
+    "seoul": {
+      "tv": {
+        "seen": 15,
+        "accepted": 11
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 13
+      },
+      "music": {
+        "seen": 15,
+        "accepted": 12
+      }
+    },
+    "paris": {
+      "tv": {
+        "seen": 15,
+        "accepted": 9
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 6
+      },
+      "music": {
+        "seen": 15,
+        "accepted": 10
+      }
+    },
+    "chennai": {
+      "tv": {
+        "seen": 15,
+        "accepted": 2
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 6
+      },
+      "music": {
+        "seen": 15,
+        "accepted": 0
+      }
+    }
   }
 }

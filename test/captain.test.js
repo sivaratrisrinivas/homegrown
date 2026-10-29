@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { cityStatus, cultureLead, suggestCity, catalogue, loadGate, requireLiveCity } from '../lib/gate.js';
 import { createTwinService, WANT, SCARCE_BELOW, CANDIDATES } from '../lib/twin.js';
-import { postcardCategories, scarcePicks, cityForLanguage } from '../public/logic.js';
+import { postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from '../public/logic.js';
+import { CITIES, LANGUAGES } from '../lib/cities.js';
 import { FAVS } from './helpers.js';
 
 const r = (seen, accepted) => ({ seen, accepted });
@@ -61,7 +62,7 @@ test('captain 3: language first, then the suggested live city', () => {
   assert.equal(suggestCity(g, 'ko').city, 'seoul');
   assert.equal(suggestCity(g, 'fr').city, null);
   const cat = catalogue(g);
-  assert.deepEqual(cat.languages.map((l) => l.id), ['es', 'ko', 'fr']);
+  assert.deepEqual(cat.languages.map((l) => l.id), ['es', 'ko', 'fr', 'ta']);
   assert.equal(cityForLanguage(cat, 'ko').id, 'seoul');
   assert.equal(cityForLanguage(cat, 'fr'), null);
   const app = readFileSync('public/app.js', 'utf8');
@@ -77,4 +78,48 @@ test('captain 4: culture lead comes only from the native counts', () => {
   g.results.seoul.music = r(10, 10);
   assert.equal(cultureLead(g, 'seoul').text, 'Seoul: music leads', 'changes when the counts change');
   assert.equal(cultureLead(gate({ seoul: { tv: r(10, 0), movie: r(10, 0), music: r(10, 0) } }), 'seoul'), null);
+});
+
+const ALL = (tv, movie, music) => ({ tv: r(10, tv), movie: r(10, movie), music: r(10, music) });
+
+test('captain 5: only languages with a live city are offered; others are coming soon', () => {
+  const g = gate({ seoul: ALL(7, 8, 8), paris: ALL(7, 4, 9), chennai: ALL(9, 9, 5) });
+  const { live, soon } = languageGroups(catalogue(g));
+  assert.deepEqual(live.map((l) => l.id), ['ko']);
+  assert.deepEqual(soon.map((l) => l.id), ['es', 'fr', 'ta']);
+});
+
+test('captain 6: measured best city is the default; other live cities are one tap away', () => {
+  const g = gate({ mexico_city: ALL(7, 6, 6), madrid: ALL(9, 8, 7), buenos_aires: ALL(8, 5, 9) });
+  const cat = catalogue(g);
+  assert.equal(cityForLanguage(cat, 'es').id, 'madrid', 'highest weakest-category % wins');
+  assert.deepEqual(liveCitiesForLanguage(cat, 'es').map((c) => c.id), ['madrid', 'mexico_city']);
+  const app = readFileSync('public/app.js', 'utf8');
+  assert.match(app, /Switch to \$\{o\.name\}/);
+});
+
+test('captain 7: cities and languages are config; Chennai/Tamil is a gated candidate', () => {
+  const cfg = JSON.parse(readFileSync('config/cities.json', 'utf8'));
+  assert.deepEqual(Object.keys(CITIES), cfg.cities.map((c) => c.id));
+  assert.deepEqual(LANGUAGES, cfg.languages);
+  assert.deepEqual(Object.keys(CITIES).sort(), ['buenos_aires', 'chennai', 'madrid', 'mexico_city', 'paris', 'seoul']);
+  const ch = CITIES.chennai;
+  assert.deepEqual([ch.country, ch.language, ch.releaseCountry], ['IN', 'ta', 'India']);
+  assert.equal(cityStatus(gate({}), 'chennai').live, false, 'unmeasured city stays off');
+  assert.equal(cityStatus(gate({ chennai: ALL(6, 6, 6) }), 'chennai').live, true);
+  for (const c of cfg.cities) for (const k of ['name', 'localName', 'country', 'releaseCountry', 'countryNames', 'language', 'flag', 'accent', 'header', 'itunesCountry', 'subtitleTip']) assert.ok(c[k], `${c.id}.${k}`);
+  for (const c of cfg.cities) assert.ok(LANGUAGES.some((l) => l.id === c.language));
+  assert.doesNotMatch(readFileSync('public/app.js', 'utf8'), /const CITIES/, 'client takes cities from /api/cities');
+});
+
+test('Chennai TV: Tamil original language + IN origin passes; Telugu from IN does not', async () => {
+  const { verifyShow } = await import('../lib/tmdb.js');
+  const tmdb = (o) => ({ searchTv: async () => [{ id: 1, name: 'X', original_language: o, origin_country: ['IN'] }] });
+  assert.equal((await verifyShow(tmdb('ta'), { name: 'X' }, CITIES.chennai)).ok, true);
+  assert.equal((await verifyShow(tmdb('te'), { name: 'X' }, CITIES.chennai)).reason, 'not_native');
+});
+
+test('measure script covers every configured city x tv, movie, music', () => {
+  const src = readFileSync('scripts/measure.mjs', 'utf8');
+  assert.match(src, /Object\.keys\(CITIES\)/); assert.match(src, /CATEGORIES/);
 });

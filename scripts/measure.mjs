@@ -24,7 +24,7 @@ for (const cityId of Object.keys(CITIES)) {
   for (const category of CATEGORIES) {
     const r = await twin.measure({ favourites, cityId, category });
     results[cityId][category] = { seen: r.seen, accepted: r.accepted };
-    console.log(JSON.stringify({ city: cityId, category, seen: r.seen, accepted: r.accepted, pct: r.pct }));
+    console.log(JSON.stringify({ city: cityId, category, seen: r.seen, accepted: r.accepted, pct: r.pct, reasons: r.rejected.reduce((m, x) => ({ ...m, [x]: (m[x] || 0) + 1 }), {}) }));
   }
 }
 const gate = { ...old, measuredAt: new Date().toISOString(), source: `npm run measure: top 15 per category, every candidate checked; seeds ${SEEDS.map((s) => s[0]).join(', ')}`, results };

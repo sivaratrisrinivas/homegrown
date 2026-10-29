@@ -1,10 +1,6 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
 
-const CITIES = [
-  { id: 'mexico_city', local: 'Ciudad de México', name: 'Mexico City', accent: '#E4007C', header: 'Tu yo chilango', flag: '🇲🇽' },
-  { id: 'seoul', local: '서울', name: 'Seoul', accent: '#2E8B57', header: '서울의 너', flag: '🇰🇷' },
-  { id: 'paris', local: 'Paris', name: 'Paris', accent: '#1D4E89', header: 'Toi, version parisienne', flag: '🇫🇷' },
-];
 const app = document.getElementById('app');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const qlooGate = createSpacer();
@@ -51,9 +47,12 @@ async function pickLanguage() {
     if (!r?.languages) return show(h('p', { class: 'note' }, 'Cities are unavailable right now. Please try again in a minute.'));
     S.catalogue = r;
   }
+  // Only languages with a live city are offered; the rest are listed as coming soon.
+  const { live, soon } = languageGroups(S.catalogue);
   show(h('h2', {}, 'Which language are you learning?'),
-    h('div', { class: 'cities' }, S.catalogue.languages.map((l) => h('button', { class: 'postcard', onclick: () => { S.lang = l; suggestCity(); } },
-      h('span', { class: `serif ${l.id === 'ko' ? 'ko' : ''}` }, l.local), h('span', {}, l.name)))));
+    h('div', { class: 'cities' }, live.map((l) => h('button', { class: 'postcard', onclick: () => { S.lang = l; suggestCity(); } },
+      h('span', { class: serif(l.id) }, l.local), h('span', {}, l.name)))),
+    soon.length ? h('p', { class: 'muted' }, `Coming soon: ${soon.map((l) => l.name).join(', ')}`) : null);
 }
 
 // Step 2: we suggest the best live city for that language.
@@ -64,12 +63,17 @@ function suggestCity() {
       h('p', { class: 'muted' }, `A city opens only when at least ${Math.round(S.catalogue.threshold * 100)}% of its picks in music, TV and movies are verified local. Its city hasn't reached that yet.`),
       h('button', { class: 'ghost', onclick: pickLanguage }, 'Pick another language'));
   }
-  const c = CITIES.find((x) => x.id === live.id);
-  show(h('p', { class: 'muted' }, `For ${S.lang.name}, we suggest`),
-    h('h2', { class: `serif ${c.id === 'seoul' ? 'ko' : ''}` }, `${c.local} ${c.flag}`),
-    live.lead ? h('p', { class: 'lead' }, live.lead.text) : null,
-    h('button', { onclick: () => { S.city = c; favourite(); } }, `Go to ${c.name}`),
-    h('button', { class: 'ghost', onclick: pickLanguage }, 'Change language'));
+  // Default is the measured best city; switching to another live city is one tap.
+  const pick = (c) => {
+    const others = liveCitiesForLanguage(S.catalogue, S.lang.id).filter((x) => x.id !== c.id);
+    show(h('p', { class: 'muted' }, c.id === live.id ? `For ${S.lang.name}, we suggest` : `${S.lang.name} in`),
+      h('h2', { class: serif(c.language) }, `${c.local} ${c.flag}`),
+      c.lead ? h('p', { class: 'lead' }, c.lead.text) : null,
+      h('button', { onclick: () => { S.city = c; favourite(); } }, `Go to ${c.name}`),
+      others.length ? h('div', {}, others.map((o) => h('button', { class: 'ghost', onclick: () => pick(o) }, `Switch to ${o.name}`))) : null,
+      h('button', { class: 'ghost', onclick: pickLanguage }, 'Change language'));
+  };
+  pick(live);
 }
 
 function favourite() {
@@ -152,7 +156,7 @@ async function morph() {
   const qlooP = runCategories(QLOO_ORDER, (cat) => qlooPost({ ...base, category: cat }, current), land);
   await Promise.race([qlooP, new Promise((r) => setTimeout(r, MORPH_BUDGET_MS))]);
   if (!current()) return;
-  hdr.textContent = c.header; hdr.classList.toggle('ko', c.id === 'seoul');
+  hdr.textContent = c.header; hdr.classList.toggle('ko', c.language === 'ko');
   await new Promise((r) => setTimeout(r, reduced ? 200 : 1200));
   if (!current()) return;
   reveal();
@@ -168,7 +172,7 @@ function pickCard(p, hero = false) {
   return h('article', { class: `card ${hero ? 'hero' : ''}` },
     h('span', { class: 'kind' }, kind),
     p.image && hero ? h('img', { class: 'thumb', src: p.image, alt: '' }) : null,
-    h(hero ? 'h2' : 'h3', { class: S.city.id === 'seoul' ? 'ko' : '' }, p.title),
+    h(hero ? 'h2' : 'h3', { class: S.city.language === 'ko' ? 'ko' : '' }, p.title),
     p.englishTitle && p.englishTitle !== p.title ? h('p', { class: 'muted' }, p.englishTitle) : null,
     h('p', {}, p.why?.text),
     h('div', { class: 'meta' }, p.difficulty ? h('span', {}, h('span', { class: `dot ${p.difficulty}` }), p.difficulty) : null,
@@ -214,8 +218,7 @@ function reveal() {
       e.target.textContent = 'Thank you'; e.target.disabled = true;
     } }, 'Send'));
   // Only other live cities are offered.
-  const liveIds = new Set((S.catalogue?.cities || []).filter((c) => c.live).map((c) => c.id));
-  const others = CITIES.filter((c) => c.id !== S.city.id && liveIds.has(c.id));
+  const others = (S.catalogue?.cities || []).filter((c) => c.live && c.id !== S.city.id);
   show(h('p', { class: 'kind' }, S.city.header), picks, rating,
     h('section', { class: 'card postcard-summary' }, h('h3', { class: 'serif' }, `Keep your ${S.city.name} self`),
       h('button', { onclick: (e) => { e.target.replaceWith(h('p', { class: 'muted' }, 'Saving with an email link is coming soon.')); } }, `Save my ${S.city.name} self`),

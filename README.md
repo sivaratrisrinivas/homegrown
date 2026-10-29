@@ -32,7 +32,8 @@ When a key is missing, the API returns `503 {"error":"missing_key","key":"..."}`
 
 - **Picks:** 5 strict-local picks per category from a Qloo top 15. Fewer than 3 is "scarce": the category is shown with a plain note but left off the postcard.
 - **City gate:** a city is live only with ≥ 60% local picks in TV, movies and music. See `config/gate.json`, refreshed by `npm run measure`, which needs `QLOO_API_KEY` and `TMDB_API_KEY` and takes ~3 min because Qloo calls are ~7 s apart.
-- **Flow:** language first, then the suggested city.
+- **Flow:** language first (only languages with a live city; the others are "coming soon"), then the measured best city, with a one-tap switch to other live cities.
+- **Config:** cities and languages live in `config/cities.json`. To add a city, add an entry and run `npm run measure`. Candidates: Mexico City, Madrid, Buenos Aires, Seoul, Paris, Chennai.
 - **Reveal:** one "culture leads in" line, computed from the measured native counts.
 
 ## Deployment

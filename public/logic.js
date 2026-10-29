@@ -48,12 +48,15 @@ export function createSpacer({ gapMs = CLIENT_QLOO_GAP_MS, now = () => Date.now(
     const p = chain.then(async () => {
       const wait = last + gapMs - now();
       if (wait > 0) await sleep(wait);
-      try { return await fn(); } finally { last = now(); }
+      let out = SKIP;
+      try { out = await fn(); return out; } finally { if (out !== SKIP) last = now(); }
     });
     chain = p.catch(() => {});
     return p;
   };
 }
+// Return SKIP from a gated fn when no request was sent; it then doesn't push back the next slot.
+export const SKIP = Symbol('skip');
 // Client-side memo so repeat queries, favourites and cities never re-hit the network.
 export function createMemo() {
   const m = new Map();

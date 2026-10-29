@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, createMemo, searchKey, twinClientKey } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey } from './logic.js';
 
 const CITIES = [
   { id: 'mexico_city', local: 'Ciudad de México', name: 'Mexico City', accent: '#E4007C', header: 'Tu yo chilango', flag: '🇲🇽' },
@@ -61,10 +61,11 @@ function favourite() {
       let r = searchMemo.get(sk);
       if (!r) {
         r = await qlooGate(async () => {
-          if (my !== seq) return null; // superseded while waiting for the gate: don't spend a Qloo call
+          if (my !== seq) return SKIP; // superseded while waiting for the gate: don't spend a Qloo call
           const res = await fetch(`/api/search?kind=${p.kind}&q=${encodeURIComponent(q)}`);
           return { ok: res.ok, body: await res.json().catch(() => ({})) };
         });
+        if (r === SKIP) return;
         if (r?.ok) searchMemo.set(sk, r);
       }
       if (!r || my !== seq) return;

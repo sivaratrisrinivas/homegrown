@@ -100,3 +100,11 @@ test('HG-11 India picker render: lang= on native names, no aria-disabled, polite
   assert.match(all.find((e) => e.attrs.class?.includes('india-hint')).textContent, /No film language for your state yet/);
   assert.doesNotMatch(readFileSync('public/styles.css', 'utf8').split('HG-11')[1], /opacity/);
 });
+
+test('HG-12: no hint at all when the search results include a live language', () => {
+  const g = G();
+  const p = matchState(g, 'pradesh');
+  assert.ok(p.live.length > 0 && p.unsupported.length + p.soon.length > 0, 'pradesh mixes live and waiting rows');
+  assert.equal(meanwhileHint(p), null);
+  for (const q of ['telangana', 'kerala', 'punjab']) assert.equal(meanwhileHint(matchState(g, q)), null, q);
+});

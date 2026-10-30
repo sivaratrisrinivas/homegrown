@@ -285,8 +285,35 @@ function favourite(note) {
   show(h('div', { class: 'dots-row' }, index), shelf, h('h2', { id: 'prompt' }, p.label), field, msg, sr, tryOthers, sugs,
     opts({ focus: input, still: justLanded ? '.dots-row,.shelf' : null }));
   const gen = screenGen; screenAbort = () => alt.onInput(); // this screen's generation (show() just bumped it)
-  if (justLanded && shelf.lastElementChild) { fade(shelf.lastElementChild, reduced ? T('fade') : T('d-2')); shelf.scrollLeft = shelf.scrollWidth; }
+  if (justLanded && shelf.lastElementChild) { stamp(shelf.lastElementChild); shelf.scrollLeft = shelf.scrollWidth; }
 }
+
+
+// Purposeful delight (all transform/opacity, all timed by CSS tokens, all skipped with reduced motion).
+// A ticket-stamp pop: the new favourite lands on the shelf like a stamp hitting paper.
+const stamp = (el) => (reduced ? fade(el) : el.animate([
+  { transform: 'scale(1.7) rotate(-9deg)', opacity: 0 }, { transform: 'scale(.92) rotate(2deg)', opacity: 1, offset: 0.55 },
+  { transform: 'scale(1.03) rotate(0)', opacity: 1, offset: 0.8 }, { transform: 'none', opacity: 1 }], { duration: T('d-stamp'), easing: E('out') }));
+// The city's letters settle into their slots on reveal, one by one.
+function settle(cells, after = 0) {
+  if (reduced) return;
+  cells.forEach((cell, i) => cell.animate([{ transform: 'translateY(-18px) rotateX(75deg)', opacity: 0 }, { transform: 'translateY(2px)', opacity: 1, offset: 0.7 }, { transform: 'none', opacity: 1 }],
+    { duration: T('d-settle'), delay: after + i * T('d-settle-stagger'), easing: E('reveal'), fill: 'backwards' }));
+}
+// A few sparks burst from the share button: the result is on its way.
+function sparkle(btn) {
+  if (reduced) return;
+  const host = btn.parentElement, b = btn.getBoundingClientRect(), o = host.getBoundingClientRect();
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * Math.PI * 2 + Math.random() * 0.4, d = 38 + Math.random() * 34;
+    const sp = h('i', { class: 'spark', 'aria-hidden': 'true', style: `--x:${b.left - o.left + b.width / 2}px;--y:${b.top - o.top + b.height / 2}px` });
+    host.append(sp);
+    sp.animate([{ transform: 'translate(-50%,-50%) scale(.4)', opacity: 1 }, { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d}px)) scale(1) rotate(${i * 40}deg)`, opacity: 1, offset: 0.6 },
+      { transform: `translate(calc(-50% + ${Math.cos(a) * d * 1.2}px), calc(-50% + ${Math.sin(a) * d * 1.2 + 10}px)) scale(.2)`, opacity: 0 }], { duration: T('d-sparkle'), easing: E('out') }).onfinish = () => sp.remove();
+  }
+}
+// Film frames flickering by while the matcher works.
+const frames = () => h('div', { class: 'frames', 'aria-hidden': 'true' }, h('span', {}, Array.from({ length: 24 }, () => h('i'))));
 
 // Wait for the background Qloo matches, on the board: each row's end cell flips to ✓ (or ×).
 // Favourites Qloo doesn't know go back to the favourites screen with 'Try other names'.
@@ -368,7 +395,8 @@ async function morph() {
   const rows = new Map(onBoard.map((f) => [rowKey(f), flapRow(f.name, width)]));
   for (const f of S.favs) rows.get(rowKey(f)).tick.textContent = '✓';
   const hdr = h('h2', { class: 'hdr' }, 'Matching…');
-  const board = h('div', { class: 'board' }, hdr, [...rows.values()]);
+  const strip = frames();
+  const board = h('div', { class: 'board' }, hdr, strip, [...rows.values()]);
   show(board);
   if (!(await matchFavourites(board, rows)) || !current()) return;
   hdr.textContent = 'Your favourites';
@@ -545,8 +573,18 @@ function shareBlock() {
   // iOS only lets navigator.share run inside the tap's user activation, so the postcard is drawn
   // ahead of time (when the block appears) and send() calls share with no await before it.
   let cached = null;
-  wrap.prepare = () => { const code = shareCode(); if (cached?.code === code) return; card().then((blob) => { if (blob) cached = { code, file: new File([blob], `homegrown-${c.id}.png`, { type: 'image/png' }) }; }).catch(() => {}); };
-  const send = () => {
+  wrap.prepare = () => { const code = shareCode(); if (cached?.code === code) return; card().then((blob) => { if (!blob) return; cached = { code, file: new File([blob], `homegrown-${c.id}.png`, { type: 'image/png' }) }; preview(blob); }).catch(() => {}); };
+  // The postcard flips in beside the button once it's drawn: you see what you're sending.
+  const shot = h('img', { class: 'postcard', alt: `Postcard: your ${c.name} self` });
+  const preview = (blob) => {
+    const first = !shot.src; if (shot.src) URL.revokeObjectURL(shot.src); shot.src = URL.createObjectURL(blob);
+    if (!first) return; wrap.insertBefore(shot, wrap.querySelector('.cta').nextSibling);
+    if (reduced) return;
+    shot.animate([{ transform: 'perspective(800px) translateX(40px) rotateY(-80deg) rotate(4deg)', opacity: 0 }, { transform: 'perspective(800px) translateX(-4px) rotateY(8deg) rotate(-3deg)', opacity: 1, offset: 0.7 },
+      { transform: 'perspective(800px) rotate(-2deg)', opacity: 1 }], { duration: T('d-postcard'), easing: E('reveal') });
+  };
+  const send = (e) => {
+    if (e?.currentTarget) sparkle(e.currentTarget);
     if (!canShare) return copy();
     const code = shareCode(), url = shareUrl(code);
     const file = cached?.code === code ? cached.file : null;
@@ -580,6 +618,7 @@ function reveal(fromBoard) {
     const last = board.getBoundingClientRect(); const s = first.width / last.width;
     board.animate([{ transform: `translate(${first.left - last.left}px,${first.top - last.top}px) scale(${s})` }, { transform: 'none' }], { duration: T('d-shrink'), easing: E('reveal') });
   } else if (fromBoard) fade(app.querySelector('.screen'));
+  settle([...board.querySelectorAll('.flap')], fromBoard ? T('d-shrink') * 0.6 : T('d-enter'));
   updateReveal();
 }
 
@@ -600,6 +639,7 @@ async function friendView() {
     pickCard({ ...data.hero, why: null }, c, true),
     h('div', { class: 'cta' }, h('button', { class: 'primary', onclick: find }, 'Find yours')),
     data.rows.length ? h('div', { class: 'list' }, data.rows.map((p, n) => pickRow(p, n + 1, c))) : null, opts({ anim: false, focus: board.firstChild }));
+  settle([...board.querySelectorAll('.flap')], T('d-enter'));
 }
 
 if (new URLSearchParams(location.search).has('r')) { loadCatalogue(); document.getElementById('start')?.closest('.screen')?.remove(); friendView(); } else hello();

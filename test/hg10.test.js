@@ -94,18 +94,18 @@ test('HG-10 share: navigator.share with files, then url, then Copy link + Save i
 });
 
 test('HG-10 share: send() calls navigator.share synchronously in the tap (iOS user activation)', async () => {
-  const src = app.slice(app.indexOf('  const send = () => {'), app.indexOf("  wrap.append(h('div', { class: 'cta' }"));
+  const src = app.slice(app.indexOf('  const send = (e) => {'), app.indexOf("  wrap.append(h('div', { class: 'cta' }"));
   assert.ok(src.length > 50); assert.doesNotMatch(src.split('navigator.share(')[0], /await|\.then\(/, 'nothing async before share');
   // Run the real send() body against mocks and check share was called before any microtask ran.
   const calls = []; let ticked = false;
-  const env = { canShare: true, copy: () => calls.push('copy'), shareCode: () => 'abc', shareUrl: (c) => `https://x/?r=${c}`, text: 't', track: (e) => calls.push(e.method),
+  const env = { sparkle: () => calls.push('sparkle'), canShare: true, copy: () => calls.push('copy'), shareCode: () => 'abc', shareUrl: (c) => `https://x/?r=${c}`, text: 't', track: (e) => calls.push(e.method),
     wrap: { prepare: () => calls.push('prepare'), append: () => calls.push('fallback') }, fallback: { isConnected: false },
     navigator: { canShare: () => true, share: (d) => { calls.push(ticked ? 'share-late' : d.files ? 'share-files' : 'share-url'); return Promise.resolve(); } } };
   const make = (cached) => new Function(...Object.keys(env), 'cached', `${src.replace('  const send = ', 'return ')}`)(...Object.values(env), cached);
   Promise.resolve().then(() => { ticked = true; });
-  const p1 = make({ code: 'abc', file: { name: 'f.png' } })(); assert.equal(calls[0], 'share-files'); await p1;
+  const p1 = make({ code: 'abc', file: { name: 'f.png' } })({ currentTarget: {} }); assert.deepEqual(calls.slice(0, 2), ['sparkle', 'share-files'], 'sparkle is synchronous DOM work, share still runs in the tap'); await p1;
   ticked = false; Promise.resolve().then(() => { ticked = true; });
-  calls.length = 0; const p2 = make(null)(); assert.equal(calls[0], 'share-url', 'no cached card yet: share the link now, draw for next time'); assert.ok(calls.includes('prepare')); await p2;
+  calls.length = 0; const p2 = make(null)(undefined); assert.equal(calls[0], 'share-url', 'no cached card yet: share the link now, draw for next time'); assert.ok(calls.includes('prepare')); await p2;
   assert.ok(calls.includes('link'));
 });
 
@@ -164,4 +164,11 @@ test('HG-10 journey: back goes one step; exactly 3 favourites; HG-5 data model i
   assert.match(app, /settleFavourites\(S\.favs, S\.pending, matches\)/);
   assert.match(app, /const key = `\$\{pick\}\|\$\{S\.pending\.length \+ S\.favs\.length\}`/);
   assert.match(app, /results\.slice\(0, 3\)/);
+});
+
+test('HG-10 polish: purposeful animations, token-timed, reduced-motion safe', () => {
+  for (const f of ['const stamp = (el) => (reduced ? fade(el)', 'function settle(cells', 'if (reduced) return;', 'function sparkle(btn)', "h('div', { class: 'frames', 'aria-hidden': 'true' }", 'const preview = (blob) =>', 'stamp(shelf.lastElementChild)', 'sparkle(e.currentTarget)', "settle([...board.querySelectorAll('.flap')]"]) assert.ok(app.includes(f), f);
+  for (const t of ['d-press', 'd-stamp', 'd-settle', 'd-settle-stagger', 'd-frames', 'd-postcard', 'd-sparkle']) { assert.match(css, new RegExp(`--${t}:\\d+ms`)); assert.match(css, new RegExp(`prefers-reduced-motion:reduce\\)\\{:root\\{[^}]*--${t}:0ms`)); }
+  assert.match(css, /button:active:not\(:disabled\)\{transform:scale\(\.96\)\}/);
+  assert.match(css, /prefers-reduced-motion:reduce\)\{button:active:not\(:disabled\)\{transform:none\}\.frames>span\{animation:none\}/);
 });

@@ -227,7 +227,7 @@ test('r2 allowed words: content words removed; possessive s accepted', () => {
   const g = { favourite: 'Breaking Bad', sources: ['a chemistry teacher turns to crime, killer'] };
   for (const w of ['world', 'life', 'journey', 'gripping', 'thrilling', 'tense', 'compelling', 'caught'])
     assert.equal(validateWhy(`Like Breaking Bad, a ${w} chemistry teacher turns to crime here.`, g), null, w);
-  assert.ok(validateWhy("If you love Breaking Bad's crime, a chemistry teacher turns to the killer's crime.", g));
+  assert.ok(validateWhy("Fans of Breaking Bad's crime will like a chemistry teacher turns to the killer's crime.", g));
 });
 test('r2: a capped caller does not write the skip marker for everyone', async () => {
   const claude = mockClaude(answer(GOOD));
@@ -292,9 +292,37 @@ test("r5: curly apostrophes are normalised in the favourite and the line; 'll/'r
   assert.ok(validateWhy("Fans of Schindler's List will like this crime drama about revenge here.", g));
   const g2 = { favourite: "Schindler's List", sources: ['A crime drama about revenge.'] };
   assert.ok(validateWhy('Fans of Schindler’s List will like this crime drama about revenge here.', g2));
-  assert.ok(validateWhy("Fans of Breaking Bad'll like this crime drama, they're into revenge.", { favourite: 'Breaking Bad', sources: ['A crime drama about revenge.'] }));
+  assert.equal(validateWhy("Fans of Breaking Bad'll like this crime drama, they're into revenge.", { favourite: 'Breaking Bad', sources: ['A crime drama about revenge.'] }), null);
 });
 test('r5: system prompt bans contractions and first person', async () => {
   const { WHY_SYSTEM } = await import('../lib/anthropic.js');
   assert.match(WHY_SYSTEM, /No contractions, no first person/);
+});
+
+const R6 = { favourite: 'Breaking Bad', sources: ['A crime drama about a killer and revenge.'] };
+test("r6: 'than' and 'if' reject the line", () => {
+  assert.equal(validateWhy('Like Breaking Bad, this crime drama is darker than most revenge tales here.', R6), null);
+  assert.equal(validateWhy('If you liked Breaking Bad, this crime drama about revenge is here.', R6), null);
+});
+test('r6: no contractions; only a possessive on a grounded word or the favourite', () => {
+  for (const line of ["Like Breaking Bad, it's a crime drama about a killer and revenge.", "Like Breaking Bad, they'd like this crime drama about killer revenge.",
+    "Like Breaking Bad, you'll like this crime drama about killer revenge.", "Like Breaking Bad, they've a crime drama about killer revenge here.",
+    "Like Breaking Bad, they're in a crime drama about killer revenge.", "Like Breaking Bad, I'm into this crime drama about killer revenge.",
+    "Like Breaking Bad, this crime drama is about someone's killer revenge."])
+    assert.equal(validateWhy(line, R6), null, line);
+  assert.ok(validateWhy("Like Breaking Bad, this crime drama follows the killer's revenge here.", R6));
+  assert.ok(validateWhy("Breaking Bad's fans will like this crime drama about killer revenge.", R6));
+  assert.ok(validateWhy("Breaking Bad’s fans will like this crime drama about killer revenge.", R6));
+});
+test('r6: colon, brackets and dashes are rejected outside the favourite', () => {
+  for (const line of ['Like Breaking Bad: this crime drama is about a killer and revenge.', 'Like Breaking Bad, this crime drama (about a killer) is revenge.',
+    'Like Breaking Bad, this crime drama — about a killer and revenge here.', 'Like Breaking Bad, this crime drama – about a killer and revenge here.'])
+    assert.equal(validateWhy(line, R6), null, line);
+  assert.ok(validateWhy('Fans of Star Wars: Andor will like this crime drama about a killer and revenge.', { ...R6, favourite: 'Star Wars: Andor' }));
+});
+test('r6: pick ids must look like p<number> before they go in an attribute', async () => {
+  const { buildContent } = await import('../lib/whyllm.js');
+  const p = { favourite: 'X', tags: [], title: 'T', genres: [], overview: 'o' };
+  assert.match(buildContent([{ input: { ...p, id: 'p0' } }]), /<pick id="p0">/);
+  assert.throws(() => buildContent([{ input: { ...p, id: 'p0"><x' } }]));
 });

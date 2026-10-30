@@ -24,6 +24,16 @@
       "id": "hi",
       "name": "Hindi",
       "local": "हिन्दी"
+    },
+    {
+      "id": "te",
+      "name": "Telugu",
+      "local": "తెలుగు"
+    },
+    {
+      "id": "bn",
+      "name": "Bengali",
+      "local": "বাংলা"
     }
   ],
   "cities": [
@@ -231,6 +241,87 @@
         "pakistani"
       ],
       "screenTag": "urn:tag:keyword:qloo:bollywood"
+    },
+    {
+      "id": "hyderabad",
+      "name": "Hyderabad",
+      "localName": "హైదరాబాద్",
+      "country": "IN",
+      "releaseCountry": "India",
+      "flag": "🇮🇳",
+      "itunesCountry": "in",
+      "countryNames": [
+        "india",
+        "hyderabad",
+        "telangana",
+        "andhra pradesh",
+        "భారతదేశం",
+        "హైదరాబాద్"
+      ],
+      "language": "te",
+      "accent": "#8E44AD",
+      "header": "హైదరాబాద్ నువ్వు",
+      "musicTag": "tollywood",
+      "subtitleTip": "Start with subtitles in Telugu.",
+      "musicLanguageTags": [
+        "telugu",
+        "tollywood"
+      ],
+      "musicConflictTags": [
+        "hindi",
+        "bollywood",
+        "tamil",
+        "kollywood",
+        "bengali",
+        "bangla",
+        "malayalam",
+        "kannada",
+        "punjabi",
+        "bangladesh",
+        "bangladeshi",
+        "pakistani"
+      ],
+      "screenTag": "urn:tag:keyword:qloo:telugu_cinema"
+    },
+    {
+      "id": "kolkata",
+      "name": "Kolkata",
+      "localName": "কলকাতা",
+      "country": "IN",
+      "releaseCountry": "India",
+      "flag": "🇮🇳",
+      "itunesCountry": "in",
+      "countryNames": [
+        "india",
+        "kolkata",
+        "calcutta",
+        "west bengal",
+        "ভারত",
+        "কলকাতা"
+      ],
+      "language": "bn",
+      "accent": "#B22222",
+      "header": "কলকাতার তুমি",
+      "musicTag": "bengali",
+      "subtitleTip": "Start with subtitles in Bengali.",
+      "musicLanguageTags": [
+        "bengali",
+        "bangla"
+      ],
+      "musicConflictTags": [
+        "hindi",
+        "bollywood",
+        "tamil",
+        "kollywood",
+        "telugu",
+        "malayalam",
+        "kannada",
+        "punjabi",
+        "bangladesh",
+        "bangladeshi",
+        "pakistani"
+      ],
+      "screenTag": "urn:tag:keyword:qloo:bengali_cinema"
     }
   ]
 }

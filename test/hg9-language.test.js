@@ -5,7 +5,8 @@ import { createCache } from '../lib/cache.js';
 import { musicLanguageSignal } from '../lib/musicbrainz.js';
 import { verifyShow, verifyMovie } from '../lib/tmdb.js';
 import { CITIES, LANGUAGES } from '../lib/cities.js';
-import { cityStatus, loadGate } from '../lib/gate.js';
+import { cityStatus, loadGate, liveCategories, requireLiveCategory } from '../lib/gate.js';
+import { retryable } from '../lib/qloo.js';
 import { FAVS } from './helpers.js';
 
 const g = (slug) => ({ id: `urn:tag:genre:music:${slug}`, name: slug });
@@ -87,10 +88,10 @@ test('HG-9 gate: a tiny language-filtered pool (2/2) is not enough to go live', 
   assert.equal(cityStatus(g, 'x').live, false); assert.equal(cityStatus(g, 'y').live, true);
 });
 
-test('HG-9 measured gate: all configured cities live; each category has >= minSeen and records languageShare', () => {
+test('HG-9 measured gate: all 9 cities live on movies; each live category has >= minSeen and records languageShare', () => {
   const g = loadGate();
-  for (const id of ['mexico_city', 'madrid', 'buenos_aires', 'seoul', 'paris', 'chennai', 'mumbai']) assert.equal(cityStatus(g, id).live, true, id);
-  for (const [id, res] of Object.entries(g.results)) for (const k of g.categories) {
+  for (const id of ['mexico_city', 'madrid', 'buenos_aires', 'seoul', 'paris', 'chennai', 'mumbai', 'hyderabad', 'kolkata']) assert.equal(cityStatus(g, id).live, true, id);
+  for (const [id, res] of Object.entries(g.results)) for (const k of liveCategories(g)) {
     assert.ok(res[k].seen >= g.minSeen, `${id}.${k}`);
     assert.equal(res[k].languageShare, Math.round((100 * res[k].seen) / (res[k].seen + res[k].filtered)) / 100, `${id}.${k} share`);
   }
@@ -154,4 +155,26 @@ test('HG-9 review: cache stores reason counts and at most 10 example names', asy
 test('HG-9 review: punjabi stays a Mumbai music conflict tag', () => {
   assert.ok(CITIES.mumbai.musicConflictTags.includes('punjabi'));
   assert.equal(musicLanguageSignal({ tags: [g('hindi'), g('punjabi')] }, CITIES.mumbai).ok, false);
+});
+
+test('v1 movies only: liveCategories switch, 403 guard, liveness judged on movies', () => {
+  const g = loadGate();
+  assert.deepEqual(liveCategories(g), ['movie']);
+  assert.deepEqual(liveCategories({ categories: ['tv', 'movie'] }), ['tv', 'movie'], 'falls back to categories');
+  assert.throws(() => requireLiveCategory(g, 'tv'), (e) => e.status === 403);
+  assert.throws(() => requireLiveCategory(g, 'music'), (e) => e.status === 403);
+  requireLiveCategory(g, 'movie');
+  const bad = { ...g, results: { x: { movie: { seen: 10, accepted: 9 }, tv: { seen: 10, accepted: 0 }, music: { seen: 0, accepted: 0 } } } };
+  assert.equal(cityStatus(bad, 'x').live, true, 'failing TV/music does not block a movie-live city');
+  assert.equal(cityStatus({ ...bad, liveCategories: undefined }, 'x').live, false);
+  for (const id of ['hyderabad', 'kolkata']) assert.equal(cityStatus(g, id).live, true, id);
+  assert.equal(CITIES.hyderabad.language, 'te'); assert.equal(CITIES.kolkata.language, 'bn');
+});
+
+test('retryable: 504 from Qloo retries, the measure deadline and other statuses do not', () => {
+  assert.equal(retryable({ status: 504 }), true);
+  assert.equal(retryable({ upstreamStatus: 504 }), true);
+  assert.equal(retryable({ status: 504, reason: 'deadline' }), false);
+  assert.equal(retryable({ status: 502 }), false);
+  assert.equal(retryable(undefined), false);
 });

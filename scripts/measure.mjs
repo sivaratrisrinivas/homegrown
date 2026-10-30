@@ -4,10 +4,10 @@
 //   QLOO_API_KEY=… TMDB_API_KEY=… npm run measure
 import { writeFileSync } from 'node:fs';
 import { getDeps } from '../lib/deps.js';
-import { QLOO_TYPES } from '../lib/qloo.js';
+import { QLOO_TYPES, retryable } from '../lib/qloo.js';
 import { CITIES } from '../lib/cities.js';
 import { CATEGORIES } from '../lib/twin.js';
-import { loadGate, cityStatus } from '../lib/gate.js';
+import { loadGate, cityStatus, liveCategories } from '../lib/gate.js';
 
 const SEEDS = [['Breaking Bad', 'show'], ['Radiohead', 'band'], ['Parasite', 'movie']];
 const { qloo, twin } = getDeps();
@@ -15,7 +15,7 @@ const favourites = [];
 for (const [q, kind] of SEEDS) {
   let r;
   for (let i = 0; ; i++) {
-    try { r = (await qloo.search(q, QLOO_TYPES[kind]))[0]; break; } catch (e) { if (e.status !== 504 || i >= 2) throw e; await new Promise((ok) => setTimeout(ok, 15000)); }
+    try { r = (await qloo.search(q, QLOO_TYPES[kind]))[0]; break; } catch (e) { if (!retryable(e) || i >= 2) throw e; await new Promise((ok) => setTimeout(ok, 15000)); }
   }
   if (!r) throw new Error(`seed not found: ${q}`);
   favourites.push({ id: r.id, name: r.name, tags: r.tags });
@@ -23,13 +23,14 @@ for (const [q, kind] of SEEDS) {
 const old = loadGate();
 const results = {};
 for (const cityId of Object.keys(CITIES)) {
-  results[cityId] = {};
-  for (const category of CATEGORIES) {
+  // Only the live categories are re-measured; earlier results for the others are kept for reference.
+  results[cityId] = { ...(old.results?.[cityId] || {}) };
+  for (const category of CATEGORIES.filter((c) => liveCategories(old).includes(c))) {
     // Qloo sometimes times out (504); retry the category up to 3 times, 15 s apart (measuring run only).
     let r;
     for (let i = 0; ; i++) {
       try { r = await twin.measure({ favourites, cityId, category }); break; } catch (e) {
-        if (e.status !== 504 || i >= 2) throw e;
+        if (!retryable(e) || i >= 2) throw e;
         console.log(JSON.stringify({ city: cityId, category, retry: i + 1, status: e.status }));
         await new Promise((ok) => setTimeout(ok, 15000));
       }

@@ -18,6 +18,7 @@ async function qlooPost(body, isCurrent = () => true) {
 // S.favs holds only Qloo-matched favourites ({id,name,tags}); chosen-but-unmatched ones live in
 // S.pending with their match promise kept separately in pendingMatches.
 const pendingMatches = new Map();
+const categoryWords = (cats = QLOO_ORDER) => { const w = cats.map((c) => ({ tv: 'TV', movie: 'movies', music: 'music' }[c] || c)); return w.length > 1 ? `${w.slice(0, -1).join(', ')} and ${w.at(-1)}` : w[0]; };
 const S = { favs: [], pending: [], missed: [], city: null, results: {}, sound: false, catalogue: null, lang: null };
 const h = (tag, attrs = {}, ...kids) => {
   const el = document.createElement(tag);
@@ -78,7 +79,7 @@ function suggestCity() {
   const live = cityForLanguage(S.catalogue, S.lang.id);
   if (!live) {
     return show(h('h2', {}, `${S.lang.name} isn't live yet.`),
-      h('p', { class: 'muted' }, `A city opens only when at least ${Math.round(S.catalogue.threshold * 100)}% of its picks in music, TV and movies are verified local. Its city hasn't reached that yet.`),
+      h('p', { class: 'muted' }, `A city opens only when at least ${Math.round(S.catalogue.threshold * 100)}% of its picks in ${categoryWords(S.catalogue.categories)} are verified local. Its city hasn't reached that yet.`),
       h('button', { class: 'ghost', onclick: pickLanguage }, 'Pick another language'));
   }
   // Default is the measured best city; switching to another live city is one tap.
@@ -272,7 +273,7 @@ async function morph() {
   };
   // Every category is Qloo-backed, so they go one at a time through the 7 s browser gate.
   // One failed category must not stop the ones after it.
-  const qlooP = runCategories(QLOO_ORDER, (cat) => qlooPost({ ...base, category: cat }, current), land);
+  const qlooP = runCategories(QLOO_ORDER.filter((cat) => (S.catalogue?.categories || QLOO_ORDER).includes(cat)), (cat) => qlooPost({ ...base, category: cat }, current), land);
   await Promise.race([qlooP, new Promise((r) => setTimeout(r, MORPH_BUDGET_MS))]);
   if (!current()) return;
   hdr.textContent = c.header; hdr.classList.toggle('ko', c.language === 'ko');

@@ -22,7 +22,7 @@ Looked up on 2026-10-31 with `GET /v2/tags?filter.query=<term>`. Qloo entities c
 **TV / movie.**
 - Qloo bias: `signal.interests.tags=<screenTag>`. This is a soft signal next to the taste entities, not a hard filter (a hard `filter.tags` returned only 2 Tamil TV shows).
 - Tags used: Chennai `urn:tag:keyword:qloo:tamil_cinema`, Mumbai `urn:tag:keyword:qloo:bollywood`, Seoul `urn:tag:keyword:qloo:korean_cinema`, Paris `urn:tag:keyword:qloo:french_cinema`. Measured but not added: Hyderabad `…:telugu_cinema`, Kolkata `…:bengali_cinema`. Qloo has no Mexican, Spanish or Argentine cinema tag, so those cities have none. `filter.release_country` and `signal.location.query` are kept as before.
-- Language filter: TMDB exact-title match, then `original_language` must equal the city's language. A mismatch is `off_language`, and a title with no exact match is `no_tmdb_match` (its language is unknown). Neither enters the measured 15, and neither counts in the native %.
+- Language filter: TMDB exact-title match, then `original_language` must equal the city's language. A mismatch is `off_language`: it is the only prefilter, so it never enters the measured 15 and does not count in the native %. A title with no exact match is `no_tmdb_match`: it stays in the measured 15 and counts as a failure.
 - Native check on the 15: the origin country must match (`origin_country` for TV; `origin_country` or `production_countries` for movies).
 
 **Music.**

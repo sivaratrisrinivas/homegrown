@@ -1,84 +1,97 @@
 # Homegrown
 
-*What you'd love if you grew up there.* Enter 3-5 favourites, pick a city, and get Qloo taste-matched films that are verified native (TMDB: exact title, original language and origin country). v1 is films only, from 9 cities: Mexico City, Madrid, Buenos Aires, Seoul, Paris, Chennai, Mumbai, Hyderabad and Kolkata. TV and music come later (their code paths are kept behind the gate). Anything not verifiably made in the city's language and country is dropped, never padded.
+## What
 
-## Run
+Homegrown is a small web app. You tell it a few shows or films you love. You pick a city whose language you are learning. It shows you films from there. Each film was really made there, in that language.
 
+Each film card shows:
+
+- a short reason why you might like it, tied to your favourites
+- how hard it may be for a learner: easy, medium or hard (marked "estimated")
+- where to watch it
+
+## Why
+
+It is hard to find films from another country that match your taste. Most lists show what is popular, not what you like. Homegrown starts from your own favourites. It aims to answer one question: "What would I love if I had grown up there?"
+
+## How it works
+
+1. **You type a favourite.** As you type, suggestions come from free catalogues: TMDB, iTunes and Open Library. When you choose one, the app looks it up in Qloo, a taste service.
+2. **If Qloo can't find it,** Claude suggests other names for that title. The app then tries those names in Qloo.
+3. **You pick a city.** Each city has its own language. A city goes live only when at least 60% of its picks check out as truly local.
+4. **The app asks Qloo** for films people in that city enjoy, based on your favourites. Qloo only allows a few calls at a time, so the app waits about 7 seconds between calls. If Qloo says "slow down", it waits 14 s, 28 s, then 30 s.
+5. **Each film is checked in TMDB.** It must be in the city's language and come from that country. Films that fail are dropped.
+6. **Each film gets a reason line.** One Claude call writes lines for all films at once. The app checks every line. A line must name your favourite. Its other words must come from the descriptions of the film and your favourite. Lines with numbers, links or words like "not" are thrown away. If a line fails, the app uses a simple line built from the tags your favourite and the film share. It may ask Claude once more for the lines that failed.
+7. **Each film gets a difficulty.** It comes from the film's genres and length. Claude's view of the pace and amount of talking can move it one step.
+8. **Some languages are "coming soon".** They don't have enough checked films yet. For some of them, Claude suggests films. Each one is checked in TMDB first. These are labelled "Suggested by AI, not taste-matched".
+9. **Spending is capped.** All Claude use shares one daily limit of $0.25. It is split into $0.10 for reason lines, $0.08 for other names, and $0.07 for suggested films. Each visitor also has a daily cap. These limits are kept in memory, so each server copy counts on its own.
+
+Only films are live right now. The code can also handle TV shows and music, but those are switched off.
+
+## Getting started
+
+1. **Install Node.js 22 or newer.**
+
+2. **Clone the code.**
+
+   ```sh
+   git clone https://github.com/sivaratrisrinivas/homegrown.git
+   cd homegrown
+   ```
+
+   There are no packages to install.
+
+3. **Set these environment variables.** Get your own keys from each service. Never commit them.
+
+   - `QLOO_API_KEY`: needed for search and picks.
+   - `TMDB_API_KEY`: needed to check films and find where to watch them.
+   - `ANTHROPIC_API_KEY`: for Claude. Without it, the app still works. It uses the simple reason lines and skips the Claude features.
+   - `PORT`: optional, for local runs only. The default is 3000.
+
+4. **Run it locally.**
+
+   ```sh
+   npm run dev
+   ```
+
+   Open http://localhost:3000.
+
+5. **Run the tests.**
+
+   ```sh
+   npm test
+   ```
+
+   The tests use fake services, so they need no keys.
+
+6. **Deploy to Vercel.**
+   1. Import the GitHub repo as a new Vercel project. No build step is needed.
+   2. Add the three API keys under Settings, then Environment Variables.
+   3. Deploy. Files in `public/` are served as the site. Files in `api/` become server functions.
+
+## System architecture
+
+```mermaid
+flowchart LR
+  B["Browser<br/>(public/)"]
+  subgraph V["Vercel functions (api/)"]
+    S["/api/suggest<br/>typing suggestions"]
+    Q["/api/search<br/>find a favourite"]
+    T["/api/twin<br/>city picks"]
+    A["/api/altnames<br/>other names"]
+    AI["/api/aisuggest<br/>coming-soon films"]
+    L[("Claude budget ledger<br/>$0.25 a day, in memory")]
+  end
+  B --> S & Q & T & A & AI
+  S --> TM["TMDB"] & IT["iTunes"] & OL["Open Library"]
+  Q --> QL["Qloo"]
+  T --> QL
+  T --> TM
+  T --> MB["MusicBrainz<br/>(music, switched off)"]
+  T -- reason lines --> L
+  A --> L
+  AI --> L
+  A --> QL
+  AI --> TM
+  L --> C["Claude"]
 ```
-npm test          # zero dependencies, node >= 20
-npm run dev       # http://localhost:3000
-```
-
-Deployable as-is on Vercel Hobby: `public/` is static and `api/*.js` are Node functions.
-
-## Env vars (never commit them)
-
-| Var | Needed for |
-|---|---|
-| `QLOO_API_KEY` | typeahead and discovery (v1: movies; TV/music paths kept) |
-| `TMDB_API_KEY` | show and film origin checks and where-to-watch (v3 key or v4 read token) |
-
-When a key is missing, the API returns `503 {"error":"missing_key","key":"..."}` and the UI says so. `/api/health` reports only whether each key is present.
-
-## Rules baked in
-
-- Qloo calls are serialised about 7 s apart, with 429 backoff that honours Retry-After. MusicBrainz is limited to 1 req/s with a descriptive User-Agent.
-- No padding: if verification drops candidates, the card shows fewer picks and an honest note.
-- Why-lines quote a real shared Qloo tag, or fall back to a neutral "taste-matched" line.
-- Each request logs its native rate per category (candidates checked, accepted, %), with no secrets or user text.
-- Results are cached in memory per (favourites set, city, category) for 7 days.
-
-## Captain rules (v1)
-
-- **Picks:** 5 strict-local picks per category from a Qloo top 15. Fewer than 3 is "scarce": the category is shown with a plain note but left off the postcard.
-- **v1 is movies only.** `config/gate.json` `liveCategories: ["movie"]` is the single switch: the app runs only live categories, `/api/twin` refuses the others with 403 before any Qloo call, and the TV/music code paths stay in place for later.
-- **City gate:** a city is live only with ≥ 60% local picks and ≥ `minSeen` (5) measured in every *live* category (`liveCategories`). See `config/gate.json`, refreshed by `npm run measure` (re-measures live categories only; needs `QLOO_API_KEY` and `TMDB_API_KEY`; Qloo calls ~7 s apart). Cities with a thin pool (< 10 measured or < 30% language share) show a calm note that picks may be few. With one live category the 'X lead' line is hidden.
-- **Flow:** language first (only languages with a live city; the others are "coming soon"), then the measured best city, with a one-tap switch to other live cities.
-- **Config:** cities and languages live in `config/cities.json`. To add a city, add an entry and run `npm run measure`. Live (movies): Mexico City, Madrid, Buenos Aires, Seoul, Paris, Chennai, Mumbai, Hyderabad, Kolkata.
-- **Reveal:** one "culture leads in" line, computed from the measured native counts.
-
-## Deployment
-
-`vercel.json` sets `maxDuration: 60` for `api/twin.js`. Vercel Hobby with Fluid compute (the default) allows up to 300 s, so 60 s fits; the request deadlines (45 s / 50 s) keep each call inside it.
-
-## Deviations from the design brief
-
-- **Qloo 429 backoff.** The brief ([docs/design-brief.md](docs/design-brief.md)) says 20 s, then 40 s, then 80 s, max 3 tries. We keep calls about 7 s apart, honour `Retry-After`, and otherwise back off 14 s, 28 s, then 30 s (capped by `QLOO_MAX_BACKOFF_MS`). Retries also stop at a request deadline fixed when the request arrives (50 s for Qloo, 45 s for verification). An 80 s wait cannot fit inside a 60 s serverless function, so the request returns 429/504 instead of hanging.
-
-## Claude alternate-name fallback (HG-8)
-
-When a chosen favourite has no same-name Qloo entity ("We couldn't match X"), the user can press
-"Try other names for X"; Enter on a query with zero `/api/suggest` results is a secondary trigger. Either calls `GET /api/altnames?q=&kind=`.
-The server asks `claude-haiku-5-5` (max_tokens 100, thinking off) for up to 3 alternate/official names as JSON,
-re-resolves at most 2 with Qloo search (7 s throttle) and returns only an entity whose Qloo name equals one of them.
-Claude never sources picks. Needs `ANTHROPIC_API_KEY`; without it, or on any error, the endpoint returns `{ results: [] }`.
-
-Caps (`lib/altnames.js`): 10 Claude calls per IP per UTC day (IP from `x-vercel-forwarded-for`/`x-real-ip`);
-at most 40 Qloo HTTP attempts per UTC day for this feature (no 429 retry, 45 s request deadline); Claude names cached separately for 7 days; worst-case cost reserved before each call;
-identical in-flight requests share one call; a global spend estimate from usage tokens
-(priced at Haiku 5.5's higher long-prompt rates, $0.50/$2.50 per MTok) stopped at $0.25 per UTC day; a call starts only
-if its worst case fits. Results, including "no match", are cached 7 days.
-Limitation: this state is in-memory per serverless instance. It resets on cold starts and isn't shared across
-instances, so the real daily spend can exceed one instance's cap. That's why the cap is half the $0.50 budget.
-
-## Why-lines and difficulty (HG-7)
-
-Each movie reveal makes at most one batched Claude call (`lib/whyllm.js`) for all its picks. The reveal waits at most 3 s for it, or 1.5 s when the movie list came from cache; a late answer still fills the cache. Claude sees only the favourite name (at most 60 safe characters), the shared Qloo tags, the pick title, genres and the TMDB overview, inside `<pick>` delimiters that the system prompt marks as untrusted data. Every returned line is validated: one sentence of 8 to 28 words, the exact favourite name as whole words, no links, digits or number words, and every other word must be a small grammar stopword or appear in the overview, tags, genres or title (exactly, as a plural, or as an -ing/-ed/-ion form of a source word, allowing a dropped e or doubled consonant). At least 2 distinct grounded words must come from the overview, tags or genres; title words are allowed but don't count. Any negation (not, no, nor, never, without, cannot, nobody, nothing, none, neither, n't) rejects the line. So do 'than' and 'if', contractions (only a possessive 's on a grounded word or on the favourite is allowed), and colons, brackets ( ) [ ] { }, slashes, dashes (— – or a spaced -) outside the favourite. Digit and punctuation checks ignore the favourite itself (3 Idiots, Mr. Robot, Airplane!). Pick ids must match `p<number>` before they go into the prompt. Known limit: word matching can't catch role inversion, e.g. who chases whom ("the cop hunts the killer" vs "the killer hunts the cop" use the same words). A rejected line falls back to the tag-based line in `lib/why.js`. Good lines are cached 7 days, rejected ones 1 day, and failures or in-flight calls get a 10-minute skip marker.
-
-Difficulty is labelled "estimated". It comes from TMDB genres (easy genres win over hard ones) and runtime, which always counts: 140+ minutes pushes it harder, 95 or less easier. Claude's pace and dialogue read can move it by one step at most on top. Without Claude it is genres plus runtime, so it can differ from the old genre-only heuristic. Subtitle availability isn't used, because OpenSubtitles needs an account and API key. A city's own subtitle tip wins over the generated one.
-
-All Claude features reserve from `lib/budget.js`: $0.25 per UTC day in total, split into why $0.10, altnames $0.08 and aisuggest $0.07. Each reservation is the worst-case cost of that exact request, based on its length. Why-lines are also limited to 20 calls per IP per day.
-
-### Why-line pass rate (HG-15)
-Grounding is done mostly on the prompt side. Each `<pick>` carries a `<words>` list, which holds the content words from its tags, genres and overview (letters only, no stopwords, numbers or 1-2 letter fragments). Claude must use only those words, plus function words and a few framing words (fans, will, like, follows, story, film, tale, explores, features, centres, set, plot). It fills a fixed template: "Fans of <favourite> will like this <genre> film about <phrase>." Framing words are allowed but never count toward the 2 grounded words. Every validator rule above still applies. When some lines are rejected, the writer makes one regenerate call for those picks only. That call reserves its own budget, so it is skipped when the budget can't cover it, and it doesn't use another per-IP call. A rejected line is replaced only if the regenerated one is valid. Measured on 3 live calls with no retry: Seoul 3/5, Mexico City 1/4, Paris 4/5. The recorded HG-7 answer, which used the old prompt, scores 1/5. The heuristic fallback never says "if you liked".
-
-Defaults accepted in review:
-- **The framing words are the same for every pick.** They are allowed everywhere and never count as grounded, so a line made only of framing words still fails the 2-word minimum.
-- **The regenerate call doesn't count against the per-IP limit** of 20 why calls per day. It still reserves from the global why budget ($0.10 of the $0.25 daily total), so it is skipped once that budget runs out.
-- **Only rejected lines are retried.** A pick that Claude left out of its answer, or answered with an empty line, is not retried. It keeps the heuristic line and is cached as rejected for 1 day.
-
-### Background completion and rejection logs (HG-16)
-The Claude first pass, the one regenerate and the cache fill all run in a single promise, which is handed to Vercel's `waitUntil`. The request context is read the same way `@vercel/functions` reads it, so no dependency is added. A reveal still answers at its 3 s (or 1.5 s) deadline, and the late lines fill the cache for the next visitor. Outside Vercel this is a no-op. The `why_llm` log adds `rejected`: one rule name per rejected pick (`empty`, `missing`, `no_favourite`, `length`, `word_count`, `favourite_missing`, `url`, `digit`, `punctuation`, `negation`, `hedge`, `contraction`, `number_word`, `ungrounded:<n>`, `too_few_grounded:<n>`). It never contains line text or user input. Fallback lines drop a tag's leading article, so they never read "More the …".
-
-## World cities (HG-13)
-15 cities went live on the movie gate. The raw scout and retry output is in `config/hg13-measure.json` and is referenced from `gate.json` → `hg13.raw`. Copenhagen and Lagos returned an empty Qloo pool for every country name and code we tried. **Tehran:** iTunes has no Iran storefront, so `itunesCountry: 'ir'` returns nothing. Music for Tehran won't work if music ever goes live (only movies are live now).

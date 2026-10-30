@@ -67,3 +67,10 @@ button:disabled{opacity:.6;cursor:default}
 .pull-sheet.heavy .pull-handle{box-shadow:0 0 0 3px #f3e9d255}
 .ground{width:100%;max-width:600px;max-height:70vh;overflow:hidden;border-top:3px solid #3b3127;border-radius:4px}
 .pull-sheet.open .ground{overflow:auto}
+/* HG-11 India picker */
+.india { margin-top: 2rem; }
+.india-search { width: 100%; max-width: 28rem; padding: .6rem .8rem; font: inherit; border: 1px solid #ccc; border-radius: 8px; margin: .5rem 0 1rem; }
+.india-list { display: grid; gap: .5rem; }
+.india-lang { display: flex; flex-wrap: wrap; gap: .25rem .75rem; align-items: baseline; text-align: left; padding: .7rem .9rem; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: inherit; font: inherit; }
+.india-lang.soon { opacity: .45; }
+.india-local { font-weight: 600; }

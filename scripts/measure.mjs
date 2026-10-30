@@ -4,7 +4,7 @@
 //   QLOO_API_KEY=… TMDB_API_KEY=… npm run measure
 import { writeFileSync } from 'node:fs';
 import { getDeps } from '../lib/deps.js';
-import { QLOO_TYPES, retryable } from '../lib/qloo.js';
+import { QLOO_TYPES, retryable, bestSeedMatch } from '../lib/qloo.js';
 import { CITIES } from '../lib/cities.js';
 import { CATEGORIES } from '../lib/twin.js';
 import { loadGate, cityStatus, liveCategories } from '../lib/gate.js';
@@ -15,7 +15,7 @@ const favourites = [];
 for (const [q, kind] of SEEDS) {
   let r;
   for (let i = 0; ; i++) {
-    try { r = (await qloo.search(q, QLOO_TYPES[kind]))[0]; break; } catch (e) { if (!retryable(e) || i >= 2) throw e; await new Promise((ok) => setTimeout(ok, 15000)); }
+    try { r = bestSeedMatch(await qloo.search(q, QLOO_TYPES[kind]), q); break; } catch (e) { if (!retryable(e) || i >= 2) throw e; await new Promise((ok) => setTimeout(ok, 15000)); }
   }
   if (!r) throw new Error(`seed not found: ${q}`);
   favourites.push({ id: r.id, name: r.name, tags: r.tags });

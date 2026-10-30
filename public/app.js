@@ -1,4 +1,5 @@
 import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, liveCats, pendingCats, categoryWords, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { indiaSection } from './india.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { isMapReveal, mapFraming } from './maplogic.js';
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
@@ -66,10 +67,13 @@ async function pickLanguage() {
     S.catalogue = r;
   }
   // Only languages with a live city are offered; the rest are listed as coming soon.
-  const { live, soon } = languageGroups(S.catalogue);
+  // Indian languages (those with states) are listed language-first in their own section (india.js).
+  const { live: all, soon: allSoon } = languageGroups(S.catalogue);
+  const live = all.filter((l) => !l.states), soon = allSoon.filter((l) => !l.states);
   show(h('h2', {}, 'Which language are you learning?'),
     h('div', { class: 'cities' }, live.map((l) => h('button', { class: 'postcard', onclick: () => { S.lang = l; suggestCity(); } },
       h('span', { class: serif(l.id) }, l.local), h('span', {}, l.name)))),
+    indiaSection(S.catalogue, { h, onPick: (l) => { S.lang = l; suggestCity(); } }),
     soon.length ? h('p', { class: 'muted' }, `Coming soon: ${soon.map((l) => l.name).join(', ')}`) : null);
 }
 

@@ -18,22 +18,77 @@
     {
       "id": "ta",
       "name": "Tamil",
-      "local": "தமிழ்"
+      "local": "தமிழ்",
+      "states": [
+        "Tamil Nadu",
+        "Puducherry"
+      ],
+      "statesLabel": "Tamil Nadu & Puducherry"
     },
     {
       "id": "hi",
       "name": "Hindi",
-      "local": "हिन्दी"
+      "local": "हिन्दी",
+      "states": [
+        "Uttar Pradesh",
+        "Bihar",
+        "Madhya Pradesh",
+        "Rajasthan",
+        "Delhi",
+        "Haryana",
+        "Uttarakhand",
+        "Himachal Pradesh",
+        "Chhattisgarh",
+        "Jharkhand",
+        "Maharashtra",
+        "Jammu & Kashmir",
+        "Ladakh",
+        "Arunachal Pradesh",
+        "Nagaland",
+        "Andaman & Nicobar Islands"
+      ],
+      "statesLabel": "Uttar Pradesh, Bihar, Delhi & the Hindi belt"
     },
     {
       "id": "te",
       "name": "Telugu",
-      "local": "తెలుగు"
+      "local": "తెలుగు",
+      "states": [
+        "Andhra Pradesh",
+        "Telangana"
+      ],
+      "statesLabel": "Andhra Pradesh & Telangana"
     },
     {
       "id": "bn",
       "name": "Bengali",
-      "local": "বাংলা"
+      "local": "বাংলা",
+      "states": [
+        "West Bengal",
+        "Tripura",
+        "Andaman & Nicobar Islands"
+      ],
+      "statesLabel": "West Bengal & Tripura"
+    },
+    {
+      "id": "ml",
+      "name": "Malayalam",
+      "local": "മലയാളം",
+      "states": [
+        "Kerala",
+        "Lakshadweep"
+      ],
+      "statesLabel": "Kerala & Lakshadweep"
+    },
+    {
+      "id": "pa",
+      "name": "Punjabi",
+      "local": "ਪੰਜਾਬੀ",
+      "states": [
+        "Punjab",
+        "Chandigarh"
+      ],
+      "statesLabel": "Punjab & Chandigarh"
     }
   ],
   "cities": [
@@ -322,6 +377,88 @@
         "pakistani"
       ],
       "screenTag": "urn:tag:keyword:qloo:bengali_cinema"
+    },
+    {
+      "id": "kochi",
+      "name": "Kochi",
+      "localName": "കൊച്ചി",
+      "country": "IN",
+      "releaseCountry": "India",
+      "flag": "🇮🇳",
+      "itunesCountry": "in",
+      "countryNames": [
+        "india",
+        "kochi",
+        "cochin",
+        "kerala",
+        "lakshadweep",
+        "കൊച്ചി"
+      ],
+      "language": "ml",
+      "accent": "#138808",
+      "header": "കൊച്ചിക്കാരൻ നീ",
+      "musicTag": "malayalam",
+      "subtitleTip": "Start with subtitles in Malayalam.",
+      "musicLanguageTags": [
+        "malayalam",
+        "mollywood"
+      ],
+      "musicConflictTags": [
+        "tamil",
+        "kollywood",
+        "telugu",
+        "tollywood",
+        "bengali",
+        "bangla",
+        "kannada",
+        "punjabi",
+        "bangladesh",
+        "bangladeshi",
+        "pakistani",
+        "hindi",
+        "bollywood"
+      ],
+      "screenTag": "urn:tag:keyword:qloo:malayalam_cinema"
+    },
+    {
+      "id": "amritsar",
+      "name": "Amritsar",
+      "localName": "ਅੰਮ੍ਰਿਤਸਰ",
+      "country": "IN",
+      "releaseCountry": "India",
+      "flag": "🇮🇳",
+      "itunesCountry": "in",
+      "countryNames": [
+        "india",
+        "amritsar",
+        "punjab",
+        "chandigarh",
+        "ਅੰਮ੍ਰਿਤਸਰ"
+      ],
+      "language": "pa",
+      "accent": "#FF9933",
+      "header": "ਅੰਮ੍ਰਿਤਸਰੀ ਤੂੰ",
+      "musicTag": "punjabi",
+      "subtitleTip": "Start with subtitles in Punjabi.",
+      "musicLanguageTags": [
+        "punjabi",
+        "bhangra"
+      ],
+      "musicConflictTags": [
+        "tamil",
+        "kollywood",
+        "telugu",
+        "tollywood",
+        "bengali",
+        "bangla",
+        "malayalam",
+        "kannada",
+        "bangladesh",
+        "bangladeshi",
+        "pakistani",
+        "hindi",
+        "bollywood"
+      ]
     }
   ]
 }

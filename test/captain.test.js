@@ -63,7 +63,7 @@ test('captain 3: language first, then the suggested live city', () => {
   assert.equal(suggestCity(g, 'ko').city, 'seoul');
   assert.equal(suggestCity(g, 'fr').city, null);
   const cat = catalogue(g);
-  assert.deepEqual(cat.languages.map((l) => l.id), ['es', 'ko', 'fr', 'ta', 'hi', 'te', 'bn']);
+  assert.deepEqual(cat.languages.map((l) => l.id), ['es', 'ko', 'fr', 'ta', 'hi', 'te', 'bn', 'ml', 'pa']);
   assert.equal(cityForLanguage(cat, 'ko').id, 'seoul');
   assert.equal(cityForLanguage(cat, 'fr'), null);
   const app = readFileSync('public/app.js', 'utf8');
@@ -87,7 +87,7 @@ test('captain 5: only languages with a live city are offered; others are coming 
   const g = gate({ seoul: ALL(7, 8, 8), paris: ALL(7, 4, 9), chennai: ALL(9, 9, 5) });
   const { live, soon } = languageGroups(catalogue(g));
   assert.deepEqual(live.map((l) => l.id), ['ko']);
-  assert.deepEqual(soon.map((l) => l.id), ['es', 'fr', 'ta', 'hi', 'te', 'bn']);
+  assert.deepEqual(soon.map((l) => l.id), ['es', 'fr', 'ta', 'hi', 'te', 'bn', 'ml', 'pa']);
 });
 
 test('captain 6: measured best city is the default; other live cities are one tap away', () => {
@@ -103,7 +103,7 @@ test('captain 7: cities and languages are config; Chennai/Tamil is a gated candi
   const cfg = JSON.parse(readFileSync('config/cities.json', 'utf8'));
   assert.deepEqual(Object.keys(CITIES), cfg.cities.map((c) => c.id));
   assert.deepEqual(LANGUAGES, cfg.languages);
-  assert.deepEqual(Object.keys(CITIES).sort(), ['buenos_aires', 'chennai', 'hyderabad', 'kolkata', 'madrid', 'mexico_city', 'mumbai', 'paris', 'seoul']);
+  assert.deepEqual(Object.keys(CITIES).sort(), ['buenos_aires', 'chennai', 'hyderabad', 'kolkata', 'madrid', 'mexico_city', 'mumbai', 'paris', 'seoul', 'kochi', 'amritsar'].sort());
   const ch = CITIES.chennai;
   assert.deepEqual([ch.country, ch.language, ch.releaseCountry], ['IN', 'ta', 'India']);
   assert.equal(cityStatus(gate({}), 'chennai').live, false, 'unmeasured city stays off');

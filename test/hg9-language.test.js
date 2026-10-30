@@ -78,7 +78,7 @@ test('HG-9 config: every city has music language tags; Indian cities list the ot
   for (const c of Object.values(CITIES)) {
     assert.ok(c.musicLanguageTags?.length, `${c.id}.musicLanguageTags`);
     for (const t of c.musicConflictTags || []) assert.ok(!c.musicLanguageTags.includes(t), `${c.id} conflicts with itself: ${t}`);
-    if (c.country === 'IN') assert.ok(c.musicConflictTags?.length && c.screenTag, c.id);
+    if (c.country === 'IN') assert.ok(c.musicConflictTags?.length, c.id); // screenTag optional (HG-11: no Punjabi tag)
   }
 });
 

@@ -43,7 +43,7 @@ export function meanwhileHint(g) {
   return `Try ${parts.join(', ')}${near.length < waiting.length ? ', Hindi for the rest' : ''}, meanwhile.`;
 }
 
-export function indiaSection(catalogue, { h, onPick }) {
+export function indiaSection(catalogue, { h, onPick, onSuggest }) {
   const groups = indiaGroups(catalogue);
   if (!groups.live.length && !groups.soon.length && !groups.unsupported.length) return null;
   const list = h('div', { class: 'india-list' });
@@ -51,12 +51,14 @@ export function indiaSection(catalogue, { h, onPick }) {
   const hint = h('p', { class: 'muted india-hint' });
   const native = (l) => h('span', { class: 'india-local', lang: l.id }, l.local);
   const row = (l) => h('div', { class: 'india-lang waiting' }, native(l), h('span', {}, indiaLabel(l)));
+  // HG-12: coming-soon languages can be picked for AI film suggestions (TMDB-verified, clearly labelled).
+  const soonRow = (l) => (onSuggest ? h('button', { class: 'india-lang waiting', onclick: () => onSuggest(l) }, native(l), h('span', {}, indiaLabel(l)), h('span', { class: 'india-ai' }, 'AI suggestions')) : row(l));
   const heading = (t, n) => (n ? h('h4', { class: 'india-group' }, t) : null);
   const render = (q) => {
     const g = matchState(groups, q);
     list.replaceChildren(...[
       ...g.live.map((l) => h('button', { class: 'india-lang', onclick: () => onPick(l.lang) }, native(l), h('span', {}, indiaLabel(l)))),
-      heading('Coming soon', g.soon.length), ...g.soon.map(row),
+      heading('Coming soon', g.soon.length), ...g.soon.map(soonRow),
       heading('Not supported yet', g.unsupported.length), ...g.unsupported.map(row),
     ].filter(Boolean));
     status.textContent = matchStatus(g);

@@ -68,3 +68,6 @@ Each movie reveal makes at most one batched Claude call (`lib/whyllm.js`) for al
 Difficulty is labelled "estimated". It comes from TMDB genres (easy genres win over hard ones) and runtime, which always counts: 140+ minutes pushes it harder, 95 or less easier. Claude's pace and dialogue read can move it by one step at most on top. Without Claude it is genres plus runtime, so it can differ from the old genre-only heuristic. Subtitle availability isn't used, because OpenSubtitles needs an account and API key. A city's own subtitle tip wins over the generated one.
 
 All Claude features reserve from `lib/budget.js`: $0.25 per UTC day in total, split into why $0.10, altnames $0.08 and aisuggest $0.07. Each reservation is the worst-case cost of that exact request, based on its length. Why-lines are also limited to 20 calls per IP per day.
+
+## World cities (HG-13)
+15 cities went live on the movie gate. The raw scout and retry output is in `config/hg13-measure.json` and is referenced from `gate.json` → `hg13.raw`. Copenhagen and Lagos returned an empty Qloo pool for every country name and code we tried. **Tehran:** iTunes has no Iran storefront, so `itunesCountry: 'ir'` returns nothing. Music for Tehran won't work if music ever goes live (only movies are live now).

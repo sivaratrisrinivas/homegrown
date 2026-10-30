@@ -1,0 +1,445 @@
+{
+ "task": "HG-13",
+ "method": "twin.measure({category:'movie'}) via scripts like npm run measure; seeds Breaking Bad, Radiohead, Parasite; Qloo pool 50 -> top 15; sequential, >=7 s apart",
+ "scout": {
+  "ranAt": "2026-10-30T22:15Z..22:30Z (2026-10-31 03:45-04:00 IST)",
+  "baseCommit": "e8b9ca9",
+  "results": [
+   {
+    "id": "tokyo",
+    "name": "Tokyo",
+    "cc": "JP",
+    "lang": "ja",
+    "seen": 15,
+    "accepted": 12,
+    "filtered": 13,
+    "errors": 0,
+    "share": 0.54,
+    "reasons": {
+     "off_language": 13,
+     "no_tmdb_match": 3
+    },
+    "releaseCountry": "Japan"
+   },
+   {
+    "id": "beijing",
+    "name": "Beijing",
+    "cc": "CN",
+    "lang": "zh",
+    "seen": 4,
+    "accepted": 3,
+    "filtered": 44,
+    "errors": 0,
+    "share": 0.08,
+    "reasons": {
+     "off_language": 44,
+     "no_tmdb_match": 1
+    },
+    "releaseCountry": "China"
+   },
+   {
+    "id": "hong_kong",
+    "name": "Hong Kong",
+    "cc": "HK",
+    "lang": "cn",
+    "seen": 11,
+    "accepted": 10,
+    "filtered": 10,
+    "errors": 0,
+    "share": 0.52,
+    "reasons": {
+     "off_language": 10,
+     "no_tmdb_match": 1
+    },
+    "releaseCountry": "Hong Kong"
+   },
+   {
+    "id": "taipei",
+    "name": "Taipei",
+    "cc": "TW",
+    "lang": "zh",
+    "seen": 11,
+    "accepted": 11,
+    "filtered": 0,
+    "errors": 0,
+    "share": 1,
+    "reasons": {},
+    "releaseCountry": "Taiwan"
+   },
+   {
+    "id": "bangkok",
+    "name": "Bangkok",
+    "cc": "TH",
+    "lang": "th",
+    "seen": 7,
+    "accepted": 6,
+    "filtered": 4,
+    "errors": 0,
+    "share": 0.64,
+    "reasons": {
+     "off_language": 4,
+     "no_tmdb_match": 1
+    },
+    "releaseCountry": "Thailand"
+   },
+   {
+    "id": "jakarta",
+    "name": "Jakarta",
+    "cc": "ID",
+    "lang": "id",
+    "seen": 15,
+    "accepted": 14,
+    "filtered": 0,
+    "errors": 0,
+    "share": 1,
+    "reasons": {
+     "no_tmdb_match": 1
+    },
+    "releaseCountry": "Indonesia"
+   },
+   {
+    "id": "manila",
+    "name": "Manila",
+    "cc": "PH",
+    "lang": "tl",
+    "seen": 10,
+    "accepted": 10,
+    "filtered": 1,
+    "errors": 0,
+    "share": 0.91,
+    "reasons": {
+     "off_language": 1
+    },
+    "releaseCountry": "Philippines"
+   },
+   {
+    "id": "istanbul",
+    "name": "Istanbul",
+    "cc": "TR",
+    "lang": "tr",
+    "seen": 15,
+    "accepted": 14,
+    "filtered": 0,
+    "errors": 0,
+    "share": 1,
+    "reasons": {
+     "no_tmdb_match": 1
+    },
+    "releaseCountry": "Turkey"
+   },
+   {
+    "id": "tehran",
+    "name": "Tehran",
+    "cc": "IR",
+    "lang": "fa",
+    "seen": 8,
+    "accepted": 8,
+    "filtered": 2,
+    "errors": 0,
+    "share": 0.8,
+    "reasons": {
+     "off_language": 2
+    },
+    "releaseCountry": "Iran"
+   },
+   {
+    "id": "tel_aviv",
+    "name": "Tel Aviv",
+    "cc": "IL",
+    "lang": "he",
+    "seen": 3,
+    "accepted": 3,
+    "filtered": 1,
+    "errors": 0,
+    "share": 0.75,
+    "reasons": {
+     "off_language": 1
+    },
+    "releaseCountry": "Israel"
+   },
+   {
+    "id": "rome",
+    "name": "Rome",
+    "cc": "IT",
+    "lang": "it",
+    "seen": 6,
+    "accepted": 6,
+    "filtered": 9,
+    "errors": 0,
+    "share": 0.4,
+    "reasons": {
+     "off_language": 9
+    },
+    "releaseCountry": "Italy"
+   },
+   {
+    "id": "berlin",
+    "name": "Berlin",
+    "cc": "DE",
+    "lang": "de",
+    "seen": 13,
+    "accepted": 9,
+    "filtered": 14,
+    "errors": 0,
+    "share": 0.48,
+    "reasons": {
+     "off_language": 14,
+     "no_tmdb_match": 4
+    },
+    "releaseCountry": "Germany"
+   },
+   {
+    "id": "moscow",
+    "name": "Moscow",
+    "cc": "RU",
+    "lang": "ru",
+    "seen": 15,
+    "accepted": 12,
+    "filtered": 5,
+    "errors": 0,
+    "share": 0.75,
+    "reasons": {
+     "off_language": 5,
+     "no_tmdb_match": 3
+    },
+    "releaseCountry": "Russia"
+   },
+   {
+    "id": "warsaw",
+    "name": "Warsaw",
+    "cc": "PL",
+    "lang": "pl",
+    "seen": 2,
+    "accepted": 2,
+    "filtered": 1,
+    "errors": 0,
+    "share": 0.67,
+    "reasons": {
+     "off_language": 1
+    },
+    "releaseCountry": "Poland"
+   },
+   {
+    "id": "stockholm",
+    "name": "Stockholm",
+    "cc": "SE",
+    "lang": "sv",
+    "seen": 0,
+    "accepted": 0,
+    "filtered": 6,
+    "errors": 0,
+    "share": 0,
+    "reasons": {
+     "off_language": 6
+    },
+    "releaseCountry": "Sweden"
+   },
+   {
+    "id": "copenhagen",
+    "name": "Copenhagen",
+    "cc": "DK",
+    "lang": "da",
+    "seen": 0,
+    "accepted": 0,
+    "filtered": 0,
+    "errors": 0,
+    "share": null,
+    "reasons": {},
+    "releaseCountry": "Denmark"
+   },
+   {
+    "id": "london",
+    "name": "London",
+    "cc": "GB",
+    "lang": "en",
+    "seen": 15,
+    "accepted": 11,
+    "filtered": 0,
+    "errors": 0,
+    "share": 1,
+    "reasons": {
+     "not_native": 4
+    },
+    "releaseCountry": "United Kingdom"
+   },
+   {
+    "id": "dublin",
+    "name": "Dublin",
+    "cc": "IE",
+    "lang": "en",
+    "seen": 15,
+    "accepted": 11,
+    "filtered": 0,
+    "errors": 0,
+    "share": 1,
+    "reasons": {
+     "not_native": 4
+    },
+    "releaseCountry": "Ireland"
+   },
+   {
+    "id": "lisbon",
+    "name": "Lisbon",
+    "cc": "PT",
+    "lang": "pt",
+    "seen": 1,
+    "accepted": 1,
+    "filtered": 1,
+    "errors": 0,
+    "share": 0.5,
+    "reasons": {
+     "off_language": 1
+    },
+    "releaseCountry": "Portugal"
+   },
+   {
+    "id": "lagos",
+    "name": "Lagos",
+    "cc": "NG",
+    "lang": "en",
+    "seen": 0,
+    "accepted": 0,
+    "filtered": 0,
+    "errors": 0,
+    "share": null,
+    "reasons": {},
+    "releaseCountry": "Nigeria"
+   },
+   {
+    "id": "cairo",
+    "name": "Cairo",
+    "cc": "EG",
+    "lang": "ar",
+    "seen": 12,
+    "accepted": 8,
+    "filtered": 1,
+    "errors": 0,
+    "share": 0.92,
+    "reasons": {
+     "off_language": 1,
+     "no_tmdb_match": 4
+    },
+    "releaseCountry": "Egypt"
+   },
+   {
+    "id": "johannesburg",
+    "name": "Johannesburg",
+    "cc": "ZA",
+    "lang": "en",
+    "seen": 1,
+    "accepted": 0,
+    "filtered": 2,
+    "errors": 0,
+    "share": 0.33,
+    "reasons": {
+     "off_language": 2,
+     "not_native": 1
+    },
+    "releaseCountry": "South Africa"
+   },
+   {
+    "id": "sao_paulo",
+    "name": "São Paulo",
+    "cc": "BR",
+    "lang": "pt",
+    "seen": 15,
+    "accepted": 15,
+    "filtered": 3,
+    "errors": 0,
+    "share": 0.83,
+    "reasons": {
+     "off_language": 3
+    },
+    "releaseCountry": "Brazil"
+   },
+   {
+    "id": "bogota",
+    "name": "Bogotá",
+    "cc": "CO",
+    "lang": "es",
+    "seen": 3,
+    "accepted": 3,
+    "filtered": 2,
+    "errors": 0,
+    "share": 0.6,
+    "reasons": {
+     "off_language": 2
+    },
+    "releaseCountry": "Colombia"
+   },
+   {
+    "id": "santiago",
+    "name": "Santiago",
+    "cc": "CL",
+    "lang": "es",
+    "seen": 1,
+    "accepted": 1,
+    "filtered": 0,
+    "errors": 0,
+    "share": 1,
+    "reasons": {},
+    "releaseCountry": "Chile"
+   }
+  ]
+ },
+ "retry": {
+  "ranAt": "2026-10-30T22:32Z (2026-10-31 04:02 IST)",
+  "baseCommit": "f8b744e",
+  "results": [
+   {
+    "id": "copenhagen",
+    "releaseCountry": "DK",
+    "language": "da",
+    "seen": 0,
+    "accepted": 0,
+    "filtered": 0,
+    "reasons": {}
+   },
+   {
+    "id": "copenhagen",
+    "releaseCountry": "Kingdom of Denmark",
+    "language": "da",
+    "seen": 0,
+    "accepted": 0,
+    "filtered": 0,
+    "reasons": {}
+   },
+   {
+    "id": "lagos",
+    "releaseCountry": "NG",
+    "language": "en",
+    "seen": 0,
+    "accepted": 0,
+    "filtered": 0,
+    "reasons": {}
+   },
+   {
+    "id": "lagos",
+    "releaseCountry": "Federal Republic of Nigeria",
+    "language": "en",
+    "seen": 0,
+    "accepted": 0,
+    "filtered": 0,
+    "reasons": {}
+   },
+   {
+    "id": "lagos",
+    "releaseCountry": "Nigeria",
+    "language": "yo",
+    "seen": 0,
+    "accepted": 0,
+    "filtered": 0,
+    "reasons": {}
+   },
+   {
+    "id": "lagos",
+    "releaseCountry": "NG",
+    "language": "yo",
+    "seen": 0,
+    "accepted": 0,
+    "filtered": 0,
+    "reasons": {}
+   }
+  ]
+ }
+}

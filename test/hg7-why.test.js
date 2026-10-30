@@ -411,3 +411,66 @@ test('HG-15: the fallback line never says "if you liked"', async () => {
     for (const tag of ['thriller', 'revenge', 'dark', 'slow burn', 'drug dealer'])
       for (let v = 0; v < 4; v++) assert.doesNotMatch(phrase({ favourite: 'Heat', tag, kind }, 'movie', v), /\bif\b/i);
 });
+
+// HG-16
+test('HG-16: rejection reasons are rule names only', async () => {
+  const { checkWhy } = await import('../lib/whyllm.js');
+  const g = { favourite: 'Breaking Bad', titles: ['Burning'], sources: ['Mystery, Drama', 'A delivery boy meets a mysterious young man and a woman who vanishes.'] };
+  const r = (line) => checkWhy(line, g).reason;
+  assert.equal(r('Fans of Breaking Bad will like this mystery drama film about a delivery boy and a mysterious young man.'), null);
+  assert.equal(r(''), 'empty');
+  assert.equal(r('Too short.'), 'length');
+  assert.equal(r('Fans of Heat will like this mystery drama film about a delivery boy and a young man.'), 'favourite_missing');
+  assert.equal(r('Fans of Breaking Bad will like this mystery film about two young men and a woman.'), 'number_word');
+  assert.equal(r('Fans of Breaking Bad will like this mystery film about 2 young men and a woman.'), 'digit');
+  assert.equal(r('Fans of Breaking Bad will like this mystery film about a boy who does not vanish.'), 'negation');
+  assert.equal(r('Fans of Breaking Bad will like this mystery film if a woman vanishes here.'), 'hedge');
+  assert.equal(r("Fans of Breaking Bad will like this mystery film, it's a woman who vanishes."), 'contraction');
+  assert.equal(r('Fans of Breaking Bad will like this mystery film: a woman who vanishes here.'), 'punctuation');
+  assert.equal(r('Fans of Breaking Bad will like this mystery film about a chef and a pilot who vanishes.'), 'ungrounded:2');
+  assert.equal(r('Fans of Breaking Bad will like this film, a tale that explores the plot and story set here.'), 'too_few_grounded:0');
+});
+test('HG-16: the why_llm log carries reasons, never line text or user input', async () => {
+  const logs = [];
+  const SECRET = 'Like Breaking Bad, directed by christopher nolan and loved by many people.';
+  const claude = mockClaude(answer(SECRET));
+  await createWhyWriter({ retry: false, claude, budget: createClaudeBudget(), log: (o) => logs.push(o) })([pick(), pick({ qlooId: 'q2' })], FAVS, { ip: '1.2.3.4' });
+  const ev = logs.find((l) => l.event === 'why_llm');
+  assert.deepEqual(ev.rejected, ['ungrounded:4', 'ungrounded:4']);
+  const dump = JSON.stringify(logs);
+  for (const bad of ['christopher', 'nolan', 'Breaking Bad', '1.2.3.4', 'chemistry']) assert.ok(!dump.includes(bad), bad);
+  const logs2 = [];
+  const c2 = mockClaude({ text: JSON.stringify({ picks: [] }), usage: {} });
+  await createWhyWriter({ retry: false, claude: c2, budget: createClaudeBudget(), log: (o) => logs2.push(o) })([pick()], FAVS, { ip: 'x' });
+  assert.deepEqual(logs2.find((l) => l.event === 'why_llm').rejected, ['missing']);
+});
+test('HG-16: the Claude pass, retry and cache fill are handed to waitUntil so they finish after the response', async () => {
+  const handed = [];
+  let release; const gate = new Promise((r) => { release = r; });
+  let n = 0;
+  const claude = mockClaude(async (c) => { n++; if (n === 1) await gate; return answer(n === 1 ? 'Like Breaking Bad, directed by christopher nolan and loved by many people.' : GOOD)(c); });
+  const w = createWhyWriter({ claude, budget: createClaudeBudget(), waitUntil: (p) => handed.push(p) });
+  const out = await w([pick()], FAVS, { ip: 'x', waitMs: 20 }); // reveal answers at the deadline
+  assert.deepEqual(out, [null]); assert.equal(handed.length, 1);
+  release(); assert.equal(await handed[0], 'ok'); // first pass, then the regenerate, then cache fill
+  assert.equal(claude.calls.n, 2);
+  assert.equal((await w([pick()], FAVS, { ip: 'y' }))[0].why, GOOD);
+  // A throwing waitUntil never breaks the reveal; outside Vercel the default is a no-op.
+  const { vercelWaitUntil } = await import('../lib/whyllm.js');
+  assert.equal(vercelWaitUntil(Promise.resolve()), false);
+  const ctx = Symbol.for('@vercel/request-context'); const got = [];
+  globalThis[ctx] = { get: () => ({ waitUntil: (p) => got.push(p) }) };
+  try { assert.equal(vercelWaitUntil(Promise.resolve(1)), true); assert.equal(got.length, 1); } finally { delete globalThis[ctx]; }
+  const w2 = createWhyWriter({ claude: mockClaude(answer(GOOD)), budget: createClaudeBudget(), waitUntil: () => { throw new Error('x'); } });
+  assert.equal((await w2([pick({ qlooId: 'z' })], FAVS, { ip: 'q' }))[0].why, GOOD);
+});
+test('HG-16: fallback never says "More the", "Another the" or doubled articles', async () => {
+  const { phrase } = await import('../lib/why.js');
+  for (const kind of ['theme', 'genre', 'plot', 'style', 'mood', 'keyword', 'character', 'audience'])
+    for (const tag of ['the trickster', 'The Heist', 'a thriller', 'an outsider', 'the_underdog'])
+      for (let v = 0; v < 4; v++) {
+        const s = phrase({ favourite: 'Heat', tag, kind }, 'movie', v);
+        assert.doesNotMatch(s, /\b(more|another|same|the|a|an) (the|a|an)\b/i, s);
+      }
+  assert.equal(phrase({ favourite: 'The Dark Knight', tag: 'the trickster', kind: 'theme' }, 'movie', 1), 'More trickster film for fans of The Dark Knight');
+});

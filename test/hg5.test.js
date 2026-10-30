@@ -1,8 +1,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { whyLine, phrase, plural } from '../lib/why.js';
-import { createSuggest } from '../lib/suggest.js';
-import { present, bestQlooMatch, DEBOUNCE_MS } from '../public/logic.js';
+import { createSuggest, normaliseKind } from '../lib/suggest.js';
+import { present, bestQlooMatch, DEBOUNCE_MS, settleFavourites, favouriteIds } from '../public/logic.js';
 import { createServer } from '../server.js';
 import { setSuggest, suggestCache } from '../api/suggest.js';
 
@@ -48,17 +48,20 @@ test('e) suggestions come from TMDB/iTunes/Open Library in parallel, never Qloo'
     return { ok: true, status: 200, json: async () => body };
   };
   const tmdb = { searchTv: async () => [{ name: 'Breaking Bad', first_air_date: '2008-01-20' }], searchMovie: async () => [{ title: 'Parasite', release_date: '2019-05-30' }] };
-  const s = createSuggest({ fetch, tmdb });
-  const any = await s.suggest('ra', 'any');
+  const s = createSuggest({ fetch, tmdb }); const all = async (q, k) => (await s.suggest(q, k)).results;
+  const any = await all('ra', 'any');
   assert.deepEqual(any.map((r) => r.kind).sort(), ['band', 'book', 'movie', 'show']);
   assert.equal(peak, 2, 'iTunes and Open Library ran concurrently');
   assert.ok(calls.every((u) => !u.includes('qloo')));
-  assert.deepEqual(await s.suggest('br', 'show'), [{ name: 'Breaking Bad', year: 2008, kind: 'show' }]);
+  assert.deepEqual(await all('br', 'show'), [{ name: 'Breaking Bad', year: 2008, kind: 'show' }]);
 });
 
 test('e) one failing source does not sink the others', async () => {
   const s = createSuggest({ fetch: async () => ({ ok: false, status: 500 }), tmdb: { searchTv: async () => [{ name: 'X', first_air_date: '2001' }], searchMovie: async () => [] } });
-  assert.equal((await s.suggest('xx', 'any'))[0].name, 'X');
+  const r = await s.suggest('xx', 'any');
+  assert.equal(r.results[0].name, 'X'); assert.equal(r.partial, true);
+  assert.deepEqual(await s.suggest('xx', 'constructor'), { results: [], partial: false }, 'prototype keys are not sources');
+  assert.deepEqual(await s.suggest('xx', '__proto__'), { results: [], partial: false });
 });
 
 test('e) the chosen suggestion maps to the right Qloo entity', () => {
@@ -66,6 +69,7 @@ test('e) the chosen suggestion maps to the right Qloo entity', () => {
   assert.equal(bestQlooMatch(rs, { name: 'Breaking Bad', year: 2008 }).id, 'b');
   assert.equal(bestQlooMatch(rs, { name: 'breaking  bad' }).id, 'b');
   assert.equal(bestQlooMatch([], { name: 'x' }), null);
+  assert.equal(bestQlooMatch(rs, { name: 'The Wire' }), null, 'no name match -> null, never results[0]');
   assert.ok(DEBOUNCE_MS <= 300);
 });
 
@@ -83,16 +87,22 @@ test('c) /favicon.ico and /favicon.svg are served', async () => {
 test('d) first paint: Start is in the HTML and fonts cannot block or re-flow it', async () => {
   const html = await (await fetch(base + '/')).text();
   assert.match(html, /<button id="start"[^>]*>Start<\/button>/);
-  assert.match(html, /display=optional/);
+  assert.match(html, /display=swap/);
+  assert.equal((html.match(/rel="preload" as="font"/g) || []).length, 1, 'preload only the primary font');
   assert.match(html, /media="print" onload=/);
   assert.doesNotMatch(html, /filter id="grain"/);
   const css = await (await fetch(base + '/styles.css')).text();
   assert.doesNotMatch(css, /mix-blend-mode/);
+  for (const fam of ['Fraunces Fallback', 'Noto Serif KR Fallback']) {
+    const face = css.match(new RegExp(`@font-face\\{font-family:"${fam}"[^}]*\\}`))?.[0] || '';
+    assert.match(face, /src:local\(/); assert.match(face, /size-adjust:/); assert.match(face, /ascent-override:/); assert.match(face, /descent-override:/);
+  }
+  assert.match(css, /h1,h2,\.serif\{font-family:Fraunces,"Fraunces Fallback"/);
 });
 
 test('e) /api/suggest caches by (kind, q) and needs no Qloo key', async () => {
   suggestCache.set('x', null);
-  let n = 0; setSuggest({ suggest: async (q) => { n++; return [{ name: q.toUpperCase(), kind: 'show' }]; } });
+  let n = 0; setSuggest({ suggest: async (q) => { n++; return { results: [{ name: q.toUpperCase(), kind: 'show' }], partial: false }; } });
   const a = await (await fetch(base + '/api/suggest?kind=show&q=lost')).json();
   const b = await (await fetch(base + '/api/suggest?kind=show&q=Lost')).json();
   assert.deepEqual(a, b); assert.equal(n, 1);
@@ -105,4 +115,36 @@ test('b) picks in one category avoid repeating a tag when others are shared', ()
   const lines = [0, 1, 2].map((i) => whyLine(favs, { tags, category: 'tv' }, i, used).text);
   for (const t of ['cinematic', 'crime', 'protective']) assert.equal(lines.filter((l) => l.toLowerCase().includes(t)).length, 1, lines.join(' | '));
   assert.equal(phrase({ favourite: 'Parasite', tag: 'Family', kind: 'theme' }, 'movie', 0), 'A family film, like Parasite');
+});
+
+test('1) partial suggestions are served but not cached (server or edge)', async () => {
+  let n = 0; setSuggest({ suggest: async () => { n++; return { results: [{ name: 'Only TMDB', kind: 'show' }], partial: true }; } });
+  const r1 = await fetch(base + '/api/suggest?kind=any&q=partialq');
+  assert.equal(r1.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(await r1.json(), { results: [{ name: 'Only TMDB', kind: 'show' }], partial: true });
+  await fetch(base + '/api/suggest?kind=any&q=partialq');
+  assert.equal(n, 2, 'second request asked the sources again');
+  assert.equal(suggestCache.get('any|partialq'), undefined);
+  setSuggest(undefined);
+});
+
+test('3) unknown kinds normalise to "any" before the cache key', async () => {
+  const seen = []; setSuggest({ suggest: async (q, k) => { seen.push(k); return { results: [], partial: false }; } });
+  await fetch(base + '/api/suggest?kind=__proto__&q=kindq');
+  await fetch(base + '/api/suggest?kind=bogus&q=kindq');
+  await fetch(base + '/api/suggest?kind=any&q=kindq');
+  assert.deepEqual(seen, ['any'], 'one source call: all three share the any|kindq key');
+  assert.equal(normaliseKind('constructor'), 'any'); assert.equal(normaliseKind('band'), 'band');
+  setSuggest(undefined);
+});
+
+test('2) pending favourites become real only with a valid Qloo id; track() gets ids only', () => {
+  const favs = [{ id: 'q1', name: 'BB', tags: [] }];
+  const pending = [{ key: 'k1', name: 'Radiohead' }, { key: 'k2', name: 'Nope' }, { key: 'k3', name: 'Bad' }];
+  const matches = new Map([['k1', { id: 'q2', name: 'Radiohead', tags: [{ id: 't', name: 'x' }] }], ['k2', null], ['k3', { name: 'no id' }]]);
+  const { favs: out, missed } = settleFavourites(favs, pending, matches);
+  assert.deepEqual(out.map((f) => f.id), ['q1', 'q2']);
+  assert.deepEqual(missed, ['Nope', 'Bad']);
+  assert.ok(out.every((f) => !('match' in f) && Array.isArray(f.tags)));
+  assert.deepEqual(favouriteIds([{ id: 'a' }, { name: 'pending' }, { id: '' }, { id: 'b' }]), ['a', 'b']);
 });

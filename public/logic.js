@@ -106,7 +106,21 @@ export const present = (els) => els.flat().filter((e) => e != null && e !== fals
 export const DEBOUNCE_MS = 250;
 const nm = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 // The Qloo entity for a chosen suggestion: exact name, and the same year when both have one.
+// Never falls back to an unrelated first result.
 export function bestQlooMatch(results, { name, year }) {
   const same = results.filter((r) => nm(r.name) === nm(name));
-  return same.find((r) => !year || !r.year || r.year === year) || same[0] || results[0] || null;
+  // No name match means Qloo doesn't know this title: return null so the user is asked for another.
+  return same.find((r) => !year || !r.year || r.year === year) || same[0] || null;
 }
+
+// Pending favourites become real ones only with a valid Qloo id; the user's chosen name is kept.
+export function settleFavourites(favs, pending, matches) {
+  const out = [...favs]; const missed = [];
+  for (const f of pending) {
+    const m = matches.get(f.key);
+    if (m && typeof m.id === 'string' && m.id) out.push({ id: m.id, name: f.name, tags: Array.isArray(m.tags) ? m.tags : [] });
+    else missed.push(f.name);
+  }
+  return { favs: out, missed };
+}
+export const favouriteIds = (favs) => favs.map((f) => f.id).filter((id) => typeof id === 'string' && id);

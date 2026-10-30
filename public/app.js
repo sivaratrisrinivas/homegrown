@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
 
 const app = document.getElementById('app');
@@ -13,7 +13,10 @@ async function qlooPost(body, isCurrent = () => true) {
   if (shouldMemoTwin(r)) twinMemo.set(k, r);
   return r;
 }
-const S = { favs: [], city: null, results: {}, sound: false, catalogue: null, lang: null };
+// S.favs holds only Qloo-matched favourites ({id,name,tags}); chosen-but-unmatched ones live in
+// S.pending with their match promise kept separately in pendingMatches.
+const pendingMatches = new Map();
+const S = { favs: [], pending: [], city: null, results: {}, sound: false, catalogue: null, lang: null };
 const h = (tag, attrs = {}, ...kids) => {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else if (v != null) el.setAttribute(k, v);
@@ -22,7 +25,7 @@ const h = (tag, attrs = {}, ...kids) => {
 };
 const show = (...els) => { app.replaceChildren(...present(els)); window.scrollTo(0, 0); };
 const post = (url, body) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ ok: r.ok, body: await r.json().catch(() => ({})) }));
-const track = (body) => post('/api/feedback', { city: S.city?.id, favourites: S.favs.map((f) => f.id), ...body }).catch(() => {});
+const track = (body) => post('/api/feedback', { city: S.city?.id, favourites: favouriteIds(S.favs), ...body }).catch(() => {});
 
 // Sound: off by default; a quiet synthesised click per flap when enabled.
 let actx; const soundBtn = document.getElementById('sound');
@@ -99,7 +102,7 @@ function resolveFavourite(sug, kind) {
 }
 
 function favourite(note) {
-  const i = S.favs.length;
+  const i = S.favs.length + S.pending.length;
   if (i >= MAX_FAVS) return morph();
   const p = PROMPTS[i];
   const input = h('input', { 'aria-label': p.label, placeholder: 'Start typing…', autocomplete: 'off' });
@@ -119,19 +122,21 @@ function favourite(note) {
           const res = await fetch(`/api/suggest?kind=${p.kind}&q=${encodeURIComponent(q)}`, { signal: ctl.signal });
           r = { ok: res.ok, body: await res.json().catch(() => ({})) };
         } catch { if (my === seq) msg.textContent = 'Search is unavailable right now.'; return; }
-        if (r.ok) suggestMemo.set(sk, r);
+        if (r.ok && !r.body.partial) suggestMemo.set(sk, r);
       }
       if (my !== seq) return;
       if (!r.ok) { msg.textContent = r.body.message || 'Search is unavailable right now.'; return; }
       const results = r.body.results || [];
       msg.textContent = results.length ? '' : 'Nothing found. Try something like it.';
       sugs.replaceChildren(...results.slice(0, 5).map((e) => h('li', {}, h('button', { onclick: () => {
-        S.favs.push({ name: e.name, year: e.year, kind: e.kind || p.kind, match: resolveFavourite(e, e.kind || p.kind) });
+        const kind = e.kind || p.kind; const key = `${kind}|${e.name}|${e.year || ''}|${S.pending.length + S.favs.length}`;
+        pendingMatches.set(key, resolveFavourite(e, kind));
+        S.pending.push({ key, name: e.name });
         favourite();
       } }, e.name, e.year ? ` (${e.year})` : ''))));
     }, DEBOUNCE_MS);
   });
-  const shelf = h('div', { class: 'shelf', 'aria-label': 'Your favourites' }, S.favs.map((f) => h('span', { class: 'chip' }, f.name)));
+  const shelf = h('div', { class: 'shelf', 'aria-label': 'Your favourites' }, [...S.favs, ...S.pending].map((f) => h('span', { class: 'chip' }, f.name)));
   show(h('p', { class: 'muted' }, `Favourite ${i + 1} of ${MAX_FAVS}`), h('h2', {}, p.label), input, msg, sugs,
     canSkip(i) ? h('div', {}, h('button', { class: 'ghost', onclick: () => morph() }, 'Skip, that’s enough')) : null, shelf);
   input.focus();
@@ -139,11 +144,12 @@ function favourite(note) {
 
 // Wait for the background Qloo matches; favourites Qloo doesn't know are dropped with a note.
 async function matchFavourites() {
-  if (S.favs.every((f) => f.id)) return true;
+  if (!S.pending.length) return S.favs.length >= 3 || (favourite('Pick at least 3 favourites.'), false);
   show(h('p', { class: 'muted' }, 'Matching your favourites…'));
-  const matched = await Promise.all(S.favs.map(async (f) => (f.id ? f : (await f.match) && { ...(await f.match), name: f.name })));
-  const missed = S.favs.filter((_, k) => !matched[k]).map((f) => f.name);
-  S.favs = matched.filter(Boolean);
+  const matches = new Map(await Promise.all(S.pending.map(async (f) => [f.key, await pendingMatches.get(f.key)])));
+  const { favs, missed } = settleFavourites(S.favs, S.pending, matches);
+  S.pending.forEach((f) => pendingMatches.delete(f.key));
+  S.favs = favs; S.pending = [];
   if (S.favs.length < 3) { favourite(`We couldn't match ${missed.join(', ')}. Pick ${3 - S.favs.length} more.`); return false; }
   return true;
 }

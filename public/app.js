@@ -1,4 +1,5 @@
 import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { isMapReveal, mapFraming } from './maplogic.js';
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
 
@@ -17,14 +18,18 @@ async function qlooPost(body, isCurrent = () => true) {
 // S.favs holds only Qloo-matched favourites ({id,name,tags}); chosen-but-unmatched ones live in
 // S.pending with their match promise kept separately in pendingMatches.
 const pendingMatches = new Map();
-const S = { favs: [], pending: [], city: null, results: {}, sound: false, catalogue: null, lang: null };
+const S = { favs: [], pending: [], missed: [], city: null, results: {}, sound: false, catalogue: null, lang: null };
 const h = (tag, attrs = {}, ...kids) => {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else if (v != null) el.setAttribute(k, v);
   for (const k of kids.flat()) if (k != null) el.append(k.nodeType ? k : document.createTextNode(String(k)));
   return el;
 };
-const show = (...els) => { app.replaceChildren(...present(els)); window.scrollTo(0, 0); };
+// Every screen replace bumps screenGen and aborts the previous screen's alt-names lookup, so a
+// stale lookup can never change S.favs after the user has left that screen (HG-8).
+let screenGen = 0, screenAbort = null;
+const show = (...els) => { screenGen++; screenAbort?.(); screenAbort = null; app.replaceChildren(...present(els)); window.scrollTo(0, 0); };
+const missNote = (missed) => missedNote(missed, S.favs.length + S.pending.length);
 const post = (url, body) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ ok: r.ok, body: await r.json().catch(() => ({})) }));
 const track = (body) => post('/api/feedback', { city: S.city?.id, favourites: favouriteIds(S.favs), ...body }).catch(() => {});
 
@@ -47,8 +52,10 @@ function hello() {
   document.documentElement.style.setProperty('--accent', '#1B1B1B');
   // The hello screen is already in index.html (so it paints before JS); just wire up Start.
   const start = document.getElementById('start');
-  if (start) { start.disabled = false; start.onclick = () => pickLanguage(); return; }
-  show(h('h1', {}, "What you'd love if you grew up there."), h('div', {}, h('button', { onclick: () => pickLanguage() }, 'Start')));
+  // A new run starts here: earlier misses from a previous run are cleared.
+  const begin = () => { S.missed = []; pickLanguage(); };
+  if (start) { start.disabled = false; start.onclick = begin; return; }
+  show(h('h1', {}, "What you'd love if you grew up there."), h('div', {}, h('button', { onclick: begin }, 'Start')));
 }
 
 // Step 1: the language you're learning.
@@ -106,17 +113,47 @@ function resolveFavourite(sug, kind) {
   return p.then((r) => lookupOutcome(r, sug)).catch(() => LOOKUP_FAILED);
 }
 
+// S.missed: favourites HG-5 couldn't match (persistent across rounds); each gets a 'Try other names' action (HG-8).
 function favourite(note) {
-  const i = S.favs.length + S.pending.length;
+  const missed = S.missed;
+  const i = S.favs.length + S.pending.length; // pending picks count toward the slot index
   if (i >= MAX_FAVS) return morph();
   const p = PROMPTS[i];
   const input = h('input', { 'aria-label': p.label, placeholder: 'Start typing…', autocomplete: 'off' });
   const sugs = h('ul', { class: 'sugs' }); const msg = h('p', { class: 'muted', 'aria-live': 'polite' }, note || '');
   let t, seq = 0, ctl;
+  const alt = createAltTrigger();
+  // A verified alt-names match goes straight into S.favs (it's already a Qloo entity).
+  const addVerified = (e, kind, from, key) => {
+    if (gen !== screenGen) return false; // user left this screen: never touch S.favs
+    const v = verifiedFavourite(e, kind, S.favs, S.pending, from);
+    if (v.dup) { msg.textContent = `${from || e.name} is already in your favourites.`; return 'dup'; }
+    if (!v.fav) return false;
+    S.favs.push(v.fav);
+    S.missed = resolveMissed(S.missed, { keys: [key] });
+    favourite(missNote(S.missed)); return true;
+  };
+  // Secondary trigger: Enter on a query whose suggest came back empty.
+  input.addEventListener('keydown', async (ev) => {
+    if (ev.key !== 'Enter') return;
+    const q = input.value.trim(); const my = seq;
+    if (q.length < 2 || !alt.eligible(q)) return;
+    const prev = msg.textContent;
+    msg.textContent = 'Looking for other names…';
+    const found = await alt.submit(p.kind, q);
+    if (my !== seq) return; // superseded: the newer query owns msg
+    if (found === null) { msg.textContent = prev; return; } // aborted/failed: restore main's copy
+    if (!found.length) { msg.textContent = prev; return; } // no verified match: keep main's copy
+    addVerified(found[0], p.kind, q);
+  });
   input.addEventListener('input', () => {
+    // Bump seq on the keystroke itself (not when the debounce fires), so an in-flight Enter lookup
+    // or suggest from an older query can never write msg after the user has typed again.
+    const my = ++seq; alt.onInput();
     clearTimeout(t);
     t = setTimeout(async () => {
-      const q = input.value.trim(); const my = ++seq;
+      const q = input.value.trim();
+      if (my !== seq) return;
       if (q.length < 2) { sugs.replaceChildren(); msg.textContent = ''; return; }
       const sk = searchKey(p.kind, q);
       let r = suggestMemo.get(sk);
@@ -132,26 +169,43 @@ function favourite(note) {
       if (my !== seq) return;
       if (!r.ok) { msg.textContent = r.body.message || 'Search is unavailable right now.'; return; }
       const results = r.body.results || [];
-      msg.textContent = results.length ? '' : 'Nothing found. Try something like it.';
+      alt.noteResults(q, results.length); // zero suggest results (not zero Qloo results) make Enter eligible
+      msg.textContent = results.length ? '' : 'Nothing found. Press Enter to try other names, or try something like it.';
       sugs.replaceChildren(...results.slice(0, 5).map((e) => h('li', {}, h('button', { onclick: () => {
         const kind = e.kind || p.kind; const pick = pickKey(kind, e.name, e.year);
         if (isPicked(pick, S.favs, S.pending)) { msg.textContent = `${e.name} is already in your favourites.`; return; }
         const key = `${pick}|${S.pending.length + S.favs.length}`;
         pendingMatches.set(key, resolveFavourite(e, kind));
         S.pending.push({ key, pick, name: e.name, sug: e, kind });
-        favourite();
+        favourite(missNote(S.missed)); // S.missed keeps the 'Try other names' actions
       } }, e.name, e.year ? ` (${e.year})` : ''))));
     }, DEBOUNCE_MS);
   });
+  // Primary trigger: favourites HG-5 marked as missed get a 'Try other names' action, same server caps.
+  const tryOthers = missed.length ? h('div', {}, missed.map((m) => {
+    const b = h('button', { class: 'ghost', onclick: async () => {
+      b.disabled = true; const label = b.textContent; b.textContent = 'Looking for other names…';
+      const found = await alt.lookup(m.kind, m.name);
+      if (gen !== screenGen) return;
+      const added = found?.length ? addVerified(found[0], m.kind, m.name, m.key) : false;
+      if (added === true) return; // re-rendered
+      if (added === 'dup') { b.textContent = label; b.disabled = false; return; } // msg explains; button usable again
+      b.textContent = found === null ? label : `No other names found for ${m.name}`; b.disabled = found !== null;
+    } }, `Try other names for ${m.name}`);
+    // The user can remove a missed favourite they no longer want.
+    const x = h('button', { class: 'ghost', 'aria-label': `Remove ${m.name}`, onclick: () => { S.missed = resolveMissed(S.missed, { keys: [m.key] }); favourite(missNote(S.missed)); } }, '✕');
+    return h('span', {}, b, x);
+  })) : null;
   const shelf = h('div', { class: 'shelf', 'aria-label': 'Your favourites' }, [...S.favs, ...S.pending].map((f) => h('span', { class: 'chip' }, f.name)));
-  show(h('p', { class: 'muted' }, `Favourite ${i + 1} of ${MAX_FAVS}`), h('h2', {}, p.label), input, msg, sugs,
+  show(h('p', { class: 'muted' }, `Favourite ${i + 1} of ${MAX_FAVS}`), h('h2', {}, p.label), input, msg, tryOthers, sugs,
     canSkip(i) ? h('div', {}, h('button', { class: 'ghost', onclick: () => morph() }, 'Skip, that’s enough')) : null, shelf);
+  const gen = screenGen; screenAbort = () => alt.onInput(); // this screen's generation (show() just bumped it)
   input.focus();
 }
 
 // Wait for the background Qloo matches; favourites Qloo doesn't know are dropped with a note.
 async function matchFavourites() {
-  if (!S.pending.length) return S.favs.length >= 3 || (favourite('Pick at least 3 favourites.'), false);
+  if (!S.pending.length) return S.favs.length >= 3 || (favourite(S.missed.length ? missNote(S.missed) : 'Pick at least 3 favourites.'), false);
   const total = S.pending.length; let done = 0;
   const progress = h('p', { class: 'muted', role: 'status', 'aria-live': 'polite' }, matchingProgress(done, total));
   show(h('p', { class: 'muted' }, 'Matching your favourites…'), progress);
@@ -160,7 +214,11 @@ async function matchFavourites() {
     progress.textContent = matchingProgress(++done, total);
     return [f.key, m];
   })));
-  const { favs, missed, failed } = settleFavourites(S.favs, S.pending, matches);
+  const { favs, missed, missedKeys, failed } = settleFavourites(S.favs, S.pending, matches);
+  // Matched by pending key (not name), so two picks with the same name can't be confused.
+  const missedPicks = S.pending.filter((f) => missedKeys.includes(f.key)).map((f) => ({ key: f.key, pick: f.pick, name: f.name, kind: f.kind }));
+  // Merge into the persistent list; a later successful match of the same pick resolves an earlier miss.
+  S.missed = resolveMissed(mergeMissed(S.missed, missedPicks), { picks: favs.map((f) => f.pick) });
   S.pending.forEach((f) => pendingMatches.delete(f.key));
   S.favs = favs; S.pending = failed;
   if (failed.length) {
@@ -170,7 +228,7 @@ async function matchFavourites() {
       h('button', { onclick: retry }, 'Try again'));
     return false;
   }
-  if (S.favs.length < 3) { favourite(`We couldn't match ${missed.join(', ')}. Pick ${3 - S.favs.length} more.`); return false; }
+  if (S.favs.length < 3) { favourite(missNote(S.missed) || `Pick ${3 - S.favs.length} more.`); return false; }
   return true;
 }
 

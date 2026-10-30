@@ -129,15 +129,15 @@ export function lookupOutcome(r, sug) {
 export const matchingProgress = (done, total) => `Matching ${Math.min(done + 1, total)} of ${total}`;
 
 export function settleFavourites(favs, pending, matches) {
-  const out = [...favs]; const missed = []; const failed = []; const ids = new Set(favouriteIds(favs));
+  const out = [...favs]; const missed = []; const missedKeys = []; const failed = []; const ids = new Set(favouriteIds(favs));
   for (const f of pending) {
     const m = matches.get(f.key);
     if (m === LOOKUP_FAILED || m?.failed) { failed.push(f); continue; } // keep the pick; let the user retry
-    if (!(m && typeof m.id === 'string' && m.id)) { missed.push(f.name); continue; }
+    if (!(m && typeof m.id === 'string' && m.id)) { missed.push(f.name); missedKeys.push(f.key); continue; }
     if (ids.has(m.id)) continue; // two picks resolved to the same Qloo entity: keep the first
     ids.add(m.id);
     out.push({ id: m.id, name: f.name, pick: f.pick, tags: Array.isArray(m.tags) ? m.tags : [] });
   }
-  return { favs: out, missed, failed };
+  return { favs: out, missed, missedKeys, failed };
 }
 export const favouriteIds = (favs) => favs.map((f) => f.id).filter((id) => typeof id === 'string' && id);

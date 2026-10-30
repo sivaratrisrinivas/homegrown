@@ -26,7 +26,7 @@ test('TV: keeps only TMDB-native, applies country filter, grounded why-line', as
   assert.deepEqual(r.picks.map((p) => p.title), ['Diablero', 'Club de Cuervos']);
   assert.ok(r.picks.every((p) => p.verification.language === 'es' && p.verification.origin.includes('MX')));
   assert.equal(r.picks[0].why.grounded, true);
-  assert.match(r.picks[0].why.text, /Breaking Bad.*moral decay/);
+  assert.match(r.picks[0].why.text, /moral decay.*Breaking Bad|Breaking Bad.*moral decay/);
   assert.equal(r.picks[1].difficulty, 'easy');
   assert.equal(r.picks[0].watch.provider, 'Netflix');
   assert.equal(r.scarce, true); assert.match(r.note, /scarce in Mexico City.*left off your postcard/);

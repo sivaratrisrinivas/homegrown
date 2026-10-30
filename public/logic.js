@@ -99,3 +99,45 @@ export async function gatedIfCurrent(gate, isCurrent, send) {
 
 // Incomplete answers (a check errored or hit the deadline) are not memoised, so a retry asks again.
 export const shouldMemoTwin = (r) => Boolean(r?.ok && !r.body?.incomplete);
+
+// Optional view parts are passed as null; drop them, or replaceChildren would render the text 'null'.
+export const present = (els) => els.flat().filter((e) => e != null && e !== false);
+// Typeahead is cheap (no Qloo), so a short debounce keeps it snappy without a request per key.
+export const DEBOUNCE_MS = 250;
+const nm = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+// The Qloo entity for a chosen suggestion: exact name, and the same year when both have one.
+// Never falls back to an unrelated first result.
+export function bestQlooMatch(results, { name, year }) {
+  const same = results.filter((r) => nm(r.name) === nm(name));
+  // No name match means Qloo doesn't know this title: return null so the user is asked for another.
+  return same.find((r) => !year || !r.year || r.year === year) || same[0] || null;
+}
+
+// Pending favourites become real ones only with a valid Qloo id; the user's chosen name is kept.
+// Identity of a picked suggestion, so the same pick can't be added twice.
+export const pickKey = (kind, name, year) => `${kind}|${String(name || '').trim().toLowerCase()}|${year || ''}`;
+export const isPicked = (pick, favs, pending) => [...favs, ...pending].some((f) => f.pick === pick);
+
+// A Qloo lookup that couldn't be done (HTTP error, network error, timeout). Distinct from null,
+// which means Qloo answered and doesn't know the title.
+export const LOOKUP_FAILED = Object.freeze({ failed: true });
+export const QLOO_LOOKUP_TIMEOUT_MS = 15000;
+export function lookupOutcome(r, sug) {
+  if (!r || !r.ok) return LOOKUP_FAILED;
+  return bestQlooMatch(r.body?.results || [], sug);
+}
+export const matchingProgress = (done, total) => `Matching ${Math.min(done + 1, total)} of ${total}`;
+
+export function settleFavourites(favs, pending, matches) {
+  const out = [...favs]; const missed = []; const failed = []; const ids = new Set(favouriteIds(favs));
+  for (const f of pending) {
+    const m = matches.get(f.key);
+    if (m === LOOKUP_FAILED || m?.failed) { failed.push(f); continue; } // keep the pick; let the user retry
+    if (!(m && typeof m.id === 'string' && m.id)) { missed.push(f.name); continue; }
+    if (ids.has(m.id)) continue; // two picks resolved to the same Qloo entity: keep the first
+    ids.add(m.id);
+    out.push({ id: m.id, name: f.name, pick: f.pick, tags: Array.isArray(m.tags) ? m.tags : [] });
+  }
+  return { favs: out, missed, failed };
+}
+export const favouriteIds = (favs) => favs.map((f) => f.id).filter((id) => typeof id === 'string' && id);

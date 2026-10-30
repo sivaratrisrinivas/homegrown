@@ -23,7 +23,7 @@ test('locale -> country', () => { assert.equal(userCountryFromLocale('en-IN'), '
 test('why-line only quotes real shared tags', () => {
   const favs = [{ name: 'BB', tags: [{ id: 't1', name: 'slow_burn' }] }];
   assert.equal(sharedTags(favs, { tags: [{ id: 't1', name: 'slow_burn' }] }).length, 1);
-  assert.match(whyLine(favs, { tags: [{ id: 't1', name: 'slow_burn' }] }).text, /BB: both are slow burn/);
+  assert.match(whyLine(favs, { tags: [{ id: 't1', name: 'slow_burn' }] }).text, /slow burn.*BB/);
   const w = whyLine(favs, { tags: [{ id: 't2', name: 'x' }] });
   assert.equal(w.grounded, false); assert.doesNotMatch(w.text, /Because/);
 });

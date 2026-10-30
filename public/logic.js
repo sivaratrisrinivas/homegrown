@@ -13,7 +13,8 @@ export const QLOO_ORDER = ['tv', 'movie', 'music'];
 // A missing or empty list falls back to every category.
 // The categories to run: the journey's own, in order, that the catalogue says are live. No fallback:
 // an empty result means this city isn't ready, and the UI says so.
-export const runCatsFor = (J, catalogue) => { const live = liveCats(catalogue); return J.order.filter((c) => live.includes(c)); };
+// No categories in the catalogue (missing or empty) means not ready: never fall back to every category.
+export const runCatsFor = (J, catalogue) => { const cats = catalogue?.categories; if (!Array.isArray(cats) || !cats.length) return []; const live = liveCats(catalogue); return J.order.filter((c) => live.includes(c)); };
 export const NOT_READY = 'Picks for this city aren’t ready yet. Try another city.';
 export const liveCats = (catalogue) => { const live = catalogue?.categories; return QLOO_ORDER.filter((c) => (Array.isArray(live) && live.length ? live : QLOO_ORDER).includes(c)); };
 const CAT_WORD = { tv: 'TV', movie: 'movies', music: 'music' };
@@ -54,6 +55,12 @@ export function cityForLanguage(catalogue, languageId) {
 export function liveCitiesForLanguage(catalogue, languageId) {
   const lang = catalogue.languages.find((l) => l.id === languageId);
   return (lang?.liveCities || []).map((id) => catalogue.cities.find((c) => c.id === id && c.live)).filter(Boolean);
+}
+// Cross-city "Try X" links: never offer a city in an explicit-only language (English) unless the
+// learner picked that language themselves (captain, HG-13).
+export function otherCities(catalogue, currentCityId, pickedLanguageId) {
+  const explicitOnly = new Set((catalogue.languages || []).filter((l) => l.explicitOnly).map((l) => l.id));
+  return (catalogue.cities || []).filter((c) => c.live && c.id !== currentCityId && (!explicitOnly.has(c.language) || c.language === pickedLanguageId));
 }
 export const languageGroups = (catalogue) => ({ live: catalogue.languages.filter((l) => l.live), soon: catalogue.languages.filter((l) => !l.live) });
 export function userCountryFromLocale(locale) {

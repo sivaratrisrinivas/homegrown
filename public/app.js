@@ -1,4 +1,5 @@
-import { JOURNEY_FAVS, journeyFor, revealHeader, journeyPicks, encodeShare, decodeShare, QLOO_ORDER, liveCats, pendingCats, runCatsFor, NOT_READY, flapSteps, padTo, userCountryFromLocale, createRunGuard, createSpacer, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { JOURNEY_FAVS, journeyFor, revealHeader, journeyPicks, encodeShare, decodeShare, QLOO_ORDER, liveCats, pendingCats, runCatsFor, NOT_READY, flapSteps, padTo, userCountryFromLocale, createRunGuard, createSpacer, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, scarcePicks, cityForLanguage, otherCities, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { aiReveal } from './aisuggest-client.js';
 import { indiaSection } from './india.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { CATEGORY } from './config.js';
@@ -43,6 +44,7 @@ const track = (body) => post('/api/feedback', { city: S.city?.id, favourites: fa
 
 // Loops: at most one per screen, and all of them pause while the tab is hidden.
 document.addEventListener('visibilitychange', () => {
+  document.documentElement.toggleAttribute('data-hidden', document.hidden); // CSS pauses the .acid blobs
   for (const a of document.getAnimations()) if (a.effect?.getTiming().iterations === Infinity) document.hidden ? a.pause() : a.play();
 });
 
@@ -109,13 +111,12 @@ addEventListener('popstate', (e) => {
   } finally { restoring = false; goingBack = false; }
 });
 
-// Accent: set per city (CSS rule, or cities.json accent inline); CSS cross-fades it (--d-2).
+// Accent: set per city from cities.json; CSS cross-fades it (--d-2).
 function setCity(c) {
-  const root = document.documentElement; root.style.removeProperty('--accent');
-  if (!c) { delete root.dataset.city; return; }
-  delete root.dataset.city; const plain = getComputedStyle(root).getPropertyValue('--accent');
-  root.dataset.city = c.id;
-  if (getComputedStyle(root).getPropertyValue('--accent') === plain && c.accent) root.style.setProperty('--accent', c.accent);
+  // config/cities.json is the single source of every city accent.
+  const root = document.documentElement;
+  if (!c) { delete root.dataset.city; root.style.removeProperty('--accent'); return; }
+  root.dataset.city = c.id; if (c.accent) root.style.setProperty('--accent', c.accent);
 }
 let koFont = false;
 function loadKorean() {
@@ -149,9 +150,9 @@ async function pickLanguage() {
   const { live: all } = languageGroups(S.catalogue);
   const live = all.filter((l) => !l.states);
   show(h('h2', {}, 'You’re learning…'),
-    h('div', { class: 'tiles' }, live.map((l) => h('button', { class: 'tile', onclick: () => { chooseLanguage(l); suggestCity(); } },
+    h('div', { class: 'tiles' }, live.map((l) => h('button', { class: 'tile', onclick: () => { S.ai = null; chooseLanguage(l); suggestCity(); } },
       h('span', { class: serif(l.id), lang: l.id }, l.local), h('span', { class: 'cap' }, l.name)))),
-    indiaSection(S.catalogue, { h, onPick: (l) => { chooseLanguage(l); suggestCity(); } }));
+    indiaSection(S.catalogue, { h, onPick: (l) => { S.ai = null; chooseLanguage(l); suggestCity(); }, onSuggest: (l) => { S.ai = l; S.city = null; favourite(); } }));
 }
 function chooseLanguage(l) { S.lang = l; if (l.id === 'ko') loadKorean(); }
 
@@ -168,7 +169,7 @@ function suggestCity(chosen) {
   const others = liveCitiesForLanguage(S.catalogue, S.lang.id).filter((x) => x.id !== c.id);
   show(back,
     h('div', {}, h('p', { class: 'cap' }, c.id === best.id ? `${S.lang.name} · Best match` : S.lang.name),
-      h('h2', { class: `city-name ${serif(c.language)}`, lang: c.language, style: 'margin:12px 0 8px' }, c.local),
+      h('h2', { class: `city-name ${serif(c.language)}`, lang: c.language, dir: 'auto', style: 'margin:12px 0 8px' }, c.local),
       h('p', { class: 'flagline' }, c.local !== c.name ? `${c.name} ${c.flag}` : c.flag)),
     others.length ? h('p', { class: 'or' }, 'or') : null,
     others.length ? h('div', { class: 'tiles' }, others.map((o) => h('button', { class: 'tile', onclick: (e) => suggestCity(o, e) },
@@ -397,6 +398,8 @@ async function flipHeader(hdr, text, ko) {
 const runs = createRunGuard();
 const rowKey = (f) => f.pick || f.id;
 async function morph() {
+  // HG-12: a 'coming soon' Indian language goes to AI suggestions (names only, no Qloo twin).
+  if (S.ai) return aiReveal({ h, show, lang: S.ai, favourites: [...S.favs, ...S.pending].map((f) => f.name), onBack: pickLanguage });
   if (!S.pending.length && S.favs.length < 3) return favourite('Pick at least 3 favourites.');
   const current = runs.start();
   const c = S.city; setCity(c); nav('reveal');
@@ -415,7 +418,7 @@ async function morph() {
   const flipRows = S.favs.map((f) => rows.get(rowKey(f))).filter(Boolean);
 
   S.results = {};
-  const base = { favourites: S.favs.map(({ id, name, tags }) => ({ id, name, tags })), city: c.id, userCountry: userCountryFromLocale(navigator.language) };
+  const base = { favourites: S.favs.map(({ id, name, tags }) => ({ id, name, tags })), city: c.id, learnerLanguage: S.lang?.id, userCountry: userCountryFromLocale(navigator.language) };
   let flipped = 0, flips = Promise.resolve();
   const land = (cat, r) => {
     if (!current()) return; // a newer city run started: drop stale responses
@@ -430,7 +433,7 @@ async function morph() {
   await Promise.race([flips, wait(T('d-flip-cap'))]);
   if (!current()) return;
   foot.remove();
-  await flipHeader(hdr, revealHeader(J, c), !J.single && c.language === 'ko');
+  hdr.dir = 'auto'; await flipHeader(hdr, revealHeader(J, c), !J.single && c.language === 'ko');
   board.classList.add('city');
   await wait(T('d-hold'));
   if (!current()) return;
@@ -517,7 +520,7 @@ function picksView() {
       notes.map((n) => h('p', { class: 'note-row' }, n)),
       thin ? h('p', { class: 'note-row thin-note' }, thin) : null,
     ].flat().filter(Boolean),
-    foot: watched ? h('p', { class: 'foot-line' }, `Where-to-watch data: ${watched.watch.attribution}.`) : null,
+    foot: h('p', { class: 'foot-line' }, watched ? `Taste-matched by Qloo · Where-to-watch data: ${watched.watch.attribution}.` : 'Taste-matched by Qloo'),
     hasHero: !!hero,
   };
 }
@@ -608,7 +611,9 @@ function shareBlock() {
       .catch((e) => { if (e?.name !== 'AbortError' && !fallback.isConnected) wrap.append(fallback); });
   };
   wrap.append(h('div', { class: 'cta' }, h('button', { class: 'primary', onclick: send }, `Send my ${c.name} self`)), ...(canShare ? [] : [fallback]), status); // append(null) would print "null"
-  const others = liveCitiesForLanguage(S.catalogue || { cities: [], languages: [] }, c.language).filter((o) => o.id !== c.id);
+  // HG-13: same-language live cities only, and never an explicit-only language (English) the learner didn't pick.
+  const allowed = new Set(S.catalogue ? otherCities(S.catalogue, S.city.id, S.lang?.id).map((o) => o.id) : []);
+  const others = liveCitiesForLanguage(S.catalogue || { cities: [], languages: [] }, c.language).filter((o) => o.id !== c.id && allowed.has(o.id));
   if (others.length) wrap.append(h('div', {}, others.map((o) => h('button', { class: 'quiet', onclick: () => { track({ event: 'try_city', to: o.id }); S.city = o; setCity(o); morph(); } }, `Grow up in ${o.name} instead →`))));
   return wrap;
 }
@@ -618,7 +623,7 @@ function reveal(fromBoard) {
   const first = fromBoard?.getBoundingClientRect();
   const R = revealEls = { hero: h('div'), rest: h('div', { class: 'screen', style: 'gap:0' }), foot: h('div'), seen: new Set(), first: !!fromBoard, shareShown: false };
   const ko = !J.single && S.city.language === 'ko';
-  const board = h('div', { class: 'board compact city' }, h('h2', { class: `hdr ${ko ? 'ko' : ''}`, lang: J.single ? 'en' : S.city.language }, revealHeader(J, S.city)), flapRow(S.city.name.toUpperCase(), [...S.city.name].length, false));
+  const board = h('div', { class: 'board compact city' }, h('h2', { class: `hdr ${ko ? 'ko' : ''}`, lang: J.single ? 'en' : S.city.language, dir: 'auto' }, revealHeader(J, S.city)), flapRow(S.city.name.toUpperCase(), [...S.city.name].length, false));
   const share = shareBlock();
   R.showShare = () => {
     // A21: the share block rises 1.2 s after the header settles (immediately with reduced() motion).
@@ -646,7 +651,7 @@ async function friendView() {
   const c = data.city; setCity(c); if (c.language === 'ko') loadKorean();
   track({ event: 'share_open', city: c.id, favourites: [] });
   const fj = journeyFor(data.category); const header = fj.single ? `${fj.noun} self` : 'self';
-  const board = h('div', { class: 'board compact city' }, h('h2', { class: 'hdr', lang: 'en' }, `A friend’s ${c.name} ${header}`), flapRow(c.name.toUpperCase(), [...c.name].length, false));
+  const board = h('div', { class: 'board compact city' }, h('h2', { class: 'hdr', lang: 'en', dir: 'auto' }, `A friend’s ${c.name} ${header}`), flapRow(c.name.toUpperCase(), [...c.name].length, false));
   const lang = (cat.languages || []).find((l) => l.id === (data.lang || c.language)) || (cat.languages || []).find((l) => l.id === c.language);
   const find = () => { history.replaceState({ step: 'hello' }, '', location.pathname); S.missed = []; S.favs = []; S.pending = []; if (lang) { chooseLanguage(lang); S.city = c; suggestCity(c); } else pickLanguage(); };
   show(board, h('p', { class: 'cap shared-by' }, 'Shared by a friend · open yours for live picks'), h('p', { class: 'friend-cap' }, data.favs.length ? `Because they love ${fj.single ? `the ${fj.plural} ` : ''}${data.favs.join(', ')}` : null),

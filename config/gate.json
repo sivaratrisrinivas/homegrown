@@ -236,6 +236,141 @@
         "filtered": 41,
         "languageShare": 0.18
       }
+    },
+    "tokyo": {
+      "movie": {
+        "seen": 15,
+        "accepted": 12,
+        "errors": 0,
+        "filtered": 13,
+        "languageShare": 0.54
+      }
+    },
+    "hong_kong": {
+      "movie": {
+        "seen": 11,
+        "accepted": 10,
+        "errors": 0,
+        "filtered": 10,
+        "languageShare": 0.52
+      }
+    },
+    "taipei": {
+      "movie": {
+        "seen": 11,
+        "accepted": 11,
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
+      }
+    },
+    "bangkok": {
+      "movie": {
+        "seen": 7,
+        "accepted": 6,
+        "errors": 0,
+        "filtered": 4,
+        "languageShare": 0.64
+      }
+    },
+    "jakarta": {
+      "movie": {
+        "seen": 15,
+        "accepted": 14,
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
+      }
+    },
+    "manila": {
+      "movie": {
+        "seen": 10,
+        "accepted": 10,
+        "errors": 0,
+        "filtered": 1,
+        "languageShare": 0.91
+      }
+    },
+    "istanbul": {
+      "movie": {
+        "seen": 15,
+        "accepted": 14,
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
+      }
+    },
+    "tehran": {
+      "movie": {
+        "seen": 8,
+        "accepted": 8,
+        "errors": 0,
+        "filtered": 2,
+        "languageShare": 0.8
+      }
+    },
+    "rome": {
+      "movie": {
+        "seen": 6,
+        "accepted": 6,
+        "errors": 0,
+        "filtered": 9,
+        "languageShare": 0.4
+      }
+    },
+    "berlin": {
+      "movie": {
+        "seen": 13,
+        "accepted": 9,
+        "errors": 0,
+        "filtered": 14,
+        "languageShare": 0.48
+      }
+    },
+    "moscow": {
+      "movie": {
+        "seen": 15,
+        "accepted": 12,
+        "errors": 0,
+        "filtered": 5,
+        "languageShare": 0.75
+      }
+    },
+    "london": {
+      "movie": {
+        "seen": 15,
+        "accepted": 11,
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
+      }
+    },
+    "dublin": {
+      "movie": {
+        "seen": 15,
+        "accepted": 11,
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
+      }
+    },
+    "cairo": {
+      "movie": {
+        "seen": 12,
+        "accepted": 8,
+        "errors": 0,
+        "filtered": 1,
+        "languageShare": 0.92
+      }
+    },
+    "sao_paulo": {
+      "movie": {
+        "seen": 15,
+        "accepted": 15,
+        "errors": 0,
+        "filtered": 3,
+        "languageShare": 0.83
+      }
     }
   },
   "comingSoon": [
@@ -405,5 +540,23 @@
     "Nagaland",
     "Ladakh",
     "Andaman & Nicobar Islands"
-  ]
+  ],
+  "hg13": {
+    "measuredAt": "2026-10-30T22:15:00Z",
+    "source": "HG-13 scout: twin.measure movie, seeds Breaking Bad, Radiohead, Parasite; pool 50 -> top 15",
+    "emptyPool": {
+      "copenhagen": [
+        "Denmark",
+        "DK",
+        "Kingdom of Denmark"
+      ],
+      "lagos": [
+        "Nigeria",
+        "NG",
+        "Federal Republic of Nigeria",
+        "yo"
+      ]
+    },
+    "raw": "config/hg13-measure.json"
+  }
 }

@@ -137,7 +137,7 @@ test('HG-10 why fallback names no vendor', () => {
 
 test('HG-10 VS palette, type and tokens', () => {
   for (const t of ['--paper:#F5F1EA', '--card:var(--paper)', '--ink:#161616', '--ink-2:#55585A', '--ink-3:#6A6D6F', '--line:#E2DED6', '--board:#17161A', '--board-2:#24232A', '--chalk:#F1E7D3', '--t-display:clamp(40px,10vw,56px)', '--t-body:18px', '--mono:ui-monospace', '--ease-reveal:cubic-bezier(.19,1,.22,1)', '--d-share-delay:1200ms', '--d-share:280ms']) assert.ok(css.includes(t), t);
-  assert.match(css, /\[data-city=madrid\]\{--accent:#C8102E\}/);
+  assert.equal(JSON.parse(readFileSync(new URL("../config/cities.json", import.meta.url), "utf8")).cities.find((c) => c.id === "madrid").accent, "#C8102E");
   assert.doesNotMatch(css, /#3aa655|#e0a100|#d0453a|feTurbulence/, 'no traffic lights, no grain');
   assert.match(html, /family=Fraunces:opsz,wght@9\.\.144,400&family=Inter:wght@400;500&display=swap/);
   assert.doesNotMatch(html, /Noto\+Serif\+KR/); assert.match(app, /if \(l\.id === 'ko'\) loadKorean\(\)/);
@@ -186,9 +186,15 @@ test('HG-10 contrast: text tokens meet AA; board header is chalk with an accent 
   assert.ok(css.includes('--accent-rule:color-mix(in srgb,var(--accent) 80%,var(--chalk))'));
   assert.ok(!/[{;]color:var\(--accent\)[;}]/.test(css.replace(/\.poster b\{[^}]*\}/, '')), 'accent is never body text on paper');
   const cities = JSON.parse(readFileSync(new URL('../config/cities.json', import.meta.url), 'utf8')).cities;
-  assert.ok(cities.length >= 9); // every city, including HG-11 additions
+  // The exact set of cities, so a new one cannot skip this check.
+  assert.deepEqual(cities.map((c) => c.id).sort(), ['amritsar', 'bangkok', 'berlin', 'buenos_aires', 'cairo', 'chennai', 'dublin', 'hong_kong', 'hyderabad', 'istanbul', 'jakarta', 'kochi', 'kolkata', 'london', 'madrid', 'manila', 'mexico_city', 'moscow', 'mumbai', 'paris', 'rome', 'sao_paulo', 'seoul', 'taipei', 'tehran', 'tokyo']);
+  // cities.json is the single source of accents: no per-city CSS override.
+  assert.doesNotMatch(css, /\[data-city=[a-z_]+\]\{--accent/);
   for (const c of cities) {
-    const acc = css.match(new RegExp(`\\[data-city=${c.id}\\]\\{--accent:(#[0-9A-Fa-f]{6})\\}`))?.[1] || c.accent;
+    const acc = c.accent;
+    assert.match(acc, /^#[0-9A-Fa-f]{6}$/, c.id);
+    // The accent is used as a mark on paper (rules, underlines, the postcard bar): non-text contrast >= 3:1.
+    assert.ok(ratio(acc, paper) >= 3, `${c.id} accent on paper ${ratio(acc, paper).toFixed(2)}`);
     const mix = (a, b, p) => '#' + [0, 2, 4].map((i) => Math.round(p * parseInt(a.slice(1 + i, 3 + i), 16) + (1 - p) * parseInt(b.slice(1 + i, 3 + i), 16)).toString(16).padStart(2, '0')).join('');
     const rule = mix(acc, tok('chalk'), 0.8);
     assert.ok(ratio(rule, board) >= 3, `${c.id} rule on board ${ratio(rule, board).toFixed(2)}`);
@@ -199,6 +205,11 @@ test('HG-10 runCats: the journey categories that are live, no fallback; empty me
   const J = journeyFor('movies');
   assert.deepEqual(runCatsFor(J, { categories: ['movie', 'tv'] }), ['movie']);
   assert.deepEqual(runCatsFor(J, { categories: ['tv'] }), []);
+  // Missing or empty categories mean not ready, never "run everything".
+  assert.deepEqual(runCatsFor(J, { categories: [] }), []);
+  assert.deepEqual(runCatsFor(J, {}), []);
+  assert.deepEqual(runCatsFor(J, null), []);
+  assert.deepEqual(runCatsFor(J, undefined), []);
   assert.ok(NOT_READY.length);
   const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
   assert.ok(app.includes('const runCats = () => runCatsFor(J, S.catalogue);') && !/cats\.length \? cats : J\.order/.test(app));
@@ -215,4 +226,13 @@ test('HG-10 acid layer: colour field behind a solid slab, static under reduced m
   assert.match(css, /@media\(min-width:1024px\)\{[^@]*\.screen\.reveal\{display:grid;grid-template-columns:minmax\(0,5fr\) minmax\(0,6fr\)/);
   assert.ok(app.includes("classList.add('reveal')") && app.includes('document.body.dataset.step = step;'));
   assert.ok(app.includes('...(canShare ? [] : [fallback]), status)'), 'no stray "null" text in the share block');
+});
+test('HG-10 r4: blobs are smaller, contained and paused while the tab is hidden; Qloo credit always on the reveal', () => {
+  const css = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  const w = Number(css.match(/\.acid i\{position:absolute;width:(\d+)vmax;contain:strict;/)[1]);
+  assert.ok(w <= 50, `blob ${w}vmax`);
+  assert.ok(css.includes('[data-hidden] .acid i{animation-play-state:paused}'));
+  assert.ok(app.includes("document.documentElement.toggleAttribute('data-hidden', document.hidden)"));
+  assert.ok(app.includes("'Taste-matched by Qloo'") && app.includes('`Taste-matched by Qloo · Where-to-watch data:'));
 });

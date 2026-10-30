@@ -56,3 +56,17 @@ test('review 10: a non-string city never bypasses the live-city gate', async () 
   assert.equal((await post('/api/feedback', { event: 'try_city', city: 'seoul', to: ['madrid'] })).status, 400);
   assert.equal((await post('/api/feedback', { event: 'try_city', city: 'seoul', to: 'madrid' })).status, 200);
 });
+test('HG-13: London/Dublin (explicit-only English) are served only to English learners', async () => {
+  for (const city of ['london', 'dublin']) {
+    for (const learnerLanguage of [undefined, 'ja', 'hi', 'EN', ['en']]) {
+      const r = await post('/api/twin', { favourites: FAVS, city, category: 'movie', learnerLanguage });
+      assert.equal(r.status, 403, `${city}/${JSON.stringify(learnerLanguage)}`);
+    }
+    // Picked English: passes the gate and reaches the (keyless) service.
+    assert.equal((await post('/api/twin', { favourites: FAVS, city, category: 'movie', learnerLanguage: 'en' })).status, 503);
+  }
+  // Other cities don't need the field (client contract unchanged for them).
+  assert.equal((await post('/api/twin', { favourites: FAVS, city: 'tokyo', category: 'movie' })).status, 503);
+  const app = (await import('node:fs')).readFileSync('public/app.js', 'utf8');
+  assert.match(app, /learnerLanguage: S\.lang\?\.id/);
+});

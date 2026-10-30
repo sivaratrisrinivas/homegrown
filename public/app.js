@@ -89,7 +89,7 @@ function suggestCity() {
   const pick = (c) => {
     const others = liveCitiesForLanguage(S.catalogue, S.lang.id).filter((x) => x.id !== c.id);
     show(h('p', { class: 'muted' }, c.id === live.id ? `For ${S.lang.name}, we suggest` : `${S.lang.name} in`),
-      h('h2', { class: serif(c.language) }, `${c.local} ${c.flag}`),
+      h('h2', { class: serif(c.language), dir: 'auto' }, `${c.local} ${c.flag}`),
       c.lead ? h('p', { class: 'lead' }, c.lead.text) : null,
       h('button', { onclick: () => { S.city = c; favourite(); } }, `Go to ${c.name}`),
       others.length ? h('div', {}, others.map((o) => h('button', { class: 'ghost', onclick: () => pick(o) }, `Switch to ${o.name}`))) : null,
@@ -279,7 +279,7 @@ async function morph() {
   const qlooP = runCategories(liveCats(S.catalogue), (cat) => qlooPost({ ...base, category: cat }, current), land);
   await Promise.race([qlooP, new Promise((r) => setTimeout(r, MORPH_BUDGET_MS))]);
   if (!current()) return;
-  hdr.textContent = c.header; hdr.classList.toggle('ko', c.language === 'ko');
+  hdr.textContent = c.header; hdr.dir = 'auto'; hdr.classList.toggle('ko', c.language === 'ko');
   await new Promise((r) => setTimeout(r, reduced ? 200 : 1200));
   if (!current()) return;
   reveal();
@@ -351,7 +351,7 @@ function reveal() {
     } }, 'Send'));
   // Only other live cities are offered.
   const others = (S.catalogue?.cities || []).filter((c) => c.live && c.id !== S.city.id);
-  show(h('p', { class: 'kind' }, S.city.header), picks, rating,
+  show(h('p', { class: 'kind', dir: 'auto' }, S.city.header), picks, rating,
     h('section', { class: 'card postcard-summary' }, h('h3', { class: 'serif' }, `Keep your ${S.city.name} self`),
       h('button', { onclick: (e) => { e.target.replaceWith(h('p', { class: 'muted' }, 'Saving with an email link is coming soon.')); } }, `Save my ${S.city.name} self`),
       h('div', {}, others.map((c) => h('button', { class: 'ghost', onclick: () => { track({ event: 'try_city', to: c.id }); S.city = c; morph(); } }, `Try ${c.name}`)))));

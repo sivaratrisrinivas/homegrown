@@ -60,3 +60,6 @@ identical in-flight requests share one call; a global spend estimate from usage 
 if its worst case fits. Results, including "no match", are cached 7 days.
 Limitation: this state is in-memory per serverless instance. It resets on cold starts and isn't shared across
 instances, so the real daily spend can exceed one instance's cap. That's why the cap is half the $0.50 budget.
+
+## World cities (HG-13)
+15 cities went live on the movie gate. The raw scout and retry output is in `config/hg13-measure.json` and is referenced from `gate.json` → `hg13.raw`. Copenhagen and Lagos returned an empty Qloo pool for every country name and code we tried. **Tehran:** iTunes has no Iran storefront, so `itunesCountry: 'ir'` returns nothing. Music for Tehran won't work if music ever goes live (only movies are live now).

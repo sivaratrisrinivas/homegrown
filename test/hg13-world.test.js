@@ -45,3 +45,19 @@ test('HG-13: every configured city is gated by its measured result; thin note fo
   const cat = catalogue(gate);
   for (const c of NEW) assert.ok(cat.languages.find((l) => l.id === c.language).live, c.language);
 });
+
+test('HG-13 review: RTL-safe headers, provenance, no combining-dot aliases', () => {
+  const app = readFileSync('public/app.js', 'utf8');
+  assert.match(app, /h\('h2', \{ class: serif\(c\.language\), dir: 'auto' \}/);
+  assert.match(app, /hdr\.textContent = c\.header; hdr\.dir = 'auto'/);
+  assert.match(app, /h\('p', \{ class: 'kind', dir: 'auto' \}, S\.city\.header\)/);
+  const raw = JSON.parse(readFileSync(gate.hg13.raw, 'utf8'));
+  for (const c of NEW) {
+    const r = raw.scout.results.find((x) => x.id === c.id);
+    assert.ok(r, c.id); assert.equal(gate.results[c.id].movie.seen, r.seen); assert.equal(gate.results[c.id].movie.accepted, r.accepted);
+    assert.equal(r.releaseCountry, c.releaseCountry, c.id);
+  }
+  assert.ok(raw.retry.results.every((r) => r.seen === 0));
+  assert.doesNotMatch(readFileSync('config/cities.json', 'utf8'), /\u0307/);
+  assert.match(CITIES.tehran.itunesNote, /ir/);
+});

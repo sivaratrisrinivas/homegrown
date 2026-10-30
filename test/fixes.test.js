@@ -66,14 +66,12 @@ test('MusicBrainz 503 is retried with backoff', async () => {
   assert.equal(r[0].name, 'IU'); assert.equal(n, 3); assert.ok(sleeps.includes(2000) && sleeps.includes(4000));
 });
 test('TV uses Qloo country names for filter.release_country', () => {
-  // Derived from config: one Qloo country name per ISO country, a real name (not the bare code).
-  const byCountry = {};
-  for (const c of Object.values(CITIES)) {
-    assert.ok(c.releaseCountry && c.releaseCountry !== c.country, c.id);
-    byCountry[c.country] ??= c.releaseCountry;
-    assert.equal(c.releaseCountry, byCountry[c.country], `${c.id}: same country, same Qloo name`);
-  }
-  assert.equal(byCountry.MX, 'Mexico'); assert.equal(byCountry.IN, 'India');
+  const want = { MX: 'Mexico', ES: 'Spain', AR: 'Argentina', KR: 'South Korea', FR: 'France', IN: 'India',
+    // HG-13: the exact names measured against Qloo (config/hg13-measure.json).
+    JP: 'Japan', HK: 'Hong Kong', TW: 'Taiwan', TH: 'Thailand', ID: 'Indonesia', PH: 'Philippines', TR: 'Turkey',
+    IR: 'Iran', IT: 'Italy', DE: 'Germany', RU: 'Russia', GB: 'United Kingdom', IE: 'Ireland', EG: 'Egypt', BR: 'Brazil' };
+  assert.equal(Object.keys(want).length, 21);
+  for (const c of Object.values(CITIES)) assert.equal(c.releaseCountry, want[c.country], c.id);
 });
 
 import { twinKey } from '../lib/cache.js';

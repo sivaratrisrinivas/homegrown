@@ -686,7 +686,6 @@
       "itunesCountry": "tr",
       "countryNames": [
         "istanbul",
-        "i̇stanbul",
         "turkey",
         "turkiye",
         "türkiye"
@@ -726,7 +725,8 @@
         "persian",
         "iranian",
         "persian_pop"
-      ]
+      ],
+      "itunesNote": "iTunes has no Iran storefront: itunesCountry 'ir' will not return music; music is not live for Tehran."
     },
     {
       "id": "rome",

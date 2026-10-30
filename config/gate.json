@@ -218,6 +218,192 @@
         "filtered": 3,
         "languageShare": 0.25
       }
+    },
+    "kochi": {
+      "movie": {
+        "seen": 15,
+        "accepted": 15,
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
+      }
+    },
+    "amritsar": {
+      "movie": {
+        "seen": 9,
+        "accepted": 7,
+        "errors": 0,
+        "filtered": 41,
+        "languageShare": 0.18
+      }
     }
-  }
+  },
+  "comingSoon": [
+    {
+      "language": "kn",
+      "name": "Kannada",
+      "city": "Bengaluru",
+      "reason": "native 40% (2/5)",
+      "states": [
+        "Karnataka"
+      ],
+      "local": "ಕನ್ನಡ",
+      "statesLabel": "Karnataka",
+      "meanwhile": "hi"
+    },
+    {
+      "language": "mr",
+      "name": "Marathi",
+      "city": "Pune",
+      "reason": "3 measured, 0 native",
+      "states": [
+        "Maharashtra"
+      ],
+      "local": "मराठी",
+      "statesLabel": "Maharashtra",
+      "meanwhile": "hi"
+    },
+    {
+      "language": "gu",
+      "name": "Gujarati",
+      "city": "Ahmedabad",
+      "reason": "4 measured",
+      "states": [
+        "Gujarat",
+        "Dadra & Nagar Haveli and Daman & Diu"
+      ],
+      "local": "ગુજરાતી",
+      "statesLabel": "Gujarat, Dadra & Nagar Haveli and Daman & Diu",
+      "meanwhile": "hi"
+    },
+    {
+      "language": "or",
+      "name": "Odia",
+      "city": "Bhubaneswar",
+      "reason": "3 measured",
+      "states": [
+        "Odisha"
+      ],
+      "local": "ଓଡ଼ିଆ",
+      "statesLabel": "Odisha",
+      "meanwhile": "hi"
+    },
+    {
+      "language": "as",
+      "name": "Assamese",
+      "city": "Guwahati",
+      "reason": "2 measured",
+      "states": [
+        "Assam"
+      ],
+      "local": "অসমীয়া",
+      "statesLabel": "Assam",
+      "meanwhile": "bn"
+    },
+    {
+      "language": "ks",
+      "name": "Kashmiri",
+      "city": "Srinagar",
+      "reason": "2 measured",
+      "states": [
+        "Jammu & Kashmir"
+      ],
+      "local": "کٲشُر",
+      "statesLabel": "Jammu & Kashmir",
+      "meanwhile": "hi"
+    },
+    {
+      "language": "ne",
+      "name": "Nepali",
+      "city": "Gangtok",
+      "reason": "2 measured",
+      "states": [
+        "Sikkim"
+      ],
+      "local": "नेपाली",
+      "statesLabel": "Sikkim",
+      "meanwhile": "hi"
+    }
+  ],
+  "notSupported": [
+    {
+      "language": "bho",
+      "name": "Bhojpuri",
+      "city": "Patna",
+      "reason": "no TMDB language code (Bhojpuri films are tagged Hindi)",
+      "states": [
+        "Bihar",
+        "Uttar Pradesh"
+      ],
+      "local": "भोजपुरी",
+      "statesLabel": "Bihar & eastern Uttar Pradesh",
+      "meanwhile": "hi"
+    },
+    {
+      "language": "kok",
+      "name": "Konkani",
+      "city": "Panaji",
+      "reason": "no TMDB language code",
+      "states": [
+        "Goa"
+      ],
+      "local": "कोंकणी",
+      "statesLabel": "Goa",
+      "meanwhile": "hi"
+    },
+    {
+      "language": "mni",
+      "name": "Manipuri",
+      "city": "Imphal",
+      "reason": "no TMDB language code",
+      "states": [
+        "Manipur"
+      ],
+      "local": "ꯃꯩꯇꯩꯂꯣꯟ",
+      "statesLabel": "Manipur",
+      "meanwhile": "hi"
+    },
+    {
+      "language": "tcy",
+      "name": "Tulu",
+      "city": "Mangaluru",
+      "reason": "no TMDB language code",
+      "states": [
+        "Karnataka"
+      ],
+      "local": "ತುಳು",
+      "statesLabel": "coastal Karnataka",
+      "meanwhile": "hi"
+    },
+    {
+      "language": "lus",
+      "name": "Mizo",
+      "city": "Aizawl",
+      "reason": "no TMDB language code",
+      "states": [
+        "Mizoram"
+      ],
+      "local": "Mizo ṭawng",
+      "statesLabel": "Mizoram",
+      "meanwhile": "hi"
+    },
+    {
+      "language": "kha",
+      "name": "Khasi",
+      "city": "Shillong",
+      "reason": "no TMDB language code",
+      "states": [
+        "Meghalaya"
+      ],
+      "local": "Ka Ktien Khasi",
+      "statesLabel": "Meghalaya",
+      "meanwhile": "hi"
+    }
+  ],
+  "noFilmLanguage": [
+    "Arunachal Pradesh",
+    "Nagaland",
+    "Ladakh",
+    "Andaman & Nicobar Islands"
+  ]
 }

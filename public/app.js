@@ -298,7 +298,7 @@ function pickCard(p, hero = false) {
     h(hero ? 'h2' : 'h3', { class: S.city.language === 'ko' ? 'ko' : '' }, p.title),
     p.englishTitle && p.englishTitle !== p.title ? h('p', { class: 'muted' }, p.englishTitle) : null,
     h('p', {}, p.why?.text),
-    h('div', { class: 'meta' }, p.difficulty ? h('span', {}, h('span', { class: `dot ${p.difficulty}` }), p.difficulty) : null,
+    h('div', { class: 'meta' }, p.difficulty ? h('span', { title: 'Estimated difficulty for a language learner' }, h('span', { class: `dot ${p.difficulty}` }), `${p.difficulty} (estimated)`) : null,
       h('span', {}, `made in ${S.city.flag}`)),
     p.tip ? h('p', { class: 'muted tip' }, p.tip) : null,
     link, p.watch ? h('p', { class: 'muted', style: 'font-size:12px' }, `Availability: ${p.watch.attribution}`) : null,

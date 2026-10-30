@@ -48,7 +48,9 @@ test('reduced motion: no springs or pulses, a short fade instead', () => {
   assert.deepEqual(motionPlan(true), { spring: false, fadeMs: 150, pulse: false });
   assert.equal(motionPlan(false).spring, true);
   const css = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
-  assert.match(css, /prefers-reduced-motion:reduce\)\{\*\{animation:none!important/);
+  // HG-10: no blanket rule; reduced motion zeroes the duration tokens and JS sets end states.
+  assert.doesNotMatch(css, /\*\{animation:none!important/);
+  assert.match(css, /prefers-reduced-motion:reduce\)\{:root\{--d-1:0ms;--d-2:0ms;--d-3:0ms;--d-4:0ms\}\}/);
   const map = readFileSync(new URL('../public/map.js', import.meta.url), 'utf8');
   assert.match(map, /motionPlan\(reduced\)/);
 });

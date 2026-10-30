@@ -11,7 +11,7 @@ const ent = (id, name) => ({ id, name, type: 'urn:entity:tv_show', tags: [] });
 const mockClaude = (names, usage = { input_tokens: 80, output_tokens: 20 }) => {
   const c = { calls: 0, async altNames() { c.calls++; return { names, usage }; } }; return c;
 };
-const mockQloo = (db) => { const q = { calls: [], async search(n) { q.calls.push(n); return db[n] || []; } }; return q; };
+const mockQloo = (db) => { const q = { calls: [], async search(n, t, o) { o?.beforeAttempt?.(); q.calls.push(n); return db[n] || []; } }; return q; };
 
 test('re-resolves alt names with Qloo and returns only a genuine same-name match', async () => {
   const qloo = mockQloo({ 'Dark Desire': [ent('q-x', 'Something Else')], 'Oscuro Deseo': [ent('q-od', 'Oscuro deseo')] });
@@ -70,7 +70,7 @@ test('end to end with mocked Qloo fetch (7 s throttle mocked) and handler output
   const qloo = createQloo({ fetch: qf, env: { QLOO_API_KEY: 'k' }, sleep: async () => {} });
   setDeps({ altnames: createAltNames({ qloo, claude: mockClaude(['Wrong', 'Alt Name']) }) });
   const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(b) { this.body = JSON.parse(b); } };
-  await handler({ query: { q: 'typed name', kind: 'movie' }, headers: { 'x-forwarded-for': '1.2.3.4' } }, res);
+  await handler({ query: { q: 'typed name', kind: 'movie' }, headers: { 'x-vercel-forwarded-for': '1.2.3.4' } }, res);
   assert.deepEqual(res.body.results.map((e) => e.id), ['q-1']); assert.equal(qf.calls.length, 2);
   setDeps({ altnames: async () => { throw new Error('boom'); } });
   await handler({ query: { q: 'xx', kind: 'movie' }, headers: {} }, res);
@@ -146,4 +146,44 @@ test('app wires altnames only through the Enter handler, outside qlooGate', asyn
   const src = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
   assert.ok(!src.includes('/api/altnames')); // only altnames-client.js builds that URL
   assert.match(src, /key !== 'Enter'/); assert.match(src, /alt\.onInput\(\)/);
+});
+
+// Review round 2
+test('deadline fixed at entry is passed to qloo.search; a deadline stop is incomplete and not cached', async () => {
+  let t = 0; const seen = [];
+  const qloo = { async search(n, types, o) { seen.push(o); t += 30000; if (seen.length === 2) throw Object.assign(new Error('late'), { status: 504, notSent: true }); return []; } };
+  const claude = mockClaude(['A', 'B']);
+  const f = createAltNames({ qloo, claude, now: () => t + Date.parse('2026-10-30T00:00:00Z') });
+  assert.deepEqual((await f({ q: 'foo', kind: 'show', ip: 'x' })).results, []);
+  assert.equal(seen[0].deadline, Date.parse('2026-10-30T00:00:00Z') + 45000); assert.equal(seen[1].deadline, seen[0].deadline);
+  assert.ok(seen[0].maxRetries <= 1);
+  const again = await f({ q: 'foo', kind: 'show', ip: 'x' }); assert.equal(again.cached, undefined); // not cached
+  // A loop-level deadline stop (time already past) is also incomplete.
+  const g = createAltNames({ qloo: mockQloo({}), claude: mockClaude(['A']), deadlineMs: -1 });
+  await g({ q: 'bar', kind: 'show', ip: 'x' }); assert.equal((await g({ q: 'bar', kind: 'show', ip: 'x' })).cached, undefined);
+});
+test('real Qloo client: at most 1 retry, every HTTP attempt counts against the 40/day budget', async () => {
+  const qf = fakeFetch([['/search', () => json({}, 429)]]);
+  const qloo = createQloo({ fetch: qf, env: { QLOO_API_KEY: 'k' }, sleep: async () => {}, gapMs: 0 });
+  const f = createAltNames({ qloo, claude: mockClaude(['A', 'B']), caps: { ...ALT_CAPS, perIpPerDay: 1e6, qlooPerDay: 3 } });
+  await f({ q: 'one', kind: 'show', ip: 'x' });
+  assert.equal(qf.calls.length, 2); // 1 attempt + 1 retry, then the 429 ends the request
+  await f({ q: 'two', kind: 'show', ip: 'x' });
+  assert.equal(qf.calls.length, 3); // budget hit mid-retry: the 4th attempt is never sent
+  assert.equal((await f({ q: 'three', kind: 'show', ip: 'x' })).capped, 'qloo'); assert.equal(qf.calls.length, 3);
+});
+test("Claude's names are cached per key: a retry after a Qloo failure skips Claude", async () => {
+  let fail = true; const claude = mockClaude(['Alt']);
+  const qloo = { calls: 0, async search(n) { qloo.calls++; if (fail) throw Object.assign(new Error('x'), { status: 502 }); return [ent('q-a', 'Alt')]; } };
+  const f = createAltNames({ qloo, claude });
+  assert.deepEqual((await f({ q: 'foo', kind: 'show', ip: 'x' })).results, []);
+  fail = false;
+  assert.deepEqual((await f({ q: 'foo', kind: 'show', ip: 'x' })).results.map((e) => e.id), ['q-a']);
+  assert.equal(claude.calls, 1); assert.equal(qloo.calls, 2);
+});
+test('app: an aborted/superseded altnames lookup leaves the message unchanged', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  const line = src.split('\n').find((l) => l.includes('found === null'));
+  assert.ok(line && /return;/.test(line) && !/msg\.textContent/.test(line));
 });

@@ -93,7 +93,7 @@ function favourite() {
     if (q.length < 2) return;
     msg.textContent = 'Looking for other names…';
     const found = await alt.submit(p.kind, q);
-    if (found === null || my !== seq) { if (my === seq && msg.textContent === 'Looking for other names…') msg.textContent = 'Nothing found. Try something like it.'; return; }
+    if (found === null || my !== seq) return; // aborted/superseded: leave the message to the newer query
     msg.textContent = found.length ? 'Found it under another name:' : 'Nothing found. Try something like it.';
     sugs.replaceChildren(...found.slice(0, 3).map(pick));
   });

@@ -29,7 +29,7 @@ const track = (body) => post('/api/feedback', { city: S.city?.id, favourites: fa
 
 // Sound: off by default; a quiet synthesised click per flap when enabled.
 let actx; const soundBtn = document.getElementById('sound');
-soundBtn.onclick = () => { S.sound = !S.sound; soundBtn.textContent = S.sound ? '🔈' : '🔇'; soundBtn.setAttribute('aria-pressed', S.sound); };
+soundBtn.onclick = () => { S.sound = !S.sound; soundBtn.textContent = S.sound ? 'Sound on' : 'Sound off'; soundBtn.setAttribute('aria-pressed', S.sound); };
 function click() {
   if (!S.sound) return;
   actx ||= new AudioContext();

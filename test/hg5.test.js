@@ -212,3 +212,20 @@ test('round 3 (b): matching progress counts up as lookups settle, in a polite li
   assert.match(src, /'aria-live': 'polite' }, matchingProgress\(done, total\)/);
   assert.match(src, /progress\.textContent = matchingProgress\(\+\+done, total\)/);
 });
+
+test('round 4: results lead uses the app serif, sound toggle is plain text, watch link stays one line', async () => {
+  const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.match(css, /\.lead\{font-family:Fraunces,"Fraunces Fallback",serif/);
+  assert.doesNotMatch(css, /var\(--serif/, 'no undefined --serif variable');
+  assert.match(html, /<button id="sound"[^>]*>Sound off<\/button>/);
+  assert.doesNotMatch(html, /🔇/);
+  assert.match(css, /\.card \.btn\{display:block;[^}]*white-space:nowrap;[^}]*text-overflow:ellipsis/);
+});
+
+test('round 4: the wildcard slot rejects the same work picked earlier; a different work of the same name is allowed', () => {
+  const film = pickKey('movie', 'Parasite', 2019);
+  const favs = [{ id: 'q', pick: film }];
+  assert.equal(isPicked(pickKey('movie', 'Parasite', 2019), favs, []), true, 'wildcard result carries its own kind');
+  assert.equal(isPicked(pickKey('book', 'Parasite', 2013), favs, []), false, 'Parasite (2013) the book is a different work');
+});

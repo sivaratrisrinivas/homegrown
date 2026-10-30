@@ -7,8 +7,9 @@ import twin from './api/twin.js';
 import feedback from './api/feedback.js';
 import health from './api/health.js';
 import cities from './api/cities.js';
+import altnames from './api/altnames.js';
 
-const routes = { '/api/search': search, '/api/twin': twin, '/api/feedback': feedback, '/api/health': health, '/api/cities': cities };
+const routes = { '/api/search': search, '/api/twin': twin, '/api/feedback': feedback, '/api/health': health, '/api/cities': cities, '/api/altnames': altnames };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
 const PUB = join(import.meta.dirname, 'public');
 

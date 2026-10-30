@@ -95,7 +95,14 @@ function favourite() {
         r = await qlooGate(async () => {
           if (my !== seq) return SKIP; // superseded while waiting for the gate: don't spend a Qloo call
           const res = await fetch(`/api/search?kind=${p.kind}&q=${encodeURIComponent(q)}`);
-          return { ok: res.ok, body: await res.json().catch(() => ({})) };
+          const out = { ok: res.ok, body: await res.json().catch(() => ({})) };
+          // HG-8: Qloo found nothing for the typed name -> server asks Claude for alternate names, Qloo-verified only.
+          // Only on an empty result (not on partial typeahead hits) so the per-IP cap isn't spent while typing.
+          if (out.ok && !out.body.results?.length && my === seq) {
+            const alt = await fetch(`/api/altnames?kind=${p.kind}&q=${encodeURIComponent(q)}`).then((x) => x.json()).catch(() => ({}));
+            if (alt.results?.length) out.body = { ...out.body, results: alt.results };
+          }
+          return out;
         });
         if (r === SKIP) return;
         if (r?.ok) searchMemo.set(sk, r);

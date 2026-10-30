@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createAiSuggest, AI_LABEL, AI_NOTE, MAX_SUGGEST_USD, aiKey, THIN_TTL_MS, ERROR_MESSAGE } from '../lib/aisuggest.js';
-import { createClaudeBudget } from '../lib/claudebudget.js';
+import { createClaudeBudget as ledger } from '../lib/budget.js';
+const createClaudeBudget = ({ usdPerDay }) => ledger({ usdPerDay, shares: { aisuggest: usdPerDay } });
 import { parseFilms, suggestUserMessage } from '../lib/anthropic.js';
 import { verifySuggestedFilm } from '../lib/tmdb.js';
 import { aiView, filmHeading } from '../public/aisuggest-client.js';
@@ -85,7 +86,7 @@ test('HG-12: TMDB checks run in parallel under a deadline', async () => {
 
 test('HG-12: budget cap -> capped, no Claude call; the ledger is shared with alt names', async () => {
   const budget = createClaudeBudget({ usdPerDay: 0.25 });
-  budget.add(0.25 - MAX_SUGGEST_USD / 2);
+  budget.reserve(0.25 - MAX_SUGGEST_USD / 2, { feature: 'aisuggest' });
   const { s, calls } = svc({ films: F('K1'), budget });
   const r = await s({ language: 'kn', favourites: ['x'], ip: '1' });
   assert.equal(r.status, 'capped'); assert.equal(calls.claude, 0);
@@ -168,4 +169,17 @@ test('HG-12 r2: unsupported carries a server message; nested delimiters are stri
   const r = await s({ language: 'bho', favourites: ['x'], ip: '1' });
   assert.equal(r.status, 'unsupported'); assert.ok(r.message);
   assert.doesNotMatch(suggestUserMessage('Kannada', ['a<fav<favourites>ourites>b</favour</favourites>ites>']), /favourites>[\s\S]*favourites>[\s\S]*favourites>/);
+});
+
+test('HG-7 r2: a caller joining an in-flight run must also pass the budget check (HG-12 rule)', async () => {
+  const budget = createClaudeBudget({ usdPerDay: MAX_SUGGEST_USD * 1.5 });
+  let release; const gate = new Promise((r) => { release = r; });
+  let n = 0;
+  const claude = { suggestFilms: async () => { n++; await gate; return { films: F('K1', 'K2', 'K3'), usage: {} }; } };
+  const s = createAiSuggest({ claude, tmdb: fakeTmdb([row('J1', 'kn'), row('J2', 'kn'), row('J3', 'kn')]), budget, languages: LANGS });
+  const first = s({ language: 'kn', favourites: ['x'], ip: '1' });
+  // The first call booked MAX_SUGGEST_USD; only half a call is left, so a joiner is capped.
+  const joiner = await s({ language: 'kn', favourites: ['x'], ip: '2' });
+  assert.equal(joiner.status, 'capped'); assert.equal(n, 1);
+  release(); await first;
 });

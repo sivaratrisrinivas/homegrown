@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { bestSeedMatch } from '../lib/qloo.js';
 import { loadGate, catalogue, cityStatus, thinNote } from '../lib/gate.js';
-import { indiaGroups, matchState, indiaLabel, meanwhileHint, matchStatus } from '../public/india.js';
+import { indiaGroups, matchState, indiaLabel, meanwhileHint, matchStatus, indiaSection } from '../public/india.js';
 
 test('HG-11 seed: exact title beats a longer first result (Parasite, not Parasite Dolls)', () => {
   const res = [{ id: 'a', name: 'Parasite Dolls', popularity: 0.5 }, { id: 'b', name: 'Parasite', popularity: 0.99 }, { id: 'c', name: 'Parasite', popularity: 0.2 }];
@@ -54,16 +54,49 @@ test('HG-11 India picker: state search, live status, one meanwhile hint with the
   const k = matchState(g, 'karnataka');
   assert.deepEqual([k.soon.map((l) => l.id), k.unsupported.map((l) => l.id)], [['kn'], ['tcy']]);
   assert.equal(matchStatus(k), '2 languages match');
-  assert.equal(meanwhileHint(k), 'Not live yet? Try Hindi meanwhile.');
-  assert.equal(meanwhileHint(matchState(g, 'assam')), 'Not live yet? Try Bengali for Assamese, meanwhile.');
+  assert.equal(meanwhileHint(k), 'Try Hindi meanwhile.');
+  assert.equal(meanwhileHint(matchState(g, 'assam')), 'Try Bengali for Assamese, meanwhile.');
   assert.equal(meanwhileHint(matchState(g, 'kerala')), null, 'no hint when everything shown is live');
   assert.equal(matchStatus(matchState(g, 'telangana')), '1 language matches');
 });
 
-test('HG-11 India picker markup: native names carry lang=, no aria-disabled, status is polite', () => {
-  const src = readFileSync('public/india.js', 'utf8');
-  assert.match(src, /lang: l\.id/);
-  assert.doesNotMatch(src, /aria-disabled/);
-  assert.match(src, /'aria-live': 'polite'/);
+test('HG-11 India picker: stateless hint only when no language row matches; unsupported-only copy', () => {
+  const g = G();
+  const p = matchState(g, 'pradesh');
+  assert.ok(p.live.length > 0);
+  assert.equal(p.stateless, false);
+  assert.notEqual(meanwhileHint(p), 'No film language for your state yet, try Hindi meanwhile.');
+  assert.equal(meanwhileHint(matchState(g, 'goa')), "We can't match films in this language yet. Try Hindi meanwhile.");
+  assert.equal(meanwhileHint(matchState(g, 'maharashtra')), 'Try Hindi meanwhile.');
+});
+
+// Minimal DOM stand-in, enough for indiaSection.
+function stubH(tag, attrs = {}, ...kids) {
+  const el = { tag, attrs: {}, children: [], listeners: {}, textContent: '',
+    addEventListener(t, f) { this.listeners[t] = f; },
+    replaceChildren(...k) { this.children = k.flat().filter((x) => x != null); } };
+  for (const [k, v] of Object.entries(attrs)) if (k.startsWith('on')) el.listeners[k.slice(2)] = v; else if (v != null) el.attrs[k] = v;
+  el.children = kids.flat().filter((x) => x != null);
+  return el;
+}
+const walk = (el, out = []) => { if (el && typeof el === 'object') { out.push(el); for (const c of el.children || []) walk(c, out); } return out; };
+
+test('HG-11 India picker render: lang= on native names, no aria-disabled, polite status, one hint', () => {
+  const picked = [];
+  const sec = indiaSection(catalogue(loadGate()), { h: stubH, onPick: (l) => picked.push(l.id) });
+  const all = walk(sec);
+  const natives = all.filter((e) => e.attrs.class === 'india-local');
+  assert.ok(natives.length >= 19 && natives.every((e) => e.attrs.lang));
+  assert.ok(all.every((e) => !('aria-disabled' in e.attrs)));
+  const status = all.find((e) => e.attrs.role === 'status');
+  assert.equal(status.attrs['aria-live'], 'polite');
+  assert.equal(status.textContent, '19 languages match');
+  assert.equal(all.filter((e) => e.attrs.class?.includes('india-hint')).length, 1);
+  all.find((e) => e.tag === 'button').listeners.click();
+  assert.equal(picked.length, 1);
+  const input = all.find((e) => e.tag === 'input');
+  input.value = 'nagaland'; input.listeners.input();
+  assert.equal(status.textContent, '0 languages match');
+  assert.match(all.find((e) => e.attrs.class?.includes('india-hint')).textContent, /No film language for your state yet/);
   assert.doesNotMatch(readFileSync('public/styles.css', 'utf8').split('HG-11')[1], /opacity/);
 });

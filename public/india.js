@@ -22,8 +22,10 @@ export function matchState(groups, query) {
   const q = norm(query);
   if (!q) return { ...groups, stateless: false };
   const hit = (l) => [l.name, l.local, ...(l.states || [])].some((s) => norm(s).includes(q));
-  return { ...groups, live: groups.live.filter(hit), soon: groups.soon.filter(hit), unsupported: groups.unsupported.filter(hit),
-    stateless: groups.noFilmLanguage.some((s) => norm(s).includes(q)) };
+  const m = { ...groups, live: groups.live.filter(hit), soon: groups.soon.filter(hit), unsupported: groups.unsupported.filter(hit) };
+  // The 'no film language' hint only when no language row matches (e.g. 'pradesh' matches rows, so no hint).
+  m.stateless = !(m.live.length + m.soon.length + m.unsupported.length) && groups.noFilmLanguage.some((s) => norm(s).includes(q));
+  return m;
 }
 
 export const matchStatus = (g) => { const n = g.live.length + g.soon.length + g.unsupported.length; return `${n} ${n === 1 ? 'language matches' : 'languages match'}`; };
@@ -33,11 +35,12 @@ export function meanwhileHint(g) {
   if (g.stateless) return 'No film language for your state yet, try Hindi meanwhile.';
   const waiting = [...g.soon, ...g.unsupported];
   if (!waiting.length) return null;
+  if (!g.soon.length) return "We can't match films in this language yet. Try Hindi meanwhile.";
   const live = new Set(g.liveIds || []); // all live languages, not just the ones the search left visible
   const near = waiting.filter((l) => l.meanwhile && l.meanwhile !== 'hi' && live.has(l.meanwhile));
-  if (!near.length) return 'Not live yet? Try Hindi meanwhile.';
+  if (!near.length) return 'Try Hindi meanwhile.';
   const parts = near.map((l) => `${g.names[l.meanwhile] || l.meanwhile} for ${l.name}`);
-  return `Not live yet? Try ${parts.join(', ')}${near.length < waiting.length ? ', Hindi for the rest' : ''}, meanwhile.`;
+  return `Try ${parts.join(', ')}${near.length < waiting.length ? ', Hindi for the rest' : ''}, meanwhile.`;
 }
 
 export function indiaSection(catalogue, { h, onPick }) {

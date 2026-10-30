@@ -26,8 +26,22 @@ test('HG-10 journey: copy from the revised spec', () => {
     'Grow up in ${o.name} instead →', 'We couldn’t find picks local enough for your taste here. Try another city.', 'Where-to-watch data: ', 'Try other names for ${m.name}']) assert.ok(app.includes(s), s);
 });
 
-test('HG-10 category config: one value, mixed by default until HG-9', () => {
-  assert.equal(CATEGORY, 'mixed');
+test('HG-10 category config: captain set v1 to movies only', () => {
+  assert.equal(CATEGORY, 'movies');
+  const j = journeyFor(CATEGORY);
+  assert.equal(j.single, true); assert.equal(j.category, 'movie'); assert.deepEqual(j.order, ['movie']);
+  assert.deepEqual(j.prompts.map((p) => p.kind), ['movie', 'movie', 'movie']);
+  assert.ok(j.prompts.every((p) => /film/i.test(p.label)), 'prompts read as films');
+  assert.equal(revealHeader(j, madrid), 'Your film self, in Madrid'); assert.equal(j.plural, 'films');
+  const r = journeyPicks({ tv: cat('tv', 5), movie: cat('movie', 5), music: cat('music', 5) }, j);
+  assert.ok([r.hero, ...r.rows].every((p) => p.category === 'movie'));
+  const code = encodeShare({ lang: 'ko', city: 'seoul', category: j.category, favs: ['Amélie'], hero: r.hero, rows: r.rows });
+  const d = decodeShare(code, [{ id: 'seoul', name: 'Seoul', language: 'ko' }]);
+  assert.equal(d.category, 'movie'); assert.equal(revealHeader(journeyFor(d.category), d.city), 'Your film self, in Seoul');
+  assert.doesNotMatch(readFileSync(new URL('../public/logic.js', import.meta.url), 'utf8').split('export function journeyFor')[1].split('\n}')[0], /madrid|seoul/i, 'no hard-coded cities');
+});
+
+test('HG-10 category config: mixed still works (pre-captain default)', () => {
   assert.match(app, /const J = journeyFor\(CATEGORY\)/);
   const mixed = journeyFor('mixed');
   assert.equal(mixed.single, false); assert.deepEqual(mixed.order, ['tv', 'movie', 'music']);
@@ -72,8 +86,36 @@ test('HG-10 share: navigator.share with files, then url, then Copy link + Save i
   assert.match(app, /download: `homegrown-\$\{c\.id\}\.png`/);
   assert.match(app, /document\.fonts\.load/); assert.match(app, /canvas/);
   assert.doesNotMatch(app.slice(app.indexOf('async function postcard'), app.indexOf('function shareBlock')), /drawImage/, 'no posters on the canvas');
-  assert.match(html, /property="og:image" content="\/og\.png"/);
-  assert.match(app, /track\(\{ event: 'share', method: 'files' \}\)/); assert.match(app, /event: 'share_open'/);
+  assert.match(html, /property="og:image" content="https:\/\/homegrown-beta\.vercel\.app\/og\.png"/);
+  assert.match(html, /property="og:url" content="https:\/\/homegrown-beta\.vercel\.app\/"/);
+  assert.match(app, /method: useFiles \? 'files' : 'link'/); assert.match(app, /event: 'share_open'/);
+  assert.match(app, /!fallback\.isConnected\) wrap\.append\(fallback\)/);
+  assert.match(app, /share\.prepare\?\.\(\)/, 'postcard is pre-rendered when the share block appears');
+});
+
+test('HG-10 share: send() calls navigator.share synchronously in the tap (iOS user activation)', async () => {
+  const src = app.slice(app.indexOf('  const send = () => {'), app.indexOf("  wrap.append(h('div', { class: 'cta' }"));
+  assert.ok(src.length > 50); assert.doesNotMatch(src.split('navigator.share(')[0], /await|\.then\(/, 'nothing async before share');
+  // Run the real send() body against mocks and check share was called before any microtask ran.
+  const calls = []; let ticked = false;
+  const env = { canShare: true, copy: () => calls.push('copy'), shareCode: () => 'abc', shareUrl: (c) => `https://x/?r=${c}`, text: 't', track: (e) => calls.push(e.method),
+    wrap: { prepare: () => calls.push('prepare'), append: () => calls.push('fallback') }, fallback: { isConnected: false },
+    navigator: { canShare: () => true, share: (d) => { calls.push(ticked ? 'share-late' : d.files ? 'share-files' : 'share-url'); return Promise.resolve(); } } };
+  const make = (cached) => new Function(...Object.keys(env), 'cached', `${src.replace('  const send = ', 'return ')}`)(...Object.values(env), cached);
+  Promise.resolve().then(() => { ticked = true; });
+  const p1 = make({ code: 'abc', file: { name: 'f.png' } })(); assert.equal(calls[0], 'share-files'); await p1;
+  ticked = false; Promise.resolve().then(() => { ticked = true; });
+  calls.length = 0; const p2 = make(null)(); assert.equal(calls[0], 'share-url', 'no cached card yet: share the link now, draw for next time'); assert.ok(calls.includes('prepare')); await p2;
+  assert.ok(calls.includes('link'));
+});
+
+test('HG-10 feedback: share events are sanitised, not trusted', () => {
+  const v = validateFeedback({ event: 'share_open', city: 'atlantis', favourites: ['x'.repeat(100), 'Amélie'] });
+  assert.equal(v.ok, true); assert.equal(v.value.city, ''); assert.equal(v.value.favourites[0].length, 40); assert.equal(v.value.favourites[1], 'Amélie');
+  assert.equal(validateFeedback({ event: 'share', method: 'copy', city: 'toString' }).value.city, '', 'prototype keys are not cities');
+  assert.equal(validateFeedback({ event: 'share', method: 'copy', city: 'madrid' }).value.city, 'madrid');
+  assert.equal(validateFeedback({ event: 'share', method: 'link', city: 42, favourites: 'nope' }).value.favourites.length, 0);
+  assert.equal(validateFeedback({ event: 'rating', rating: 5, city: 'atlantis' }).ok, false, 'other events unchanged');
 });
 
 test('HG-10 feedback: share events validated; old events and flag payloads unchanged', () => {

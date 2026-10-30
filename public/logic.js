@@ -147,15 +147,16 @@ export const favouriteIds = (favs) => favs.map((f) => f.id).filter((id) => typeo
 // 'mixed' (default until HG-9): today's show / band / film prompts and every Qloo category.
 export const JOURNEY_FAVS = 3;
 const SINGLE = {
-  tv: { kind: 'show', noun: 'TV', labels: ["A show you'd rewatch", 'Another show you love', 'One more show'], examples: ['e.g. Breaking Bad', 'e.g. Fleabag', 'e.g. Dark'] },
-  movie: { kind: 'movie', noun: 'film', labels: ['A film you could quote', 'Another film you love', 'One more film'], examples: ['e.g. Amélie', 'e.g. Parasite', 'e.g. Spirited Away'] },
-  music: { kind: 'band', noun: 'music', labels: ['A band you always come back to', 'Another artist you love', 'One more artist'], examples: ['e.g. Radiohead', 'e.g. Daft Punk', 'e.g. Bad Bunny'] },
+  tv: { kind: 'show', noun: 'TV', plural: 'shows', labels: ["A show you'd rewatch", 'Another show you love', 'One more show'], examples: ['e.g. Breaking Bad', 'e.g. Fleabag', 'e.g. Dark'] },
+  movie: { kind: 'movie', noun: 'film', plural: 'films', labels: ['A film you could quote', 'Another film you love', 'One more film'], examples: ['e.g. Amélie', 'e.g. Parasite', 'e.g. Spirited Away'] },
+  music: { kind: 'band', noun: 'music', plural: 'songs', labels: ['A band you always come back to', 'Another artist you love', 'One more artist'], examples: ['e.g. Radiohead', 'e.g. Daft Punk', 'e.g. Bad Bunny'] },
 };
 const MIXED_EXAMPLES = ['e.g. Breaking Bad', 'e.g. Radiohead', 'e.g. Amélie'];
-export function journeyFor(category) {
-  const s = SINGLE[category];
+const ALIAS = { movies: 'movie', film: 'movie', films: 'movie', shows: 'tv' };
+export function journeyFor(raw) {
+  const category = ALIAS[raw] || raw; const s = SINGLE[category];
   if (!s) return { single: false, category: 'mixed', order: QLOO_ORDER, prompts: PROMPTS.slice(0, JOURNEY_FAVS).map((p, i) => ({ ...p, placeholder: MIXED_EXAMPLES[i] })) };
-  return { single: true, category, noun: s.noun, order: [category], prompts: s.labels.map((label, i) => ({ kind: s.kind, label, placeholder: s.examples[i] })) };
+  return { single: true, category, noun: s.noun, plural: s.plural, order: [category], prompts: s.labels.map((label, i) => ({ kind: s.kind, label, placeholder: s.examples[i] })) };
 }
 // Reveal header: single-category says what the list is; mixed keeps the city's own line.
 export const revealHeader = (j, city) => (j.single ? `Your ${j.noun} self, in ${city.name}` : city.header);

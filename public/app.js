@@ -518,7 +518,7 @@ async function postcard({ city, favs, picks, url }) {
   g.textBaseline = 'alphabetic'; g.fillStyle = css('--ink-2'); g.font = `400 30px ui-monospace, Menlo, monospace`; g.fillText('HOMEGROWN', M, M + 20);
   g.fillStyle = css('--ink'); const cs = fit(city.local, (s) => `400 ${s}px ${disp}`, 132, W - 2 * M); g.fillText(city.local, M, M + 80 + cs);
   let y = M + 80 + cs + 40; g.fillStyle = accent; g.fillRect(M, y, 160, 6); y += 90;
-  g.fillStyle = css('--ink-2'); g.font = '400 40px Inter, sans-serif'; g.fillText('If I’d grown up here, I’d love:', M, y); y += 40;
+  g.fillStyle = css('--ink-2'); g.font = '400 40px Inter, sans-serif'; g.fillText(J.single ? `If I’d grown up here, my ${J.plural} would be:` : 'If I’d grown up here, I’d love:', M, y); y += 40;
   for (const p of picks.slice(0, 3)) {
     y += 96; g.fillStyle = css('--ink'); fit(p.title, (s) => `400 ${s}px ${disp}`, 72, W - 2 * M); g.fillText(p.title, M, y);
     const en = enTitle(p); if (en) { y += 52; g.fillStyle = css('--ink-3'); g.font = '400 36px Inter, sans-serif'; g.fillText(en, M, y); }
@@ -544,14 +544,19 @@ function shareBlock() {
   };
   const canShare = typeof navigator.share === 'function';
   const fallback = h('div', { class: 'row-btns' }, h('button', { class: 'quiet', onclick: copy }, 'Copy link'), h('button', { class: 'quiet', onclick: save }, 'Save image'));
-  const send = async () => {
-    const url = shareUrl(shareCode());
+  // iOS only lets navigator.share run inside the tap's user activation, so the postcard is drawn
+  // ahead of time (when the block appears) and send() calls share with no await before it.
+  let cached = null;
+  wrap.prepare = () => { const code = shareCode(); if (cached?.code === code) return; card().then((blob) => { if (blob) cached = { code, file: new File([blob], `homegrown-${c.id}.png`, { type: 'image/png' }) }; }).catch(() => {}); };
+  const send = () => {
     if (!canShare) return copy();
-    try {
-      const file = new File([await card()], `homegrown-${c.id}.png`, { type: 'image/png' });
-      if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], text: `${text} ${url}`, url }); track({ event: 'share', method: 'files' }); }
-      else { await navigator.share({ url, text }); track({ event: 'share', method: 'link' }); }
-    } catch (e) { if (e?.name !== 'AbortError') wrap.append(fallback); }
+    const code = shareCode(), url = shareUrl(code);
+    const file = cached?.code === code ? cached.file : null;
+    const useFiles = !!file && !!navigator.canShare?.({ files: [file] });
+    const sent = useFiles ? navigator.share({ files: [file], text: `${text} ${url}`, url }) : navigator.share({ url, text });
+    if (!file) wrap.prepare(); // picks changed since the last draw: ready for next time
+    return Promise.resolve(sent).then(() => track({ event: 'share', method: useFiles ? 'files' : 'link' }))
+      .catch((e) => { if (e?.name !== 'AbortError' && !fallback.isConnected) wrap.append(fallback); });
   };
   wrap.append(h('div', { class: 'cta' }, h('button', { class: 'primary', onclick: send }, `Send my ${c.name} self`)), canShare ? null : fallback, status);
   const others = liveCitiesForLanguage(S.catalogue || { cities: [], languages: [] }, c.language).filter((o) => o.id !== c.id);
@@ -569,7 +574,7 @@ function reveal(fromBoard) {
   R.showShare = () => {
     // A21: the share block rises 1.2 s after the header settles (immediately with reduced motion).
     const delay = fromBoard ? T('d-share-delay') : 0;
-    setTimeout(() => { if (revealEls !== R) return; share.classList.remove('wait'); if (reduced) return;
+    setTimeout(() => { if (revealEls !== R) return; share.classList.remove('wait'); share.prepare?.(); if (reduced) return;
       share.animate([{ opacity: 0, transform: `translateY(${T('travel')}px)` }, { opacity: 1, transform: 'none' }], { duration: T('d-share'), easing: E('reveal') }); }, delay);
   };
   show(board, R.hero, share, R.rest, feelsLike(), R.foot, opts({ anim: !fromBoard, focus: board.firstChild }));
@@ -593,7 +598,7 @@ async function friendView() {
   const board = h('div', { class: 'board compact city' }, h('h2', { class: 'hdr', lang: 'en' }, `A friend’s ${c.name} ${header}`), flapRow(c.name.toUpperCase(), [...c.name].length, false));
   const lang = (cat.languages || []).find((l) => l.id === (data.lang || c.language)) || (cat.languages || []).find((l) => l.id === c.language);
   const find = () => { history.replaceState({ step: 'hello' }, '', location.pathname); S.missed = []; S.favs = []; S.pending = []; if (lang) { chooseLanguage(lang); S.city = c; suggestCity(c); } else pickLanguage(); };
-  show(board, h('p', { class: 'friend-cap' }, data.favs.length ? `Because they love ${data.favs.join(', ')}` : null),
+  show(board, h('p', { class: 'cap shared-by' }, 'Shared by a friend · open yours for live picks'), h('p', { class: 'friend-cap' }, data.favs.length ? `Because they love ${data.favs.join(', ')}` : null),
     pickCard({ ...data.hero, why: null }, c, true),
     h('div', { class: 'cta' }, h('button', { class: 'primary', onclick: find }, 'Find yours')),
     data.rows.length ? h('div', { class: 'list' }, data.rows.map((p, n) => pickRow(p, n + 1, c))) : null, opts({ anim: false, focus: board.firstChild }));

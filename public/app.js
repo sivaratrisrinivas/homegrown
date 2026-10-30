@@ -1,4 +1,5 @@
 import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { isMapReveal } from './maplogic.js';
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
 
 const app = document.getElementById('app');
@@ -201,9 +202,15 @@ function picksView() {
   ].flat().filter(Boolean);
 }
 // Only the picks region re-renders as categories land; the rating/note form keeps its state.
-function updateReveal() { revealEls.picks.replaceChildren(...picksView()); }
+function updateReveal() { if (revealEls.update) return revealEls.update(); revealEls.picks.replaceChildren(...picksView()); }
 function shownPicks() { const { hero, rest } = rankPicks(S.results); return [hero, ...rest].filter(Boolean); }
 
+// HG-6 prototype: ?reveal=map swaps the picks list for a walkable map. Without the flag nothing changes.
+async function mapPicks() {
+  const { createMapReveal } = await import('./map.js');
+  const m = createMapReveal({ h, city: S.city, getResults: () => S.results, picks: () => [...shownPicks(), ...scarcePicks(S.results)], pickCard, reduced, ping: click });
+  return m;
+}
 function reveal() {
   const picks = h('div', { style: 'display:flex;flex-direction:column;gap:16px' });
   revealEls = { picks };
@@ -223,6 +230,10 @@ function reveal() {
     h('section', { class: 'card postcard-summary' }, h('h3', { class: 'serif' }, `Keep your ${S.city.name} self`),
       h('button', { onclick: (e) => { e.target.replaceWith(h('p', { class: 'muted' }, 'Saving with an email link is coming soon.')); } }, `Save my ${S.city.name} self`),
       h('div', {}, others.map((c) => h('button', { class: 'ghost', onclick: () => { track({ event: 'try_city', to: c.id }); S.city = c; morph(); } }, `Try ${c.name}`)))));
+  if (isMapReveal(location.search)) {
+    mapPicks().then((m) => { if (revealEls?.picks !== picks) return; picks.replaceChildren(h('h2', {}, 'Territory you walk'), m.el); revealEls.update = m.update; });
+    return;
+  }
   updateReveal();
 }
 

@@ -245,3 +245,24 @@ test('r2: a capped caller does not write the skip marker for everyone', async ()
   b.adjust(-0.25, { feature: 'why' });
   assert.equal((await w2([pick()], FAVS, { ip: 'x' }))[0].why, GOOD); assert.equal(c2.calls.n, 1);
 });
+
+test('r4: short stems, short source words, and \'s / n\'t fragments never ground a line', async () => {
+  const { matchesSource } = await import('../lib/whyllm.js');
+  assert.equal(matchesSource('ted', new Set(['t'])), false);
+  assert.equal(matchesSource('sing', new Set(['s'])), false);
+  const g = { favourite: 'Breaking Bad', sources: ["The Glory's tion: a woman doesn't sed ted; she's t s"] };
+  assert.equal(validateWhy('Fans of Breaking Bad will sing and ting along as the tion sed ted in this glory.', g), null);
+});
+test('r4: distinct grounded words, title words do not count', () => {
+  const g = { favourite: 'Breaking Bad', titles: ['The Glory'], sources: ['A woman plans revenge on her school bullies.'] };
+  assert.equal(validateWhy('Fans of Breaking Bad will love The Glory, the glory of it all here.', g), null);
+  assert.equal(validateWhy('Fans of Breaking Bad will love The Glory, its revenge and more revenge here.', g), null);
+  assert.ok(validateWhy('Fans of Breaking Bad will love The Glory, a woman and her revenge plans.', g));
+});
+test('r4: negation words reject the line', () => {
+  const g = { favourite: 'Breaking Bad', sources: ['A crime drama about revenge.'] };
+  assert.equal(validateWhy('Like Breaking Bad, this is not a crime drama and has no revenge at all here.', g), null);
+  assert.equal(validateWhy("Like Breaking Bad, this crime drama isn't about revenge at all here.", g), null);
+  assert.equal(validateWhy('Like Breaking Bad, this crime drama never lets revenge go at all here.', g), null);
+  assert.ok(validateWhy('Like Breaking Bad, this crime drama is about revenge at all here.', g));
+});

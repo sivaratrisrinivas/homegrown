@@ -64,7 +64,7 @@ function swap(args) {
     leave.style.top = `${top}px`; app.append(leave);
     const anims = [...old.children].map((c) => (reduced() || c.matches('.pin')
       ? c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: reduced() ? T('fade') : T('d-exit'), fill: 'forwards' })
-      : c.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateX(${dx}px)` }], { duration: T('d-exit'), easing: E('in'), fill: 'forwards' })));
+      : c.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateX(${dx}px) scale(.97,1.02)` }], { duration: T('d-exit'), easing: E('in'), fill: 'forwards' })));
     Promise.all(anims.map((a) => a.finished)).catch(() => {}).finally(() => leave.remove());
   } else { old?.remove(); app.querySelectorAll(':scope > .leaving').forEach((l) => l.remove()); }
   app.querySelector(':scope > .screen')?.remove();
@@ -73,7 +73,7 @@ function swap(args) {
     for (const c of sec.children) {
       if (o.still && c.matches(o.still)) continue;
       if (reduced() || c.matches('.pin')) fade(c, reduced() ? T('fade') : T('d-enter'));
-      else c.animate([{ opacity: 0, transform: `translateX(${-dx}px)` }, { opacity: 1, transform: 'none' }], { duration: T('d-enter'), easing: E('out'), delay: T('d-enter-delay'), fill: 'backwards' });
+      else c.animate([{ opacity: 0, transform: `translateX(${-dx}px) scale(1.03,.97)` }, { opacity: 1, transform: 'scale(.995,1.005)', offset: 0.65 }, { opacity: 1, transform: 'none' }], { duration: T('d-enter'), easing: E('out'), delay: T('d-enter-delay'), fill: 'backwards' }); // liquid: lands a touch squashed, then settles
     }
   }
   const focusEl = o.focus || sec.querySelector('h1,h2');
@@ -84,6 +84,7 @@ function swap(args) {
 // History: one entry per step (#lang, #city, #fav, #reveal), so the back button goes back one step.
 let restoring = false;
 function nav(step, n) {
+  document.body.dataset.step = step; // the .acid colour field pours into a new shape per step (styles.css)
   const st = { step, n }; const url = `${location.pathname}#${step}`;
   const cur = history.state;
   if (restoring || (cur && cur.step === step && cur.n === n)) history.replaceState(st, '', url); else history.pushState(st, '', url);
@@ -606,7 +607,7 @@ function shareBlock() {
     return Promise.resolve(sent).then(() => track({ event: 'share', method: useFiles ? 'files' : 'link' }))
       .catch((e) => { if (e?.name !== 'AbortError' && !fallback.isConnected) wrap.append(fallback); });
   };
-  wrap.append(h('div', { class: 'cta' }, h('button', { class: 'primary', onclick: send }, `Send my ${c.name} self`)), canShare ? null : fallback, status);
+  wrap.append(h('div', { class: 'cta' }, h('button', { class: 'primary', onclick: send }, `Send my ${c.name} self`)), ...(canShare ? [] : [fallback]), status); // append(null) would print "null"
   const others = liveCitiesForLanguage(S.catalogue || { cities: [], languages: [] }, c.language).filter((o) => o.id !== c.id);
   if (others.length) wrap.append(h('div', {}, others.map((o) => h('button', { class: 'quiet', onclick: () => { track({ event: 'try_city', to: o.id }); S.city = o; setCity(o); morph(); } }, `Grow up in ${o.name} instead →`))));
   return wrap;
@@ -626,6 +627,7 @@ function reveal(fromBoard) {
       share.animate([{ opacity: 0, transform: `translateY(${T('travel')}px)` }, { opacity: 1, transform: 'none' }], { duration: T('d-share'), easing: E('reveal') }); }, delay);
   };
   show(board, R.hero, share, R.rest, feelsLike(), R.foot, opts({ anim: !fromBoard, focus: board.firstChild }));
+  app.querySelector(':scope > .screen').classList.add('reveal'); // two columns on desktop (styles.css)
   if (fromBoard && !reduced()) {
     const last = board.getBoundingClientRect(); const s = first.width / last.width;
     board.animate([{ transform: `translate(${first.left - last.left}px,${first.top - last.top}px) scale(${s})` }, { transform: 'none' }], { duration: T('d-shrink'), easing: E('reveal') });
@@ -651,6 +653,7 @@ async function friendView() {
     pickCard({ ...data.hero, why: null }, c, true),
     h('div', { class: 'cta' }, h('button', { class: 'primary', onclick: find }, 'Find yours')),
     data.rows.length ? h('div', { class: 'list' }, data.rows.map((p, n) => pickRow(p, n + 1, c))) : null, opts({ anim: false, focus: board.firstChild }));
+  app.querySelector(':scope > .screen').classList.add('reveal', 'friend'); document.body.dataset.step = 'reveal';
   settle([...board.querySelectorAll('.flap')], T('d-enter'));
 }
 

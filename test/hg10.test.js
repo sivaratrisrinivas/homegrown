@@ -204,3 +204,15 @@ test('HG-10 runCats: the journey categories that are live, no fallback; empty me
   assert.ok(app.includes('const runCats = () => runCatsFor(J, S.catalogue);') && !/cats\.length \? cats : J\.order/.test(app));
   assert.ok(app.includes("!cats.length ? h('p', { class: 'body not-ready' }, NOT_READY)"));
 });
+test('HG-10 acid layer: colour field behind a solid slab, static under reduced motion, two-column desktop reveal', () => {
+  const css = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.ok(html.includes('<div class="acid" aria-hidden="true">'));
+  assert.match(css, /\.acid\{position:fixed;inset:-25%;z-index:-1;pointer-events:none/);
+  assert.match(css, /main\{background:var\(--paper\);border-radius:var\(--r-lg\)/); // text sits on solid paper, never the gradient
+  assert.match(css, /prefers-reduced-motion:reduce\)\{:root\{--d-blob:0ms;--d-pour:0ms\}\.acid i\{animation:none\}\}/);
+  assert.match(css, /@media\(min-width:1024px\)\{[^@]*\.screen\.reveal\{display:grid;grid-template-columns:minmax\(0,5fr\) minmax\(0,6fr\)/);
+  assert.ok(app.includes("classList.add('reveal')") && app.includes('document.body.dataset.step = step;'));
+  assert.ok(app.includes('...(canShare ? [] : [fallback]), status)'), 'no stray "null" text in the share block');
+});

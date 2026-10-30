@@ -1,5 +1,6 @@
 import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, liveCats, pendingCats, categoryWords, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
 import { indiaSection } from './india.js';
+import { aiReveal } from './aisuggest-client.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { isMapReveal, mapFraming } from './maplogic.js';
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
@@ -71,9 +72,9 @@ async function pickLanguage() {
   const { live: all, soon: allSoon } = languageGroups(S.catalogue);
   const live = all.filter((l) => !l.states), soon = allSoon.filter((l) => !l.states);
   show(h('h2', {}, 'Which language are you learning?'),
-    h('div', { class: 'cities' }, live.map((l) => h('button', { class: 'postcard', onclick: () => { S.lang = l; suggestCity(); } },
+    h('div', { class: 'cities' }, live.map((l) => h('button', { class: 'postcard', onclick: () => { S.ai = null; S.lang = l; suggestCity(); } },
       h('span', { class: serif(l.id) }, l.local), h('span', {}, l.name)))),
-    indiaSection(S.catalogue, { h, onPick: (l) => { S.lang = l; suggestCity(); } }),
+    indiaSection(S.catalogue, { h, onPick: (l) => { S.ai = null; S.lang = l; suggestCity(); }, onSuggest: (l) => { S.ai = l; S.city = null; favourite(); } }),
     soon.length ? h('p', { class: 'muted' }, `Coming soon: ${soon.map((l) => l.name).join(', ')}`) : null);
 }
 
@@ -256,6 +257,8 @@ function flapRow(text, width) {
 
 const runs = createRunGuard();
 async function morph() {
+  // HG-12: a 'coming soon' Indian language goes to AI suggestions (names only, no Qloo twin).
+  if (S.ai) return aiReveal({ h, show, lang: S.ai, favourites: [...S.favs, ...S.pending].map((f) => f.name), onBack: pickLanguage });
   if (!(await matchFavourites())) return;
   const current = runs.start(); revealEls?.destroy?.(); revealEls = null;
   const c = S.city; document.documentElement.style.setProperty('--accent', c.accent);

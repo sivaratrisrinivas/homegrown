@@ -1,7 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/twin.js": { "maxDuration": 60 },
-    "api/altnames.js": { "maxDuration": 60 }
+    "api/twin.js": {
+      "maxDuration": 60
+    },
+    "api/altnames.js": {
+      "maxDuration": 60
+    },
+    "api/aisuggest.js": {
+      "maxDuration": 60
+    }
   }
 }

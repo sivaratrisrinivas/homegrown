@@ -146,3 +146,26 @@ test('seed paths are separate: never stored, never trimmed, drawn dashed and dim
   const map = readFileSync(new URL('../public/map.js', import.meta.url), 'utf8');
   assert.match(map, /for \(const p of seeds\)/); assert.match(map, /'stroke-dasharray': SEED_STYLE\.dash/);
 });
+
+import { isTap, TAP_PX, acceptPointer } from '../public/maplogic.js';
+test('pull handle: only near-zero travel is a tap; a downward drag is not', () => {
+  assert.equal(TAP_PX, 6); assert.equal(isTap(0), true); assert.equal(isTap(5.9), true);
+  assert.equal(isTap(6), false); assert.equal(isTap(80), false, 'downward 80px drag (moved=0) springs back');
+  const map = readFileSync(new URL('../public/map.js', import.meta.url), 'utf8');
+  assert.match(map, /travelled = Math\.max\(travelled, Math\.hypot/); assert.match(map, /if \(isTap\(travelled\)\) return done\(\)/);
+  assert.doesNotMatch(map, /moved === 0/);
+});
+test('one walking pointer at a time; move/up filtered by pointerId', () => {
+  assert.equal(acceptPointer(null, 1), true); assert.equal(acceptPointer(1, 1), true); assert.equal(acceptPointer(1, 2), false);
+  const map = readFileSync(new URL('../public/map.js', import.meta.url), 'utf8');
+  assert.match(map, /e\.pointerId !== activePointer\) return; const pt/);
+  assert.match(map, /const end = \(e\) => \{ if \(e\?\.pointerId !== activePointer\) return; activePointer = null;/);
+});
+test('spots are reused by key across updates; shut re-resolves origin by key; refresh failures fall back', () => {
+  const map = readFileSync(new URL('../public/map.js', import.meta.url), 'utf8');
+  assert.match(map, /let g = spotEls\.get\(sp\.key\)/); assert.doesNotMatch(map, /spotsG\.replaceChildren\(\)/);
+  assert.match(map, /const origin = spotEls\.get\(originKey\)/);
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.match(app, /try \{ m\.update\(\);[\s\S]*?catch \{[^\n]*delete mine\.update; delete mine\.destroy; picks\.replaceChildren\(\.\.\.picksView\(\)\)/);
+  assert.match(app, /\.catch\(\(\) => \{ if \(revealEls === mine\) \{ delete mine\.update; delete mine\.destroy;/);
+});

@@ -95,3 +95,8 @@ export const nearSpot = ([x, y], spots, radius = 6) => spots.find((s) => Math.hy
 export function safeStorage(get = () => globalThis.localStorage) { try { return get() || null; } catch { return null; } }
 // Map mode: everything picksView shows except the pick cards themselves (those live on the map).
 export const mapFraming = (els) => els.filter((el) => !(el?.matches?.('article') || el?.querySelector?.('article')));
+// Handle release: under TAP_PX of total pointer travel is a tap; anything more is a drag.
+export const TAP_PX = 6;
+export const isTap = (travelled) => Number(travelled) < TAP_PX;
+// While one pointer is walking, a second pointer is ignored.
+export const acceptPointer = (active, id) => active == null || active === id;

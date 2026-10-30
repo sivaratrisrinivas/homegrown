@@ -237,11 +237,14 @@ function reveal() {
       if (revealEls !== mine) return m.destroy();
       // The map holds the picks; the postcard line, lead, notes and "still flipping in" stay beneath it.
       const framing = h('div', { class: 'map-framing' });
-      const refresh = () => { m.update(); framing.replaceChildren(...mapFraming(picksView())); };
+      const refresh = () => {
+        try { m.update(); framing.replaceChildren(...mapFraming(picksView())); }
+        catch { try { m.destroy(); } catch {} delete mine.update; delete mine.destroy; picks.replaceChildren(...picksView()); }
+      };
       picks.replaceChildren(h('h2', {}, 'Territory you walk'), m.el, framing);
       mine.update = refresh; mine.destroy = m.destroy; refresh();
     })
-      .catch(() => { if (revealEls === mine) { delete mine.update; picks.replaceChildren(...picksView()); } });
+        .catch(() => { if (revealEls === mine) { delete mine.update; delete mine.destroy; picks.replaceChildren(...picksView()); } });
     return;
   }
   updateReveal();

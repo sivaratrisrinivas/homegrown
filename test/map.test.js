@@ -32,16 +32,16 @@ test('resistance scales with native %: strict is heavy with ticks, borderline is
 test('walked paths persist per city in localStorage, with 3 seeded starters', () => {
   const st = mem();
   const fresh = loadWalk(st, 'seoul');
-  assert.equal(fresh.length, 3); assert.deepEqual(fresh, seedPaths('seoul'));
+  assert.deepEqual(fresh, []); assert.equal(seedPaths('seoul').length, 3);
   saveWalk(st, 'seoul', [...fresh, [[1, 1], [2.234, 3]]]);
   const again = loadWalk(st, 'seoul');
-  assert.equal(again.length, 4); assert.deepEqual(again.at(-1), [[1, 1], [2.2, 3]]);
-  assert.equal(loadWalk(st, 'paris').length, 3, 'other cities are separate');
+  assert.equal(again.length, 1); assert.deepEqual(again.at(-1), [[1, 1], [2.2, 3]]);
+  assert.equal(loadWalk(st, 'paris').length, 0, 'other cities are separate');
   assert.ok(st.m.has(walkKey('seoul')) && !st.m.has(walkKey('paris')));
-  st.setItem(walkKey('seoul'), '{bad'); assert.deepEqual(loadWalk(st, 'seoul'), seedPaths('seoul'));
+  st.setItem(walkKey('seoul'), '{bad'); assert.deepEqual(loadWalk(st, 'seoul'), []);
   const many = saveWalk(st, 'x', Array.from({ length: 100 }, () => [[0, 0], [1, 1]]));
   assert.equal(many.length, 40);
-  assert.equal(loadWalk(null, 'x').length, 3); // no storage: still never blank
+  assert.deepEqual(loadWalk(null, 'x'), []); assert.equal(seedPaths('x').length, 3); // seeds still draw
 });
 
 test('reduced motion: no springs or pulses, a short fade instead', () => {
@@ -67,14 +67,14 @@ test('corrupt walk data (non-pairs, NaN, strings) falls back to seeds', () => {
   const st = mem();
   for (const bad of [[[1, 2, 3]], [[[1, 'a']]], [[[1]]], [['x']], [[[1, null]]], [[[1, 2], [3, 1e999]]], {}, 5]) {
     st.setItem(walkKey('c'), JSON.stringify(bad));
-    assert.deepEqual(loadWalk(st, 'c'), seedPaths('c'), JSON.stringify(bad));
+    assert.deepEqual(loadWalk(st, 'c'), [], JSON.stringify(bad));
   }
   assert.equal(isValidWalk([[[1, 2], [3, 4]]]), true);
 });
 test('storage access is guarded', () => {
   assert.equal(safeStorage(() => { throw new Error('SecurityError'); }), null);
   const s = mem(); assert.equal(safeStorage(() => s), s);
-  assert.equal(loadWalk(safeStorage(() => { throw 1; }), 'c').length, 3);
+  assert.deepEqual(loadWalk(safeStorage(() => { throw 1; }), 'c'), []);
 });
 test('map lifecycle: destroy closes the sheet and key listener; shut restores focus; map failures fall back', () => {
   const map = readFileSync(new URL('../public/map.js', import.meta.url), 'utf8');
@@ -129,4 +129,20 @@ test('spots stay >= 8 units apart, in bounds, and independent of arrival order',
     for (const s of a) { assert.ok(s.x >= 6 && s.x <= 94 && s.y >= 6 && s.y <= 134); const o = b.find((x) => x.key === s.key); assert.equal(o.x, s.x); assert.equal(o.y, s.y); }
     assert.deepEqual(a.map((s) => s.pick), picks, 'returned in input order');
   }
+});
+
+import { SEED_STYLE, MAX_PATHS } from '../public/maplogic.js';
+test('seed paths are separate: never stored, never trimmed, drawn dashed and dimmer', () => {
+  const st = mem(), seeds = seedPaths('seoul');
+  const walked = Array.from({ length: MAX_PATHS + 10 }, (_, i) => [[i, 1], [i, 2]]);
+  saveWalk(st, 'seoul', walked);
+  const stored = JSON.parse(st.getItem(walkKey('seoul')));
+  assert.equal(stored.length, MAX_PATHS);
+  for (const s of seeds) assert.ok(!stored.some((p) => JSON.stringify(p) === JSON.stringify(s)), 'seed not in walk array');
+  assert.deepEqual(seedPaths('seoul'), seeds, 'seeds unchanged by trimming');
+  st.setItem(walkKey('seoul'), JSON.stringify([...seeds, [[1, 1], [2, 2]]])); // older build stored seeds
+  assert.deepEqual(loadWalk(st, 'seoul'), [[[1, 1], [2, 2]]]);
+  assert.ok(SEED_STYLE.dash && SEED_STYLE.opacity < pathStyle(0, 1).opacity && SEED_STYLE.width < pathStyle(0, 1).width);
+  const map = readFileSync(new URL('../public/map.js', import.meta.url), 'utf8');
+  assert.match(map, /for \(const p of seeds\)/); assert.match(map, /'stroke-dasharray': SEED_STYLE\.dash/);
 });

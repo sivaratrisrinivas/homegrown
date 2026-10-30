@@ -1,5 +1,5 @@
 // HG-6 prototype reveal: "Territory you walk" + "Pull from the ground". Only loaded behind ?reveal=map.
-import { nativePct, resistanceFor, pullOutcome, sinkDepth, motionPlan, pickSpots, loadWalk, saveWalk, pathStyle, nearSpot, MAP_W, MAP_H, seeded, safeStorage, sameSpot } from './maplogic.js';
+import { nativePct, resistanceFor, pullOutcome, sinkDepth, motionPlan, pickSpots, loadWalk, saveWalk, pathStyle, nearSpot, MAP_W, MAP_H, seeded, safeStorage, sameSpot, seedPaths, SEED_STYLE } from './maplogic.js';
 let maskSeq = 0; // unique mask id per map instance
 const NS = 'http://www.w3.org/2000/svg';
 const s = (tag, attrs = {}) => { const el = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); return el; };
@@ -10,7 +10,7 @@ export function createMapReveal({ h, city, getResults, picks, pickCard, reduced,
   const wrap = h('div', { class: 'map-wrap' });
   const svg = s('svg', { viewBox: `0 0 ${MAP_W} ${MAP_H}`, class: 'map', role: 'group', 'aria-label': `Map of ${city.name}. Drag to walk; picks are buttons.` });
   wrap.append(svg);
-  const store = safeStorage(); let paths = loadWalk(store, city.id), spots = [], current = null, dwell = null;
+  const store = safeStorage(); const seeds = seedPaths(city.id); let paths = loadWalk(store, city.id), spots = [], current = null, dwell = null;
 
   // Static streets: a faint seeded grid, so the city feels like a place, not a chart.
   const streets = s('g', { class: 'streets' }); const r = seeded(`streets|${city.id}`);
@@ -24,6 +24,9 @@ export function createMapReveal({ h, city, getResults, picks, pickCard, reduced,
   const d = (p) => 'M' + p.map(([x, y]) => `${x} ${y}`).join('L');
   function drawPaths() {
     lit.replaceChildren(); maskPaths.replaceChildren();
+    for (const p of seeds) { // starter paths: dashed and dimmer than the user's own trail
+      lit.append(s('path', { d: d(p), class: 'seed', 'stroke-width': SEED_STYLE.width, opacity: SEED_STYLE.opacity, 'stroke-dasharray': SEED_STYLE.dash }));
+      maskPaths.append(s('path', { d: d(p), 'stroke-width': SEED_STYLE.width * 3, stroke: 'black', fill: 'none', 'stroke-linecap': 'round' })); }
     const all = current ? [...paths, current] : paths;
     all.forEach((p, i) => { const st = pathStyle(i, all.length);
       lit.append(s('path', { d: d(p), 'stroke-width': st.width, opacity: st.opacity }));

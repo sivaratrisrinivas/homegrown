@@ -56,7 +56,8 @@ export function pickSpots(picks, cityId) {
 }
 // Same spot = same key, so a re-render mid-walk doesn't count as passing a new pick.
 export const sameSpot = (a, b) => Boolean(a && b && a.key === b.key);
-// Three lit starter paths so the map is never blank.
+// Three lit starter paths so the map is never blank. They are drawn separately (dashed, dimmer),
+// never stored in the walk array, and never trimmed by MAX_PATHS.
 export function seedPaths(cityId) {
   const r = seeded(`seed|${cityId}`);
   return [0, 1, 2].map((k) => {
@@ -72,12 +73,14 @@ export const walkKey = (cityId) => `homegrown:walk:${cityId}`;
 // Every path is an array of [x, y] pairs of finite numbers; anything else falls back to the seeds.
 const isPoint = (pt) => Array.isArray(pt) && pt.length === 2 && pt.every((n) => typeof n === 'number' && Number.isFinite(n));
 export const isValidWalk = (v) => Array.isArray(v) && v.every((p) => Array.isArray(p) && p.every(isPoint));
+// Returns only the user's own walked paths ([] when none or invalid); seeds are separate.
+// Paths identical to a seed (stored by an older build) are dropped.
 export function loadWalk(storage, cityId) {
-  try {
-    const v = JSON.parse(storage?.getItem(walkKey(cityId)) || 'null');
-    if (isValidWalk(v)) return v;
-  } catch {}
-  return seedPaths(cityId);
+  let v = null;
+  try { v = JSON.parse(storage?.getItem(walkKey(cityId)) || 'null'); } catch {}
+  if (!isValidWalk(v)) return [];
+  const seeds = new Set(seedPaths(cityId).map((p) => JSON.stringify(p)));
+  return v.filter((p) => !seeds.has(JSON.stringify(p)));
 }
 export function saveWalk(storage, cityId, paths) {
   const trimmed = paths.filter((p) => p.length > 1).slice(-MAX_PATHS).map((p) => p.slice(-MAX_POINTS).map(([x, y]) => [+x.toFixed(1), +y.toFixed(1)]));
@@ -85,6 +88,7 @@ export function saveWalk(storage, cityId, paths) {
   return trimmed;
 }
 // Walks brighten and widen by recency: the newest paths (last in the list) are the widest and brightest.
+export const SEED_STYLE = { width: 1, opacity: 0.35, dash: '1.5 2' };
 export const pathStyle = (index, total) => ({ width: +(1.2 + Math.min(2.4, (index / Math.max(1, total)) * 2.4)).toFixed(2), opacity: +(0.45 + 0.55 * (index + 1) / Math.max(1, total)).toFixed(2) });
 export const nearSpot = ([x, y], spots, radius = 6) => spots.find((s) => Math.hypot(s.x - x, s.y - y) <= radius) || null;
 // localStorage can throw on access (privacy modes, sandboxed iframes); read it through a guard.

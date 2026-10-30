@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTwinService, POOL, CANDIDATES, nativeRate, MAX_SCREEN_CHECKS, summariseRejected } from '../lib/twin.js';
+import { createTwinService, POOL, CANDIDATES, nativeRate, MAX_SCREEN_CHECKS, MAX_SCREEN_TOTAL_CHECKS, summariseRejected } from '../lib/twin.js';
 import { createCache } from '../lib/cache.js';
 import { musicLanguageSignal } from '../lib/musicbrainz.js';
 import { verifyShow, verifyMovie } from '../lib/tmdb.js';
@@ -109,12 +109,15 @@ const screenSvc = (names, rows, extra = {}) => {
 test('HG-9 review: runtime TV/movie verifications capped at 25; measure is unlimited', async () => {
   assert.equal(MAX_SCREEN_CHECKS, 25);
   const names = Array.from({ length: 50 }, (_, i) => 'H' + i);
-  const rows = names.map((n) => show(n, 'hi'));
+  // Same-language but not native (Tamil from Sri Lanka): these do use up the 25 (HG-11).
+  const rows = names.map((n) => show(n, 'ta', ['LK']));
   const a = screenSvc(names, rows);
   const r = await a.s.category({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
-  assert.equal(a.searched.length, 25);
-  assert.equal(r.rejected.filter((x) => x.reason === 'check_cap').length, 25);
-  const b = screenSvc(names, rows);
+  // The top-15 same-language pool (CANDIDATES) is reached before the 25 limit.
+  assert.equal(a.searched.length, CANDIDATES);
+  assert.ok(MAX_SCREEN_CHECKS >= CANDIDATES);
+  assert.equal(r.rejected.filter((x) => x.reason === 'check_cap').length, 0);
+  const b = screenSvc(names, names.map((n) => show(n, 'hi')));
   await b.s.measure({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
   assert.equal(b.searched.length, 50);
 });
@@ -218,4 +221,20 @@ test('round 4: liveCats treats an empty list as missing; categoryWords has a def
   assert.equal(categoryWords(), 'TV, movies and music');
   assert.equal(categoryWords([]), 'TV, movies and music');
   assert.equal(categoryWords(['movie']), 'movies');
+});
+
+test('HG-11: off-language films do not use up the 25; total TMDB checks stay capped at the pool (50)', async () => {
+  assert.equal(MAX_SCREEN_TOTAL_CHECKS, POOL);
+  // 40 Hindi films first, then 10 native Tamil ones: the Tamil ones are still reached.
+  const names = Array.from({ length: 50 }, (_, i) => (i < 40 ? 'H' : 'T') + i);
+  const rows = names.map((n) => show(n, n[0] === 'H' ? 'hi' : 'ta'));
+  const a = screenSvc(names, rows);
+  const r = await a.s.category({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
+  assert.equal(r.picks.length, 5, 'native picks found after 40 off-language');
+  assert.equal(r.rejected.filter((x) => x.reason === 'check_cap').length, 0);
+  // Hard ceiling: a pool larger than 50 that is all off-language stops at 50 TMDB checks.
+  const many = Array.from({ length: 60 }, (_, i) => 'X' + i);
+  const b = screenSvc(many, many.map((n) => show(n, 'hi')));
+  await b.s.category({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
+  assert.equal(b.searched.length, 50);
 });

@@ -72,6 +72,6 @@ test('input validation', async () => {
   assert.throws(() => parseFavourites(FAVS.slice(0, 2)), /3 to 5/);
   assert.throws(() => parseFavourites([...FAVS, ...FAVS]), /3 to 5/);
   const { s } = svc();
-  await assert.rejects(s.category({ ...base, cityId: 'tokyo', category: 'tv' }), (e) => e.status === 400);
+  await assert.rejects(s.category({ ...base, cityId: 'atlantis', category: 'tv' }), (e) => e.status === 400);
   await assert.rejects(s.category({ ...base, category: 'books' }), (e) => e.status === 400);
 });

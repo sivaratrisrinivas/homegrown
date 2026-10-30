@@ -15,7 +15,7 @@ Deployable as-is on Vercel Hobby: `public/` is static and `api/*.js` are Node fu
 
 | Var | Needed for |
 |---|---|
-| `QLOO_API_KEY` | typeahead and all three categories |
+| `QLOO_API_KEY` | typeahead and discovery (v1: movies; TV/music paths kept) |
 | `TMDB_API_KEY` | show and film origin checks and where-to-watch (v3 key or v4 read token) |
 
 When a key is missing, the API returns `503 {"error":"missing_key","key":"..."}` and the UI says so. `/api/health` reports only whether each key is present.
@@ -31,9 +31,10 @@ When a key is missing, the API returns `503 {"error":"missing_key","key":"..."}`
 ## Captain rules (v1)
 
 - **Picks:** 5 strict-local picks per category from a Qloo top 15. Fewer than 3 is "scarce": the category is shown with a plain note but left off the postcard.
-- **City gate:** a city is live only with ≥ 60% local picks in TV, movies and music. See `config/gate.json`, refreshed by `npm run measure`, which needs `QLOO_API_KEY` and `TMDB_API_KEY` and takes ~3 min because Qloo calls are ~7 s apart.
+- **v1 is movies only.** `config/gate.json` `liveCategories: ["movie"]` is the single switch: the app runs only live categories, `/api/twin` refuses the others with 403 before any Qloo call, and the TV/music code paths stay in place for later.
+- **City gate:** a city is live only with ≥ 60% local picks and ≥ `minSeen` (5) measured in every *live* category (`liveCategories`). See `config/gate.json`, refreshed by `npm run measure` (re-measures live categories only; needs `QLOO_API_KEY` and `TMDB_API_KEY`; Qloo calls ~7 s apart). Cities with a thin pool (< 10 measured or < 30% language share) show a calm note that picks may be few. With one live category the 'X lead' line is hidden.
 - **Flow:** language first (only languages with a live city; the others are "coming soon"), then the measured best city, with a one-tap switch to other live cities.
-- **Config:** cities and languages live in `config/cities.json`. To add a city, add an entry and run `npm run measure`. Candidates: Mexico City, Madrid, Buenos Aires, Seoul, Paris, Chennai.
+- **Config:** cities and languages live in `config/cities.json`. To add a city, add an entry and run `npm run measure`. Live (movies): Mexico City, Madrid, Buenos Aires, Seoul, Paris, Chennai, Mumbai, Hyderabad, Kolkata.
 - **Reveal:** one "culture leads in" line, computed from the measured native counts.
 
 ## Deployment

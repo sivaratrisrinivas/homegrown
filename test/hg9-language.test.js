@@ -5,7 +5,7 @@ import { createCache } from '../lib/cache.js';
 import { musicLanguageSignal } from '../lib/musicbrainz.js';
 import { verifyShow, verifyMovie } from '../lib/tmdb.js';
 import { CITIES, LANGUAGES } from '../lib/cities.js';
-import { cityStatus, loadGate, liveCategories, requireLiveCategory } from '../lib/gate.js';
+import { cityStatus, loadGate, liveCategories, requireLiveCategory, catalogue, suggestCity, thinNote } from '../lib/gate.js';
 import { retryable } from '../lib/qloo.js';
 import { FAVS } from './helpers.js';
 
@@ -177,4 +177,35 @@ test('retryable: 504 from Qloo retries, the measure deadline and other statuses 
   assert.equal(retryable({ status: 504, reason: 'deadline' }), false);
   assert.equal(retryable({ status: 502 }), false);
   assert.equal(retryable(undefined), false);
+});
+
+test('round 3: with only movie live, a reveal with movie landed is not pending', async () => {
+  const { liveCats, pendingCats } = await import('../public/logic.js');
+  const cat = catalogue(loadGate());
+  const cats = liveCats(cat);
+  assert.deepEqual(cats, ['movie']);
+  assert.deepEqual(pendingCats(cats, { movie: { picks: [] } }), []);
+  assert.deepEqual(pendingCats(cats, {}), ['movie']);
+  assert.deepEqual(liveCats(null), ['tv', 'movie', 'music']);
+  assert.ok(cat.cities.every((c) => c.lead === null), 'lead hidden with one live category');
+});
+
+test('round 3: suggestCity ignores dead categories', () => {
+  const g = { threshold: 0.6, minSeen: 5, categories: ['tv', 'movie', 'music'], liveCategories: ['movie'], results: {
+    madrid: { movie: { seen: 10, accepted: 7 }, tv: { seen: 10, accepted: 0 }, music: { seen: 10, accepted: 0 } },
+    mexico_city: { movie: { seen: 10, accepted: 9 }, tv: { seen: 10, accepted: 10 }, music: { seen: 10, accepted: 10 } },
+    buenos_aires: { movie: { seen: 10, accepted: 10 }, tv: { seen: 0, accepted: 0 }, music: { seen: 0, accepted: 0 } } } };
+  const s = suggestCity(g, 'es');
+  assert.equal(s.city, 'buenos_aires');
+  assert.deepEqual(s.candidates.map((c) => c.floor), [100, 90, 70]);
+});
+
+test('round 3: thin-pool note comes from gate data (seen < 10 or share < 30%)', () => {
+  const g = loadGate();
+  const cat = catalogue(g);
+  const by = Object.fromEntries(cat.cities.map((c) => [c.id, c.thinNote]));
+  assert.equal(by.kolkata, 'Fewer Bengali films to draw from, so you may see only a few picks.');
+  assert.equal(by.madrid, null);
+  assert.equal(thinNote({ ...g, results: { ...g.results, madrid: { movie: { seen: 15, accepted: 14, languageShare: 0.2 } } } }, 'madrid'), 'Fewer Spanish films to draw from, so you may see only a few picks.');
+  assert.equal(thinNote({ ...g, results: { ...g.results, seoul: { movie: { seen: 6, accepted: 6, languageShare: 1 } } } }, 'seoul'), 'Fewer Korean films to draw from, so you may see only a few picks.');
 });

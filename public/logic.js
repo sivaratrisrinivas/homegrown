@@ -9,6 +9,9 @@ export const PROMPTS = [
 export const MIN_FAVS = 3, MAX_FAVS = 5;
 export const canSkip = (n) => n >= MIN_FAVS && n < MAX_FAVS;
 export const QLOO_ORDER = ['tv', 'movie', 'music'];
+// HG-9 v1: the one list of categories the app runs, waits on and notes: the catalogue's live categories, in Qloo order.
+export const liveCats = (catalogue) => QLOO_ORDER.filter((c) => (catalogue?.categories || QLOO_ORDER).includes(c));
+export const pendingCats = (cats, results) => cats.filter((k) => !results[k]);
 export const MORPH_BUDGET_MS = 8000;
 
 export const FLAP_CHARS = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

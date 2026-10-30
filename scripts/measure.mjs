@@ -13,7 +13,10 @@ const SEEDS = [['Breaking Bad', 'show'], ['Radiohead', 'band'], ['Parasite', 'mo
 const { qloo, twin } = getDeps();
 const favourites = [];
 for (const [q, kind] of SEEDS) {
-  const r = (await qloo.search(q, QLOO_TYPES[kind]))[0];
+  let r;
+  for (let i = 0; ; i++) {
+    try { r = (await qloo.search(q, QLOO_TYPES[kind]))[0]; break; } catch (e) { if (e.status !== 504 || i >= 2) throw e; await new Promise((ok) => setTimeout(ok, 15000)); }
+  }
   if (!r) throw new Error(`seed not found: ${q}`);
   favourites.push({ id: r.id, name: r.name, tags: r.tags });
 }
@@ -22,9 +25,17 @@ const results = {};
 for (const cityId of Object.keys(CITIES)) {
   results[cityId] = {};
   for (const category of CATEGORIES) {
-    const r = await twin.measure({ favourites, cityId, category });
-    results[cityId][category] = { seen: r.seen, accepted: r.accepted, errors: r.errors, filtered: r.filtered };
-    console.log(JSON.stringify({ city: cityId, category, seen: r.seen, accepted: r.accepted, pct: r.pct, errors: r.errors, filtered: r.filtered, reasons: r.rejected.reduce((m, x) => ({ ...m, [x]: (m[x] || 0) + 1 }), {}) }));
+    // Qloo sometimes times out (504); retry the category up to 3 times, 15 s apart (measuring run only).
+    let r;
+    for (let i = 0; ; i++) {
+      try { r = await twin.measure({ favourites, cityId, category }); break; } catch (e) {
+        if (e.status !== 504 || i >= 2) throw e;
+        console.log(JSON.stringify({ city: cityId, category, retry: i + 1, status: e.status }));
+        await new Promise((ok) => setTimeout(ok, 15000));
+      }
+    }
+    results[cityId][category] = { seen: r.seen, accepted: r.accepted, errors: r.errors, filtered: r.filtered, languageShare: r.seen + r.filtered ? Math.round((100 * r.seen) / (r.seen + r.filtered)) / 100 : null };
+    console.log(JSON.stringify({ city: cityId, category, seen: r.seen, accepted: r.accepted, pct: r.pct, errors: r.errors, filtered: r.filtered, languageShare: results[cityId][category].languageShare, reasons: r.rejected.reduce((m, x) => ({ ...m, [x]: (m[x] || 0) + 1 }), {}) }));
   }
 }
 const gate = { ...old, measuredAt: new Date().toISOString(), source: `npm run measure (HG-9 language-aware): Qloo pool of 50 filtered by language (TMDB original_language for tv/movie, Qloo genre tags for music), then top 15 per category, every candidate checked, MusicBrainz errors retried (1.1 s backoff) and excluded from the denominator; seeds ${SEEDS.map((s) => s[0]).join(', ')}`, results };

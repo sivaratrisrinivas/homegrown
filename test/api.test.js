@@ -47,7 +47,7 @@ test('review 10: a non-string city never bypasses the live-city gate', async () 
     const r = await post('/api/twin', { favourites: FAVS, city, category: 'tv' });
     assert.equal(r.status, 400, JSON.stringify(city));
   }
-  for (const city of ['chennai', 'toString', '__proto__', 'nowhere']) {
+  for (const city of ['toString', '__proto__', 'nowhere']) {
     assert.equal((await post('/api/twin', { favourites: FAVS, city, category: 'tv' })).status, 403, city);
   }
   assert.equal((await post('/api/feedback', { event: 'rating', rating: 4, city: ['seoul'] })).status, 400);

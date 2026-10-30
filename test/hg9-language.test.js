@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTwinService, POOL, CANDIDATES, nativeRate } from '../lib/twin.js';
+import { createTwinService, POOL, CANDIDATES, nativeRate, MAX_SCREEN_CHECKS, summariseRejected } from '../lib/twin.js';
+import { createCache } from '../lib/cache.js';
 import { musicLanguageSignal } from '../lib/musicbrainz.js';
 import { verifyShow, verifyMovie } from '../lib/tmdb.js';
 import { CITIES, LANGUAGES } from '../lib/cities.js';
@@ -62,13 +63,13 @@ test('HG-9 TV: Qloo pool of 50 with the language tag; top 15 counted only from t
   assert.equal(calls[0].extra['signal.interests.tags'], 'urn:tag:keyword:qloo:tamil_cinema');
   assert.equal(calls[0].extra['filter.release_country'], 'India');
   assert.equal(m.seen, CANDIDATES, 'exactly 15 language-matched candidates measured');
-  assert.equal(m.accepted, 12, 'T0, T5, T10 are Tamil but not Indian');
-  assert.equal(m.filtered, 21, '20 Hindi + 1 no TMDB match never enter the 15');
-  assert.ok(!searched.includes('T15'), 'stops after the 15th language match');
+  assert.equal(m.accepted, 11, 'Nope (no TMDB match) fails; T0, T5, T10 are Tamil but not Indian');
+  assert.equal(m.filtered, 20, 'only the 20 Hindi titles are filtered');
+  assert.ok(!searched.includes('T14'), 'stops after the 15th measured candidate');
 });
 
 test('HG-9: prefilter reasons stay out of the native rate', () => {
-  assert.deepEqual(nativeRate([{}], [{ reason: 'off_language' }, { reason: 'no_tmdb_match' }, { reason: 'not_native' }]), { seen: 2, accepted: 1, pct: 50 });
+  assert.deepEqual(nativeRate([{}], [{ reason: 'off_language' }, { reason: 'no_tmdb_match' }, { reason: 'not_native' }]), { seen: 3, accepted: 1, pct: 33 }, 'no_tmdb_match counts as a failure');
 });
 
 test('HG-9 config: every city has music language tags; Indian cities list the other languages as conflicts', () => {
@@ -86,9 +87,71 @@ test('HG-9 gate: a tiny language-filtered pool (2/2) is not enough to go live', 
   assert.equal(cityStatus(g, 'x').live, false); assert.equal(cityStatus(g, 'y').live, true);
 });
 
-test('HG-9 measured gate: Mumbai is live; Chennai stays gated (TV pool of 4)', () => {
+test('HG-9 measured gate: all configured cities live; each category has >= minSeen and records languageShare', () => {
   const g = loadGate();
-  for (const id of ['mexico_city', 'madrid', 'buenos_aires', 'seoul', 'paris', 'mumbai']) assert.equal(cityStatus(g, id).live, true, id);
-  assert.equal(cityStatus(g, 'chennai').live, false);
+  for (const id of ['mexico_city', 'madrid', 'buenos_aires', 'seoul', 'paris', 'chennai', 'mumbai']) assert.equal(cityStatus(g, id).live, true, id);
+  for (const [id, res] of Object.entries(g.results)) for (const k of g.categories) {
+    assert.ok(res[k].seen >= g.minSeen, `${id}.${k}`);
+    assert.equal(res[k].languageShare, Math.round((100 * res[k].seen) / (res[k].seen + res[k].filtered)) / 100, `${id}.${k} share`);
+  }
+  assert.equal(cityStatus({ ...g, results: { chennai: { ...g.results.chennai, tv: { ...g.results.chennai.tv, languageShare: 0.01 } } } }, 'chennai').live, true, 'language share is not gated');
   assert.equal(CITIES.mumbai.language, 'hi');
+});
+
+const screenSvc = (names, rows, extra = {}) => {
+  const searched = [];
+  const qloo = { insights: async () => names.map((n) => ({ id: n, name: n, tags: [] })) };
+  const tmdb = { searchTv: async (q) => { searched.push(q); return rows.filter((r) => r.name === q); }, watchProviders: async () => ({}) };
+  return { s: createTwinService({ qloo, tmdb, mb: {}, itunes: {}, ...extra }), searched };
+};
+
+test('HG-9 review: runtime TV/movie verifications capped at 25; measure is unlimited', async () => {
+  assert.equal(MAX_SCREEN_CHECKS, 25);
+  const names = Array.from({ length: 50 }, (_, i) => 'H' + i);
+  const rows = names.map((n) => show(n, 'hi'));
+  const a = screenSvc(names, rows);
+  const r = await a.s.category({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
+  assert.equal(a.searched.length, 25);
+  assert.equal(r.rejected.filter((x) => x.reason === 'check_cap').length, 25);
+  const b = screenSvc(names, rows);
+  await b.s.measure({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
+  assert.equal(b.searched.length, 50);
+});
+
+test('HG-9 review: all-prefilter rejections give a language-scarcity note, not the origin-check note', async () => {
+  const names = ['H1', 'H2', 'T1'];
+  const { s } = screenSvc(names, [show('H1', 'hi'), show('H2', 'hi'), show('T1', 'ta')]);
+  const r = await s.category({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
+  assert.equal(r.picks.length, 1);
+  assert.match(r.note, /Tamil shows are scarce for your taste: Qloo mostly suggested shows in other languages for Chennai/);
+  assert.doesNotMatch(r.note, /origin check/);
+  const z = screenSvc(['H1'], [show('H1', 'hi')]);
+  assert.match((await z.s.category({ favourites: FAVS, cityId: 'chennai', category: 'tv' })).note, /^No Tamil shows came up/);
+  const mixed = screenSvc(['H1', 'X'], [show('H1', 'hi')]);
+  assert.match((await mixed.s.category({ favourites: FAVS, cityId: 'chennai', category: 'tv' })).note, /origin check/, 'a no_tmdb_match is not a prefilter');
+});
+
+test('HG-9 review: cache stores reason counts and at most 10 example names', async () => {
+  const sum = summariseRejected(Array.from({ length: 30 }, (_, i) => ({ name: 'N' + i, reason: i < 20 ? 'off_language' : 'not_native', extra: 'x' })));
+  assert.deepEqual(sum.counts, { off_language: 20, not_native: 10 });
+  assert.equal(sum.examples.length, 10); assert.deepEqual(Object.keys(sum.examples[0]), ['name', 'reason']);
+  const store = new Map();
+  const cache = { get: (k) => store.get(k), set: (k, v) => store.set(k, v) };
+  const names = Array.from({ length: 20 }, (_, i) => 'H' + i);
+  const logs = [];
+  const { s } = screenSvc(names, names.map((n) => show(n, 'hi')), { cache, log: (e) => logs.push(e) });
+  await s.category({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
+  const [stored] = [...store.values()];
+  assert.equal(stored.rejected, undefined, 'no full rejected array in the cache');
+  assert.deepEqual(stored.rejectedSummary.counts, { off_language: 20 });
+  assert.equal(stored.rejectedSummary.examples.length, 10);
+  const hit = await s.category({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
+  assert.equal(hit.cached, true);
+  assert.deepEqual(logs.filter((l) => l.event === 'native_rate').map((l) => l.seen), [0, 0]);
+  void createCache;
+});
+
+test('HG-9 review: punjabi stays a Mumbai music conflict tag', () => {
+  assert.ok(CITIES.mumbai.musicConflictTags.includes('punjabi'));
+  assert.equal(musicLanguageSignal({ tags: [g('hindi'), g('punjabi')] }, CITIES.mumbai).ok, false);
 });

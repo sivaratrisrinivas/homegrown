@@ -1,6 +1,6 @@
 # Homegrown
 
-*What you'd love if you grew up there.* Enter 3-5 favourites, pick Mexico City, Seoul or Paris, and get Qloo taste-matched picks that are verified native: shows and a film (TMDB: exact title, original language and country) and a band (MusicBrainz, with an iTunes 30-second preview). Version 1 covers music, TV and movies only; anything not verifiably made in the city is dropped, never padded.
+*What you'd love if you grew up there.* Enter 3-5 favourites, pick a city, and get Qloo taste-matched films that are verified native (TMDB: exact title, original language and origin country). v1 is films only, from 9 cities: Mexico City, Madrid, Buenos Aires, Seoul, Paris, Chennai, Mumbai, Hyderabad and Kolkata. TV and music come later (their code paths are kept behind the gate). Anything not verifiably made in the city's language and country is dropped, never padded.
 
 ## Run
 

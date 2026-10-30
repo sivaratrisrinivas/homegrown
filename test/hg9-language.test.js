@@ -209,3 +209,13 @@ test('round 3: thin-pool note comes from gate data (seen < 10 or share < 30%)', 
   assert.equal(thinNote({ ...g, results: { ...g.results, madrid: { movie: { seen: 15, accepted: 14, languageShare: 0.2 } } } }, 'madrid'), 'Fewer Spanish films to draw from, so you may see only a few picks.');
   assert.equal(thinNote({ ...g, results: { ...g.results, seoul: { movie: { seen: 6, accepted: 6, languageShare: 1 } } } }, 'seoul'), 'Fewer Korean films to draw from, so you may see only a few picks.');
 });
+
+test('round 4: liveCats treats an empty list as missing; categoryWords has a default', async () => {
+  const { liveCats, categoryWords } = await import('../public/logic.js');
+  assert.deepEqual(liveCats({ categories: [] }), ['tv', 'movie', 'music']);
+  assert.deepEqual(liveCats({}), ['tv', 'movie', 'music']);
+  assert.deepEqual(liveCats({ categories: ['music', 'movie'] }), ['movie', 'music']);
+  assert.equal(categoryWords(), 'TV, movies and music');
+  assert.equal(categoryWords([]), 'TV, movies and music');
+  assert.equal(categoryWords(['movie']), 'movies');
+});

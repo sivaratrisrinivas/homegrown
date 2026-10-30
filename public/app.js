@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, liveCats, pendingCats, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, liveCats, pendingCats, categoryWords, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { isMapReveal, mapFraming } from './maplogic.js';
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
@@ -18,7 +18,6 @@ async function qlooPost(body, isCurrent = () => true) {
 // S.favs holds only Qloo-matched favourites ({id,name,tags}); chosen-but-unmatched ones live in
 // S.pending with their match promise kept separately in pendingMatches.
 const pendingMatches = new Map();
-const categoryWords = (cats = liveCats(S.catalogue)) => { const w = cats.map((c) => ({ tv: 'TV', movie: 'movies', music: 'music' }[c] || c)); return w.length > 1 ? `${w.slice(0, -1).join(', ')} and ${w.at(-1)}` : w[0]; };
 const S = { favs: [], pending: [], missed: [], city: null, results: {}, sound: false, catalogue: null, lang: null };
 const h = (tag, attrs = {}, ...kids) => {
   const el = document.createElement(tag);
@@ -79,7 +78,7 @@ function suggestCity() {
   const live = cityForLanguage(S.catalogue, S.lang.id);
   if (!live) {
     return show(h('h2', {}, `${S.lang.name} isn't live yet.`),
-      h('p', { class: 'muted' }, `A city opens only when at least ${Math.round(S.catalogue.threshold * 100)}% of its picks in ${categoryWords(S.catalogue.categories)} are verified local. Its city hasn't reached that yet.`),
+      h('p', { class: 'muted' }, `A city opens only when at least ${Math.round(S.catalogue.threshold * 100)}% of its picks in ${categoryWords(liveCats(S.catalogue))} are verified local. Its city hasn't reached that yet.`),
       h('button', { class: 'ghost', onclick: pickLanguage }, 'Pick another language'));
   }
   // Default is the measured best city; switching to another live city is one tap.

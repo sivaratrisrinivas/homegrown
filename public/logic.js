@@ -11,6 +11,10 @@ export const canSkip = (n) => n >= MIN_FAVS && n < MAX_FAVS;
 export const QLOO_ORDER = ['tv', 'movie', 'music'];
 // HG-9 v1: the one list of categories the app runs, waits on and notes: the catalogue's live categories, in Qloo order.
 // A missing or empty list falls back to every category.
+// The categories to run: the journey's own, in order, that the catalogue says are live. No fallback:
+// an empty result means this city isn't ready, and the UI says so.
+export const runCatsFor = (J, catalogue) => { const live = liveCats(catalogue); return J.order.filter((c) => live.includes(c)); };
+export const NOT_READY = 'Picks for this city aren’t ready yet. Try another city.';
 export const liveCats = (catalogue) => { const live = catalogue?.categories; return QLOO_ORDER.filter((c) => (Array.isArray(live) && live.length ? live : QLOO_ORDER).includes(c)); };
 const CAT_WORD = { tv: 'TV', movie: 'movies', music: 'music' };
 export const categoryWords = (cats) => { const w = (Array.isArray(cats) && cats.length ? cats : QLOO_ORDER).map((c) => CAT_WORD[c] || c); return w.length > 1 ? `${w.slice(0, -1).join(', ')} and ${w.at(-1)}` : w[0]; };

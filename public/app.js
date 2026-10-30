@@ -1,14 +1,15 @@
-import { JOURNEY_FAVS, journeyFor, revealHeader, journeyPicks, encodeShare, decodeShare, QLOO_ORDER, liveCats, pendingCats, flapSteps, padTo, userCountryFromLocale, createRunGuard, createSpacer, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { JOURNEY_FAVS, journeyFor, revealHeader, journeyPicks, encodeShare, decodeShare, QLOO_ORDER, liveCats, pendingCats, runCatsFor, NOT_READY, flapSteps, padTo, userCountryFromLocale, createRunGuard, createSpacer, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { CATEGORY } from './config.js';
 // HG-10 v1 is one journey: hello → language → city → 3 favourites → morph board → reveal → share.
 const J = journeyFor(CATEGORY);
 // HG-9: run, wait on and note only the catalogue's live categories (within this journey's category).
-const runCats = () => { const live = liveCats(S.catalogue); const cats = J.order.filter((c) => live.includes(c)); return cats.length ? cats : J.order; };
+const runCats = () => runCatsFor(J, S.catalogue);
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
 
 const app = document.getElementById('app');
-const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const motionMq = matchMedia('(prefers-reduced-motion: reduce)');
+const reduced = () => motionMq.matches; // read live at each call, so a mid-session OS toggle applies
 // Motion tokens come from styles.css (:root), so timings are retuned in one place.
 const tokens = getComputedStyle(document.documentElement);
 const T = (name) => parseFloat(tokens.getPropertyValue(`--${name}`)) || 0;
@@ -45,7 +46,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Screens: one <section> at a time. A4 slides the old one out and the new one in (opacity only when
-// reduced); focus moves to the new heading. Every screen replace bumps screenGen and aborts the
+// reduced()); focus moves to the new heading. Every screen replace bumps screenGen and aborts the
 // previous screen's alt-names lookup, so a stale lookup can never change S.favs (HG-8).
 let goingBack = false;
 let screenGen = 0, screenAbort = null;
@@ -60,8 +61,8 @@ function swap(args) {
   if (old && o.anim !== false) {
     const top = old.offsetTop; const leave = h('div', { class: 'leaving', 'aria-hidden': 'true', inert: '' }, old);
     leave.style.top = `${top}px`; app.append(leave);
-    const anims = [...old.children].map((c) => (reduced || c.matches('.pin')
-      ? c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: reduced ? T('fade') : T('d-exit'), fill: 'forwards' })
+    const anims = [...old.children].map((c) => (reduced() || c.matches('.pin')
+      ? c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: reduced() ? T('fade') : T('d-exit'), fill: 'forwards' })
       : c.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateX(${dx}px)` }], { duration: T('d-exit'), easing: E('in'), fill: 'forwards' })));
     Promise.all(anims.map((a) => a.finished)).catch(() => {}).finally(() => leave.remove());
   } else { old?.remove(); app.querySelectorAll(':scope > .leaving').forEach((l) => l.remove()); }
@@ -70,7 +71,7 @@ function swap(args) {
   if (old && o.anim !== false) {
     for (const c of sec.children) {
       if (o.still && c.matches(o.still)) continue;
-      if (reduced || c.matches('.pin')) fade(c, reduced ? T('fade') : T('d-enter'));
+      if (reduced() || c.matches('.pin')) fade(c, reduced() ? T('fade') : T('d-enter'));
       else c.animate([{ opacity: 0, transform: `translateX(${-dx}px)` }, { opacity: 1, transform: 'none' }], { duration: T('d-enter'), easing: E('out'), delay: T('d-enter-delay'), fill: 'backwards' });
     }
   }
@@ -291,20 +292,22 @@ function favourite(note) {
 }
 
 
-// Purposeful delight (all transform/opacity, all timed by CSS tokens, all skipped with reduced motion).
+// Purposeful delight (all transform/opacity, all timed by CSS tokens, all skipped with reduced() motion).
 // A ticket-stamp pop: the new favourite lands on the shelf like a stamp hitting paper.
-const stamp = (el) => (reduced ? fade(el) : el.animate([
+const stamp = (el) => (reduced() ? fade(el) : el.animate([
   { transform: 'scale(1.7) rotate(-9deg)', opacity: 0 }, { transform: 'scale(.92) rotate(2deg)', opacity: 1, offset: 0.55 },
   { transform: 'scale(1.03) rotate(0)', opacity: 1, offset: 0.8 }, { transform: 'none', opacity: 1 }], { duration: T('d-stamp'), easing: E('out') }));
 // The city's letters settle into their slots on reveal, one by one.
 function settle(cells, after = 0) {
-  if (reduced) return;
+  if (reduced()) return;
   cells.forEach((cell, i) => cell.animate([{ transform: 'translateY(-18px) rotateX(75deg)', opacity: 0 }, { transform: 'translateY(2px)', opacity: 1, offset: 0.7 }, { transform: 'none', opacity: 1 }],
     { duration: T('d-settle'), delay: after + i * T('d-settle-stagger'), easing: E('reveal'), fill: 'backwards' }));
 }
 // A few sparks burst from the share button: the result is on its way.
+let sparking = false; // rapid taps: one burst at a time
 function sparkle(btn) {
-  if (reduced) return;
+  if (reduced() || sparking) return;
+  sparking = true; setTimeout(() => { sparking = false; }, T('d-sparkle'));
   const host = btn.parentElement, b = btn.getBoundingClientRect(), o = host.getBoundingClientRect();
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * Math.PI * 2 + Math.random() * 0.4, d = 38 + Math.random() * 34;
@@ -325,7 +328,7 @@ async function matchFavourites(board, rows) {
   const progress = h('p', { class: 'foot', role: 'status', 'aria-live': 'polite' }, matchingProgress(done, total));
   board.append(progress);
   // A7: one blinking cursor, on the first row still being matched.
-  const cursor = () => { let first = true; for (const f of pend) { const r = rows.get(rowKey(f)); if (r.settled) continue; r.tick.classList.toggle('cursor', first && !reduced); first = false; } };
+  const cursor = () => { let first = true; for (const f of pend) { const r = rows.get(rowKey(f)); if (r.settled) continue; r.tick.classList.toggle('cursor', first && !reduced()); first = false; } };
   cursor();
   const matches = new Map(await Promise.all(pend.map(async (f) => {
     const m = await pendingMatches.get(f.key);
@@ -364,7 +367,7 @@ function flapRow(text, width, withTick = true) {
   row.flipTo = async (to) => {
     row.setAttribute('aria-label', to);
     const target = fit(to);
-    if (reduced) { row.cells.forEach((c, k) => (c.textContent = target[k])); await fade(row).finished.catch(() => {}); return; }
+    if (reduced()) { row.cells.forEach((c, k) => (c.textContent = target[k])); await fade(row).finished.catch(() => {}); return; }
     const step = T('d-flap'), stagger = T('d-flap-stagger');
     await Promise.all(row.cells.map(async (cell, k) => {
       await wait(k * stagger);
@@ -378,7 +381,7 @@ function flapRow(text, width, withTick = true) {
   return row;
 }
 async function flipHeader(hdr, text, ko) {
-  if (reduced) { hdr.textContent = text; hdr.classList.toggle('ko', ko); return; }
+  if (reduced()) { hdr.textContent = text; hdr.classList.toggle('ko', ko); return; }
   const half = T('d-header'), p = 'perspective(400px) rotateX';
   await hdr.animate([{ transform: `${p}(0)` }, { transform: `${p}(90deg)` }], { duration: half, easing: E('flap') }).finished.catch(() => {});
   hdr.textContent = text; hdr.classList.toggle('ko', ko);
@@ -439,7 +442,7 @@ function art(p) {
   const box = h('div', { class: 'poster', 'aria-hidden': 'true' }, h('b', {}, [...String(p.title || '?')][0]));
   if (p.image) {
     const img = h('img', { alt: '', decoding: 'async', loading: 'eager', fetchpriority: 'high', src: sized(p.image, 'w342') });
-    img.addEventListener('load', () => { img.classList.add('in'); if (reduced) fade(img); else img.animate([{ opacity: 0, transform: 'scale(1.03)' }, { opacity: 1, transform: 'none' }], { duration: T('d-develop'), easing: E('reveal') }); }, { once: true });
+    img.addEventListener('load', () => { img.classList.add('in'); if (reduced()) fade(img); else img.animate([{ opacity: 0, transform: 'scale(1.03)' }, { opacity: 1, transform: 'none' }], { duration: T('d-develop'), easing: E('reveal') }); }, { once: true });
     img.addEventListener('error', () => img.remove(), { once: true });
     box.append(img);
   }
@@ -489,7 +492,7 @@ const pickRow = (p, n, city) => h('article', { class: 'prow', 'aria-label': `${K
 // Rows rise in (opacity + --row-rise, --d-row-stagger apart), once each, late arrivals too.
 function riseIn(el, key, n) {
   const seen = revealEls?.seen; if (!seen || seen.has(key)) return el; seen.add(key);
-  if (reduced) fade(el);
+  if (reduced()) fade(el);
   else el.animate([{ opacity: 0, transform: `translateY(${T('row-rise')}px)` }, { opacity: 1, transform: 'none' }], { duration: T('d-rows'), easing: E('reveal'), delay: (revealEls.first ? T('d-shrink') / 2 : 0) + n * T('d-row-stagger'), fill: 'backwards' });
   return el;
 }
@@ -502,7 +505,7 @@ function picksView() {
   const notes = cats.filter((k) => S.results[k]?.note).map((k) => (S.results[k].error ? `${CAT[k]} didn't come through this time.` : S.results[k].note));
   const watched = [hero, ...rows, ...scarcePicks(S.results)].filter(Boolean).find((p) => p.watch?.attribution);
   return {
-    hero: hero ? riseIn(pickCard(hero, S.city), `h|${hero.title}`, 0) : pending.length ? null : h('p', { class: 'body' }, 'We couldn’t find picks local enough for your taste here. Try another city.'),
+    hero: !cats.length ? h('p', { class: 'body not-ready' }, NOT_READY) : hero ? riseIn(pickCard(hero, S.city), `h|${hero.title}`, 0) : pending.length ? null : h('p', { class: 'body' }, 'We couldn’t find picks local enough for your taste here. Try another city.'),
     rest: [
       rows.length ? h('div', { class: 'list' }, rows.map((p, n) => riseIn(pickRow(p, n + 1, S.city), `${p.category}|${p.title}`, n + 1))) : null,
       pending.map((k) => h('div', { class: 'skel' }, `${CAT[k]} — landing…`)),
@@ -584,7 +587,7 @@ function shareBlock() {
   const preview = (blob) => {
     const first = !shot.src; if (shot.src) URL.revokeObjectURL(shot.src); shot.src = URL.createObjectURL(blob);
     if (!first) return; wrap.insertBefore(shot, wrap.querySelector('.cta').nextSibling);
-    if (reduced) return;
+    if (reduced()) return;
     shot.animate([{ transform: 'perspective(800px) translateX(40px) rotateY(-80deg) rotate(4deg)', opacity: 0 }, { transform: 'perspective(800px) translateX(-4px) rotateY(8deg) rotate(-3deg)', opacity: 1, offset: 0.7 },
       { transform: 'perspective(800px) rotate(-2deg)', opacity: 1 }], { duration: T('d-postcard'), easing: E('reveal') });
   };
@@ -613,13 +616,13 @@ function reveal(fromBoard) {
   const board = h('div', { class: 'board compact city' }, h('h2', { class: `hdr ${ko ? 'ko' : ''}`, lang: J.single ? 'en' : S.city.language }, revealHeader(J, S.city)), flapRow(S.city.name.toUpperCase(), [...S.city.name].length, false));
   const share = shareBlock();
   R.showShare = () => {
-    // A21: the share block rises 1.2 s after the header settles (immediately with reduced motion).
+    // A21: the share block rises 1.2 s after the header settles (immediately with reduced() motion).
     const delay = fromBoard ? T('d-share-delay') : 0;
-    setTimeout(() => { if (revealEls !== R) return; share.classList.remove('wait'); share.prepare?.(); if (reduced) return;
+    setTimeout(() => { if (revealEls !== R) return; share.classList.remove('wait'); share.prepare?.(); if (reduced()) return;
       share.animate([{ opacity: 0, transform: `translateY(${T('travel')}px)` }, { opacity: 1, transform: 'none' }], { duration: T('d-share'), easing: E('reveal') }); }, delay);
   };
   show(board, R.hero, share, R.rest, feelsLike(), R.foot, opts({ anim: !fromBoard, focus: board.firstChild }));
-  if (fromBoard && !reduced) {
+  if (fromBoard && !reduced()) {
     const last = board.getBoundingClientRect(); const s = first.width / last.width;
     board.animate([{ transform: `translate(${first.left - last.left}px,${first.top - last.top}px) scale(${s})` }, { transform: 'none' }], { duration: T('d-shrink'), easing: E('reveal') });
   } else if (fromBoard) fade(app.querySelector('.screen'));

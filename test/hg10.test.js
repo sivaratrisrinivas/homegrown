@@ -132,11 +132,11 @@ test('HG-10 feedback: share events validated; old events and flag payloads uncha
 
 test('HG-10 why fallback names no vendor', () => {
   const w = whyLine([{ name: 'Breaking Bad', tags: [] }, { name: 'Radiohead', tags: [] }], { tags: [], category: 'tv' });
-  assert.equal(w.text, 'Close to Breaking Bad and Radiohead.'); assert.equal(w.grounded, false);
+  assert.equal(w.text, 'Taste-matched to Breaking Bad and Radiohead by Qloo.'); assert.equal(w.grounded, false);
 });
 
 test('HG-10 VS palette, type and tokens', () => {
-  for (const t of ['--paper:#F5F1EA', '--card:var(--paper)', '--ink:#161616', '--ink-2:#55585A', '--ink-3:#8A8D8F', '--line:#E2DED6', '--board:#17161A', '--board-2:#24232A', '--chalk:#F1E7D3', '--t-display:clamp(40px,10vw,56px)', '--t-body:18px', '--mono:ui-monospace', '--ease-reveal:cubic-bezier(.19,1,.22,1)', '--d-share-delay:1200ms', '--d-share:280ms']) assert.ok(css.includes(t), t);
+  for (const t of ['--paper:#F5F1EA', '--card:var(--paper)', '--ink:#161616', '--ink-2:#55585A', '--ink-3:#6A6D6F', '--line:#E2DED6', '--board:#17161A', '--board-2:#24232A', '--chalk:#F1E7D3', '--t-display:clamp(40px,10vw,56px)', '--t-body:18px', '--mono:ui-monospace', '--ease-reveal:cubic-bezier(.19,1,.22,1)', '--d-share-delay:1200ms', '--d-share:280ms']) assert.ok(css.includes(t), t);
   assert.match(css, /\[data-city=madrid\]\{--accent:#C8102E\}/);
   assert.doesNotMatch(css, /#3aa655|#e0a100|#d0453a|feTurbulence/, 'no traffic lights, no grain');
   assert.match(html, /family=Fraunces:opsz,wght@9\.\.144,400&family=Inter:wght@400;500&display=swap/);
@@ -152,8 +152,8 @@ test('HG-10 motion: tokens in CSS, transform/opacity only, reduced motion honour
   assert.doesNotMatch(app, /wait\(\d/); assert.doesNotMatch(app, /EASE_|cubic-bezier/);
   for (const t of ['d-flap', 'd-flap-stagger', 'd-row-gap', 'd-header', 'd-hold', 'd-shrink', 'd-share-delay', 'd-share', 'd-exit', 'd-enter', 'd-develop']) { assert.ok(css.includes(`--${t}:`), t); assert.ok(app.includes(`T('${t}')`), t); }
   assert.match(css, /prefers-reduced-motion:reduce\)\{:root\{--d-hover:0ms;[^}]*--d-share-delay:0ms;--d-share:0ms\}\}/);
-  assert.match(app, /const reduced = matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches/);
-  assert.match(app, /if \(reduced\) \{ row\.cells\.forEach/);
+  assert.match(app, /const motionMq = matchMedia\('\(prefers-reduced-motion: reduce\)'\);\nconst reduced = \(\) => motionMq\.matches;/); assert.ok(!/reduced(?!\(\)| = )\b/.test(app.replace(/prefers-reduced-motion/g, '')));
+  assert.match(app, /if \(reduced\(\)\) \{ row\.cells\.forEach/);
   assert.match(app, /visibilitychange[\s\S]*?iterations === Infinity/);
   assert.match(app, /flapSteps\(cell\.textContent, target\[k\], 7\)/);
 });
@@ -167,8 +167,40 @@ test('HG-10 journey: back goes one step; exactly 3 favourites; HG-5 data model i
 });
 
 test('HG-10 polish: purposeful animations, token-timed, reduced-motion safe', () => {
-  for (const f of ['const stamp = (el) => (reduced ? fade(el)', 'function settle(cells', 'if (reduced) return;', 'function sparkle(btn)', "h('div', { class: 'frames', 'aria-hidden': 'true' }", 'const preview = (blob) =>', 'stamp(shelf.lastElementChild)', 'sparkle(e.currentTarget)', "settle([...board.querySelectorAll('.flap')]"]) assert.ok(app.includes(f), f);
+  for (const f of ['const stamp = (el) => (reduced() ? fade(el)', 'function settle(cells', 'if (reduced()) return;', 'function sparkle(btn)', 'if (reduced() || sparking) return;', "h('div', { class: 'frames', 'aria-hidden': 'true' }", 'const preview = (blob) =>', 'stamp(shelf.lastElementChild)', 'sparkle(e.currentTarget)', "settle([...board.querySelectorAll('.flap')]"]) assert.ok(app.includes(f), f);
   for (const t of ['d-press', 'd-stamp', 'd-settle', 'd-settle-stagger', 'd-frames', 'd-postcard', 'd-sparkle']) { assert.match(css, new RegExp(`--${t}:\\d+ms`)); assert.match(css, new RegExp(`prefers-reduced-motion:reduce\\)\\{:root\\{[^}]*--${t}:0ms`)); }
   assert.match(css, /button:active:not\(:disabled\)\{transform:scale\(\.96\)\}/);
   assert.match(css, /prefers-reduced-motion:reduce\)\{button:active:not\(:disabled\)\{transform:none\}\.frames>span\{animation:none\}/);
+});
+
+// Round 3: WCAG contrast of the colour tokens, for every city in config/cities.json.
+const lum = (hex) => { const v = hex.replace('#', '').match(/../g).map((x) => parseInt(x, 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+test('HG-10 contrast: text tokens meet AA; board header is chalk with an accent rule that reads on the board', () => {
+  const css = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+  const tok = (n) => css.match(new RegExp(`--${n}:(#[0-9A-Fa-f]{6})`))[1];
+  const paper = tok('paper'), board = tok('board');
+  for (const n of ['ink', 'ink-2', 'ink-3']) assert.ok(ratio(tok(n), paper) >= 4.5, `${n} on paper ${ratio(tok(n), paper).toFixed(2)}`);
+  assert.ok(ratio(tok('chalk'), board) >= 4.5);
+  assert.match(css, /\.board\.city \.hdr\{color:var\(--chalk\);text-decoration:underline;text-decoration-color:var\(--accent-rule\)/);
+  assert.ok(css.includes('--accent-rule:color-mix(in srgb,var(--accent) 80%,var(--chalk))'));
+  assert.ok(!/[{;]color:var\(--accent\)[;}]/.test(css.replace(/\.poster b\{[^}]*\}/, '')), 'accent is never body text on paper');
+  const cities = JSON.parse(readFileSync(new URL('../config/cities.json', import.meta.url), 'utf8')).cities;
+  assert.equal(cities.length, 9);
+  for (const c of cities) {
+    const acc = css.match(new RegExp(`\\[data-city=${c.id}\\]\\{--accent:(#[0-9A-Fa-f]{6})\\}`))?.[1] || c.accent;
+    const mix = (a, b, p) => '#' + [0, 2, 4].map((i) => Math.round(p * parseInt(a.slice(1 + i, 3 + i), 16) + (1 - p) * parseInt(b.slice(1 + i, 3 + i), 16)).toString(16).padStart(2, '0')).join('');
+    const rule = mix(acc, tok('chalk'), 0.8);
+    assert.ok(ratio(rule, board) >= 3, `${c.id} rule on board ${ratio(rule, board).toFixed(2)}`);
+  }
+});
+test('HG-10 runCats: the journey categories that are live, no fallback; empty means not ready', async () => {
+  const { runCatsFor, NOT_READY, journeyFor } = await import('../public/logic.js');
+  const J = journeyFor('movies');
+  assert.deepEqual(runCatsFor(J, { categories: ['movie', 'tv'] }), ['movie']);
+  assert.deepEqual(runCatsFor(J, { categories: ['tv'] }), []);
+  assert.ok(NOT_READY.length);
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.ok(app.includes('const runCats = () => runCatsFor(J, S.catalogue);') && !/cats\.length \? cats : J\.order/.test(app));
+  assert.ok(app.includes("!cats.length ? h('p', { class: 'body not-ready' }, NOT_READY)"));
 });

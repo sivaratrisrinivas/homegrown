@@ -99,3 +99,14 @@ export async function gatedIfCurrent(gate, isCurrent, send) {
 
 // Incomplete answers (a check errored or hit the deadline) are not memoised, so a retry asks again.
 export const shouldMemoTwin = (r) => Boolean(r?.ok && !r.body?.incomplete);
+
+// Optional view parts are passed as null; drop them, or replaceChildren would render the text 'null'.
+export const present = (els) => els.flat().filter((e) => e != null && e !== false);
+// Typeahead is cheap (no Qloo), so a short debounce keeps it snappy without a request per key.
+export const DEBOUNCE_MS = 250;
+const nm = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+// The Qloo entity for a chosen suggestion: exact name, and the same year when both have one.
+export function bestQlooMatch(results, { name, year }) {
+  const same = results.filter((r) => nm(r.name) === nm(name));
+  return same.find((r) => !year || !r.year || r.year === year) || same[0] || results[0] || null;
+}

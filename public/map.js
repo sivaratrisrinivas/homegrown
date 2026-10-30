@@ -1,5 +1,5 @@
 // HG-6 prototype reveal: "Territory you walk" + "Pull from the ground". Only loaded behind ?reveal=map.
-import { nativePct, resistanceFor, pullOutcome, motionPlan, pickSpots, loadWalk, saveWalk, pathStyle, nearSpot, MAP_W, MAP_H, seeded, safeStorage, sameSpot } from './maplogic.js';
+import { nativePct, resistanceFor, pullOutcome, sinkDepth, motionPlan, pickSpots, loadWalk, saveWalk, pathStyle, nearSpot, MAP_W, MAP_H, seeded, safeStorage, sameSpot } from './maplogic.js';
 let maskSeq = 0; // unique mask id per map instance
 const NS = 'http://www.w3.org/2000/svg';
 const s = (tag, attrs = {}) => { const el = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); return el; };
@@ -73,7 +73,7 @@ export function createMapReveal({ h, city, getResults, picks, pickCard, reduced,
     const close = h('button', { class: 'ghost', 'aria-label': 'Back to the map' }, 'Back to the map');
     const ground = h('div', { class: 'ground' }, card);
     sheet = h('div', { class: `pull-sheet ${res.heavy ? 'heavy' : 'light'}`, role: 'dialog', 'aria-modal': 'true', 'aria-label': pick.title }, close, handle, ground);
-    const travel = () => card.offsetHeight * 0.85 || 300;
+    const travel = () => sinkDepth(card.offsetHeight);
     const setY = (moved, anim) => { card.style.transition = anim && motion.spring ? 'transform .45s cubic-bezier(.3,1.6,.5,1)' : 'none'; card.style.transform = `translateY(${Math.max(0, travel() - moved)}px)`; };
     const done = () => { sheet.classList.add('open'); card.style.transition = motion.spring ? 'transform .35s ease-out' : 'none'; card.style.transform = 'none'; if (!motion.spring) { card.style.opacity = 0; requestAnimationFrame(() => { card.style.transition = `opacity ${motion.fadeMs}ms`; card.style.opacity = 1; }); } handle.remove(); card.focus?.(); };
     let startY = null, moved = 0, ticks = 0;
@@ -83,7 +83,7 @@ export function createMapReveal({ h, city, getResults, picks, pickCard, reduced,
       if (res.tickEveryPx && Math.floor(dy / res.tickEveryPx) > ticks) { ticks = Math.floor(dy / res.tickEveryPx); buzz(8); } });
     const release = () => { if (startY == null) return; startY = null;
       if (moved === 0) return done(); // a plain tap opens it
-      if (pullOutcome(moved, travel()) === 'open') done(); else setY(0, true); moved = 0; };
+      if (pullOutcome(moved) === 'open') done(); else setY(0, true); moved = 0; };
     handle.addEventListener('pointerup', release); handle.addEventListener('pointercancel', release);
     handle.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); done(); } });
     const keys = (e) => {

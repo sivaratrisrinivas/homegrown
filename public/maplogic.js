@@ -12,13 +12,18 @@ export function nativePct(pick, byCat) {
 // factor = how far the card moves per pixel dragged (lower = heavier).
 export function resistanceFor(pct) {
   const p = Math.max(0, Math.min(100, Number(pct) || 0));
-  const factor = +(0.9 - 0.006 * p).toFixed(3); // 100% -> 0.3, 0% -> 0.9
+  const factor = +(0.9 - 0.0045 * p).toFixed(3); // 100% -> 0.45, 0% -> 0.9
   const heavy = p >= 80;
   return { pct: p, heavy, factor, tickEveryPx: heavy ? 18 : 0, label: heavy ? 'strict-native' : 'borderline' };
 }
-// Releasing midway springs back; past the threshold the pick comes out of the ground.
-export const OPEN_AT = 0.55;
-export const pullOutcome = (moved, travel) => (travel > 0 && moved / travel >= OPEN_AT ? 'open' : 'spring');
+// Releasing midway springs back; once the card has risen OPEN_PX it comes out of the ground.
+// A fixed card distance (not the card's height), so even the heaviest pull opens within
+// ~310px of finger travel on any card size: heavier = more drag, never unreachable.
+export const OPEN_PX = 140;
+export const pullOutcome = (moved) => (moved >= OPEN_PX ? 'open' : 'spring');
+// How far the sunk card sits below its open position, capped so long cards don't sink forever.
+export const sinkDepth = (cardHeight) => Math.min(Math.max(OPEN_PX, (cardHeight || 0) * 0.85), OPEN_PX * 2);
+export const dragToOpen = (pct) => Math.ceil(OPEN_PX / resistanceFor(pct).factor);
 
 export const motionPlan = (reduced) => (reduced ? { spring: false, fadeMs: 150, pulse: false } : { spring: true, fadeMs: 0, pulse: true });
 
@@ -30,8 +35,24 @@ export function seeded(str) {
 export const MAP_W = 100, MAP_H = 140;
 // Each spot is seeded from its own stable key, so spots never move when other categories land.
 export const spotKey = (cityId, p) => `${cityId}|${p?.category ?? ''}|${p?.title ?? ''}`;
+export const MIN_SPOT_GAP = 8;
+// Spots are placed in key order (not arrival order), each nudged along its own seeded spiral
+// until it is at least MIN_SPOT_GAP from every spot already placed. Same set = same layout.
 export function pickSpots(picks, cityId) {
-  return picks.map((p) => { const key = spotKey(cityId, p), r = seeded(`spot|${key}`); return { key, pick: p, x: 14 + r() * 72, y: 16 + r() * 110 }; });
+  const items = picks.map((p) => ({ key: spotKey(cityId, p), pick: p })).sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  const placed = [];
+  for (const it of items) {
+    const r = seeded(`spot|${it.key}`); let x = 14 + r() * 72, y = 16 + r() * 110; const a0 = r() * Math.PI * 2;
+    const clear = (cx, cy) => placed.every((s) => Math.hypot(s.x - cx, s.y - cy) >= MIN_SPOT_GAP);
+    for (let k = 1; k < 400 && !clear(x, y); k++) {
+      const rad = MIN_SPOT_GAP * 0.5 * Math.sqrt(k), ang = a0 + k * 2.39996;
+      const nx = Math.min(94, Math.max(6, x + rad * Math.cos(ang))), ny = Math.min(134, Math.max(6, y + rad * Math.sin(ang)));
+      if (clear(nx, ny)) { x = nx; y = ny; break; }
+    }
+    placed.push({ ...it, x: +x.toFixed(2), y: +y.toFixed(2) });
+  }
+  const byKey = new Map(placed.map((s) => [s.key, s]));
+  return picks.map((p) => byKey.get(spotKey(cityId, p)));
 }
 // Same spot = same key, so a re-render mid-walk doesn't count as passing a new pick.
 export const sameSpot = (a, b) => Boolean(a && b && a.key === b.key);

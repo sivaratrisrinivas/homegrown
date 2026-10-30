@@ -17,7 +17,7 @@ test('flag gating: only ?reveal=map turns the map on', () => {
 
 test('resistance scales with native %: strict is heavy with ticks, borderline is light', () => {
   const strict = resistanceFor(100), border = resistanceFor(60), low = resistanceFor(0);
-  assert.equal(strict.heavy, true); assert.ok(strict.tickEveryPx > 0); assert.equal(strict.factor, 0.3);
+  assert.equal(strict.heavy, true); assert.ok(strict.tickEveryPx > 0); assert.equal(strict.factor, 0.45);
   assert.equal(border.heavy, false); assert.equal(border.tickEveryPx, 0);
   assert.ok(strict.factor < border.factor && border.factor < low.factor);
   assert.equal(resistanceFor(80).heavy, true); assert.equal(resistanceFor(79).heavy, false);
@@ -26,7 +26,7 @@ test('resistance scales with native %: strict is heavy with ticks, borderline is
   assert.equal(nativePct({ category: 'tv', verification: { source: 'tmdb' } }, byCat), 100);
   assert.equal(nativePct({ category: 'music', verification: { source: 'musicbrainz' } }, byCat), 60);
   assert.equal(nativePct({ category: 'tv' }, byCat), 40);
-  assert.equal(pullOutcome(100, 300), 'spring'); assert.equal(pullOutcome(200, 300), 'open'); assert.equal(pullOutcome(5, 0), 'spring');
+  assert.equal(pullOutcome(100), 'spring'); assert.equal(pullOutcome(200), 'open'); assert.equal(pullOutcome(0), 'spring');
 });
 
 test('walked paths persist per city in localStorage, with 3 seeded starters', () => {
@@ -108,4 +108,25 @@ test('map.js: unique mask id, touch tap opens spot, dwell saves walk first', () 
   assert.match(map, /sameSpot\(hit, lastHit\)/);
   const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
   assert.match(app, /mapFraming\(picksView\(\)\)/); assert.match(app, /mine\.update = refresh/);
+});
+
+import { OPEN_PX, sinkDepth, dragToOpen, MIN_SPOT_GAP } from '../public/maplogic.js';
+test('release-to-open is reachable: strict-native opens within 400px of drag on a 600px card', () => {
+  const card = 600, sink = sinkDepth(card);
+  assert.ok(sink <= OPEN_PX * 2 && sink >= OPEN_PX, 'card sinks less than a phone screen');
+  const strict = resistanceFor(100), border = resistanceFor(60);
+  assert.equal(pullOutcome(400 * strict.factor), 'open');
+  assert.ok(dragToOpen(100) <= 400 && dragToOpen(60) < dragToOpen(100), 'heavier still needs more drag');
+  for (const dy of [50, 150, 250]) assert.equal(pullOutcome(dy * strict.factor), 'spring', `${dy}px springs back`);
+  assert.equal(pullOutcome(100 * border.factor), 'spring');
+  assert.equal(sinkDepth(0), OPEN_PX); assert.equal(sinkDepth(5000), OPEN_PX * 2);
+});
+test('spots stay >= 8 units apart, in bounds, and independent of arrival order', () => {
+  const picks = Array.from({ length: 15 }, (_, i) => ({ category: ['tv', 'movie', 'music'][i % 3], title: `T${i}` }));
+  for (const city of ['seoul', 'mexico_city', 'paris', 'chennai']) {
+    const a = pickSpots(picks, city), b = pickSpots([...picks].reverse(), city);
+    for (let i = 0; i < a.length; i++) for (let j = i + 1; j < a.length; j++) assert.ok(Math.hypot(a[i].x - a[j].x, a[i].y - a[j].y) >= MIN_SPOT_GAP, `${city} ${a[i].key} vs ${a[j].key}`);
+    for (const s of a) { assert.ok(s.x >= 6 && s.x <= 94 && s.y >= 6 && s.y <= 134); const o = b.find((x) => x.key === s.key); assert.equal(o.x, s.x); assert.equal(o.y, s.y); }
+    assert.deepEqual(a.map((s) => s.pick), picks, 'returned in input order');
+  }
 });

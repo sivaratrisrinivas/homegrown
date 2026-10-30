@@ -1,5 +1,5 @@
 // HG-6 prototype reveal: "Territory you walk" + "Pull from the ground". Only loaded behind ?reveal=map.
-import { nativePct, resistanceFor, pullOutcome, motionPlan, pickSpots, loadWalk, saveWalk, pathStyle, nearSpot, MAP_W, MAP_H, seeded } from './maplogic.js';
+import { nativePct, resistanceFor, pullOutcome, motionPlan, pickSpots, loadWalk, saveWalk, pathStyle, nearSpot, MAP_W, MAP_H, seeded, safeStorage } from './maplogic.js';
 const NS = 'http://www.w3.org/2000/svg';
 const s = (tag, attrs = {}) => { const el = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); return el; };
 const buzz = (ms) => { try { navigator.vibrate?.(ms); } catch {} };
@@ -9,7 +9,7 @@ export function createMapReveal({ h, city, getResults, picks, pickCard, reduced,
   const wrap = h('div', { class: 'map-wrap' });
   const svg = s('svg', { viewBox: `0 0 ${MAP_W} ${MAP_H}`, class: 'map', role: 'group', 'aria-label': `Map of ${city.name}. Drag to walk; picks are buttons.` });
   wrap.append(svg);
-  let paths = loadWalk(localStorage, city.id), spots = [], current = null, dwell = null;
+  const store = safeStorage(); let paths = loadWalk(store, city.id), spots = [], current = null, dwell = null;
 
   // Static streets: a faint seeded grid, so the city feels like a place, not a chart.
   const streets = s('g', { class: 'streets' }); const r = seeded(`streets|${city.id}`);
@@ -33,10 +33,10 @@ export function createMapReveal({ h, city, getResults, picks, pickCard, reduced,
     for (const sp of spots) {
       const res = resistanceFor(nativePct(sp.pick, getResults()));
       const kind = { tv: 'Show', movie: 'Film', music: 'Band' }[sp.pick.category] || 'Pick';
-      const g = s('g', { class: `spot ${res.heavy ? 'strict' : 'border'}`, tabindex: '0', role: 'button', 'aria-label': `${kind}: ${sp.pick.title}, ${res.label}. Press Enter to pull it up.`, transform: `translate(${sp.x} ${sp.y})` });
+      const g = s('g', { class: `spot${res.heavy ? '' : ' border'}`, tabindex: '0', role: 'button', 'aria-label': `${kind}: ${sp.pick.title}, ${res.label}. Press Enter to pull it up.`, transform: `translate(${sp.x} ${sp.y})` });
       g.append(s('circle', { r: 5, class: 'halo' }), s('circle', { r: 2.2, class: 'core' }));
-      g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPull(sp.pick, true); } });
-      g.addEventListener('click', () => { if (!walking) openPull(sp.pick, false); });
+      g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPull(sp.pick, sp.el); } });
+      g.addEventListener('click', () => { if (!walking) openPull(sp.pick, sp.el); });
       sp.el = g; spotsG.append(g);
     }
   }
@@ -50,19 +50,19 @@ export function createMapReveal({ h, city, getResults, picks, pickCard, reduced,
     const hit = nearSpot(pt, spots);
     if (hit && hit !== lastHit) { buzz(20); ping(); if (motion.pulse) { hit.el.classList.remove('pulse'); void hit.el.getBBox(); hit.el.classList.add('pulse'); } }
     lastHit = hit; clearTimeout(dwell);
-    if (hit) dwell = setTimeout(() => { if (current && nearSpot(current.at(-1), spots) === hit) openPull(hit.pick, false); }, 700);
+    if (hit) dwell = setTimeout(() => { if (current && nearSpot(current.at(-1), spots) === hit) openPull(hit.pick, hit.el); }, 700);
   });
   const end = () => { clearTimeout(dwell); if (!current) return;
     const stopAt = nearSpot(current.at(-1), spots);
-    if (current.length > 1) paths = saveWalk(localStorage, city.id, [...paths, current]);
+    if (current.length > 1) paths = saveWalk(store, city.id, [...paths, current]);
     current = null; drawPaths(); lastHit = null;
-    if (walking && stopAt) openPull(stopAt.pick, false);
+    if (walking && stopAt) openPull(stopAt.pick, stopAt.el);
     setTimeout(() => { walking = false; }, 0); };
   svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
 
   // "Pull from the ground": the card sits sunk below a ledge; drag the handle up to lift it.
-  let sheet = null;
-  function openPull(pick, viaKeyboard) {
+  let sheet = null; // tied to this map: destroy() removes it and its key listener
+  function openPull(pick, origin) {
     if (sheet) return; current = null; clearTimeout(dwell);
     const res = resistanceFor(nativePct(pick, getResults()));
     const card = pickCard(pick, true); card.classList.add('ground-card');
@@ -83,12 +83,20 @@ export function createMapReveal({ h, city, getResults, picks, pickCard, reduced,
       if (pullOutcome(moved, travel()) === 'open') done(); else setY(0, true); moved = 0; };
     handle.addEventListener('pointerup', release); handle.addEventListener('pointercancel', release);
     handle.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); done(); } });
-    const shut = () => { sheet.remove(); sheet = null; document.removeEventListener('keydown', esc); };
-    const esc = (e) => { if (e.key === 'Escape') shut(); };
-    close.onclick = shut; document.addEventListener('keydown', esc);
+    const keys = (e) => {
+      if (e.key === 'Escape') return shut();
+      if (e.key !== 'Tab') return; // simple focus trap: Tab cycles inside the sheet
+      const f = [...sheet.querySelectorAll('button,a[href],audio,input,[tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled);
+      if (!f.length) return; const first = f[0], last = f.at(-1);
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      else if (!sheet.contains(document.activeElement)) { e.preventDefault(); first.focus(); } };
+    shut = (restore = true) => { sheet?.remove(); sheet = null; document.removeEventListener('keydown', keys); shut = () => {};
+      if (restore && origin?.isConnected) origin.focus(); };
+    close.onclick = () => shut(); document.addEventListener('keydown', keys);
     document.body.append(sheet); setY(0, false); handle.focus();
-    void viaKeyboard;
   }
+  let shut = () => {};
   drawPaths(); drawSpots();
-  return { el: wrap, update: drawSpots };
+  return { el: wrap, update: drawSpots, destroy: () => { clearTimeout(dwell); shut(false); } };
 }

@@ -45,10 +45,13 @@ export function seedPaths(cityId) {
 // Walked state, per city, in localStorage. Capped so storage never grows without bound.
 export const MAX_PATHS = 40, MAX_POINTS = 200;
 export const walkKey = (cityId) => `homegrown:walk:${cityId}`;
+// Every path is an array of [x, y] pairs of finite numbers; anything else falls back to the seeds.
+const isPoint = (pt) => Array.isArray(pt) && pt.length === 2 && pt.every((n) => typeof n === 'number' && Number.isFinite(n));
+export const isValidWalk = (v) => Array.isArray(v) && v.every((p) => Array.isArray(p) && p.every(isPoint));
 export function loadWalk(storage, cityId) {
   try {
     const v = JSON.parse(storage?.getItem(walkKey(cityId)) || 'null');
-    if (Array.isArray(v) && v.every((p) => Array.isArray(p))) return v;
+    if (isValidWalk(v)) return v;
   } catch {}
   return seedPaths(cityId);
 }
@@ -57,6 +60,8 @@ export function saveWalk(storage, cityId, paths) {
   try { storage?.setItem(walkKey(cityId), JSON.stringify(trimmed)); } catch {}
   return trimmed;
 }
-// Walks brighten and widen the more often they are walked: width grows with how many paths exist.
+// Walks brighten and widen by recency: the newest paths (last in the list) are the widest and brightest.
 export const pathStyle = (index, total) => ({ width: +(1.2 + Math.min(2.4, (index / Math.max(1, total)) * 2.4)).toFixed(2), opacity: +(0.45 + 0.55 * (index + 1) / Math.max(1, total)).toFixed(2) });
 export const nearSpot = ([x, y], spots, radius = 6) => spots.find((s) => Math.hypot(s.x - x, s.y - y) <= radius) || null;
+// localStorage can throw on access (privacy modes, sandboxed iframes); read it through a guard.
+export function safeStorage(get = () => globalThis.localStorage) { try { return get() || null; } catch { return null; } }

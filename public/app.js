@@ -135,7 +135,7 @@ function flapRow(text, width) {
 
 const runs = createRunGuard();
 async function morph() {
-  const current = runs.start(); revealEls = null;
+  const current = runs.start(); revealEls?.destroy?.(); revealEls = null;
   const c = S.city; document.documentElement.style.setProperty('--accent', c.accent);
   S.results = {};
   const width = Math.min(22, Math.max(12, ...S.favs.map((f) => f.name.length)));
@@ -231,7 +231,10 @@ function reveal() {
       h('button', { onclick: (e) => { e.target.replaceWith(h('p', { class: 'muted' }, 'Saving with an email link is coming soon.')); } }, `Save my ${S.city.name} self`),
       h('div', {}, others.map((c) => h('button', { class: 'ghost', onclick: () => { track({ event: 'try_city', to: c.id }); S.city = c; morph(); } }, `Try ${c.name}`)))));
   if (isMapReveal(location.search)) {
-    mapPicks().then((m) => { if (revealEls?.picks !== picks) return; picks.replaceChildren(h('h2', {}, 'Territory you walk'), m.el); revealEls.update = m.update; });
+    updateReveal(); // the normal reveal shows first, so the area is never blank
+    const mine = revealEls;
+    mapPicks().then((m) => { if (revealEls !== mine) return m.destroy(); picks.replaceChildren(h('h2', {}, 'Territory you walk'), m.el); mine.update = m.update; mine.destroy = m.destroy; })
+      .catch(() => { if (revealEls === mine) { delete mine.update; picks.replaceChildren(...picksView()); } });
     return;
   }
   updateReveal();

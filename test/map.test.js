@@ -61,3 +61,28 @@ test('spots are deterministic per city and hit-testing finds them', () => {
   assert.equal(nearSpot([-50, -50], sp), null);
   assert.ok(pathStyle(9, 10).width > pathStyle(0, 10).width);
 });
+
+import { isValidWalk, safeStorage } from '../public/maplogic.js';
+test('corrupt walk data (non-pairs, NaN, strings) falls back to seeds', () => {
+  const st = mem();
+  for (const bad of [[[1, 2, 3]], [[[1, 'a']]], [[[1]]], [['x']], [[[1, null]]], [[[1, 2], [3, 1e999]]], {}, 5]) {
+    st.setItem(walkKey('c'), JSON.stringify(bad));
+    assert.deepEqual(loadWalk(st, 'c'), seedPaths('c'), JSON.stringify(bad));
+  }
+  assert.equal(isValidWalk([[[1, 2], [3, 4]]]), true);
+});
+test('storage access is guarded', () => {
+  assert.equal(safeStorage(() => { throw new Error('SecurityError'); }), null);
+  const s = mem(); assert.equal(safeStorage(() => s), s);
+  assert.equal(loadWalk(safeStorage(() => { throw 1; }), 'c').length, 3);
+});
+test('map lifecycle: destroy closes the sheet and key listener; shut restores focus; map failures fall back', () => {
+  const map = readFileSync(new URL('../public/map.js', import.meta.url), 'utf8');
+  assert.match(map, /destroy: \(\) => \{[^}]*shut\(false\)/);
+  assert.match(map, /removeEventListener\('keydown', keys\)/);
+  assert.match(map, /origin\.focus\(\)/); assert.match(map, /e\.key !== 'Tab'/);
+  assert.doesNotMatch(map, /viaKeyboard|localStorage/);
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.match(app, /\.catch\(\(\) => \{[^\n]*picksView\(\)/);
+  assert.match(app, /revealEls\?\.destroy\?\.\(\)/);
+});

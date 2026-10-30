@@ -66,7 +66,8 @@ test('MusicBrainz 503 is retried with backoff', async () => {
   assert.equal(r[0].name, 'IU'); assert.equal(n, 3); assert.ok(sleeps.includes(2000) && sleeps.includes(4000));
 });
 test('TV uses Qloo country names for filter.release_country', () => {
-  assert.deepEqual(Object.values(CITIES).map((c) => c.releaseCountry), ['Mexico', 'Spain', 'Argentina', 'South Korea', 'France', 'India', 'India', 'India', 'India', 'India', 'India']);
+  const want = { MX: 'Mexico', ES: 'Spain', AR: 'Argentina', KR: 'South Korea', FR: 'France', IN: 'India' };
+  for (const c of Object.values(CITIES)) assert.equal(c.releaseCountry, want[c.country], c.id);
 });
 
 import { twinKey } from '../lib/cache.js';

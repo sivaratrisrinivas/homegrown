@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTwinService, POOL, CANDIDATES, nativeRate, MAX_SCREEN_CHECKS, MAX_SCREEN_TOTAL_CHECKS, summariseRejected } from '../lib/twin.js';
+import { createTwinService, POOL, CANDIDATES, nativeRate, MAX_SCREEN_CHECKS, summariseRejected } from '../lib/twin.js';
 import { createCache } from '../lib/cache.js';
 import { musicLanguageSignal } from '../lib/musicbrainz.js';
 import { verifyShow, verifyMovie } from '../lib/tmdb.js';
@@ -106,20 +106,25 @@ const screenSvc = (names, rows, extra = {}) => {
   return { s: createTwinService({ qloo, tmdb, mb: {}, itunes: {}, ...extra }), searched };
 };
 
-test('HG-9 review: runtime TV/movie verifications capped at 25; measure is unlimited', async () => {
-  assert.equal(MAX_SCREEN_CHECKS, 25);
-  const names = Array.from({ length: 50 }, (_, i) => 'H' + i);
-  // Same-language but not native (Tamil from Sri Lanka): these do use up the 25 (HG-11).
-  const rows = names.map((n) => show(n, 'ta', ['LK']));
-  const a = screenSvc(names, rows);
+test('HG-11 runtime: the same-language pool stops at CANDIDATES (15); measure checks every candidate', async () => {
+  const names = Array.from({ length: 50 }, (_, i) => 'T' + i);
+  // Same-language but not native (Tamil from Sri Lanka): 15 of them fill the pool.
+  const a = screenSvc(names, names.map((n) => show(n, 'ta', ['LK'])));
   const r = await a.s.category({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
-  // The top-15 same-language pool (CANDIDATES) is reached before the 25 limit.
   assert.equal(a.searched.length, CANDIDATES);
-  assert.ok(MAX_SCREEN_CHECKS >= CANDIDATES);
   assert.equal(r.rejected.filter((x) => x.reason === 'check_cap').length, 0);
   const b = screenSvc(names, names.map((n) => show(n, 'hi')));
   await b.s.measure({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
   assert.equal(b.searched.length, 50);
+});
+
+test('HG-11 runtime: check_cap fires at 40 TMDB checks on a realistic 50-item off-language pool', async () => {
+  assert.equal(MAX_SCREEN_CHECKS, 40);
+  const names = Array.from({ length: POOL }, (_, i) => 'H' + i);
+  const a = screenSvc(names, names.map((n) => show(n, 'hi')));
+  const r = await a.s.category({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
+  assert.equal(a.searched.length, MAX_SCREEN_CHECKS);
+  assert.equal(r.rejected.filter((x) => x.reason === 'check_cap').length, POOL - MAX_SCREEN_CHECKS);
 });
 
 test('HG-9 review: all-prefilter rejections give a language-scarcity note, not the origin-check note', async () => {
@@ -223,18 +228,10 @@ test('round 4: liveCats treats an empty list as missing; categoryWords has a def
   assert.equal(categoryWords(['movie']), 'movies');
 });
 
-test('HG-11: off-language films do not use up the 25; total TMDB checks stay capped at the pool (50)', async () => {
-  assert.equal(MAX_SCREEN_TOTAL_CHECKS, POOL);
-  // 40 Hindi films first, then 10 native Tamil ones: the Tamil ones are still reached.
-  const names = Array.from({ length: 50 }, (_, i) => (i < 40 ? 'H' : 'T') + i);
-  const rows = names.map((n) => show(n, n[0] === 'H' ? 'hi' : 'ta'));
-  const a = screenSvc(names, rows);
+test('HG-11 runtime: native films after 20 off-language ones are still reached within the ceiling', async () => {
+  const names = Array.from({ length: 50 }, (_, i) => (i < 20 ? 'H' : 'T') + i);
+  const a = screenSvc(names, names.map((n) => show(n, n[0] === 'H' ? 'hi' : 'ta')));
   const r = await a.s.category({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
-  assert.equal(r.picks.length, 5, 'native picks found after 40 off-language');
+  assert.equal(r.picks.length, 5);
   assert.equal(r.rejected.filter((x) => x.reason === 'check_cap').length, 0);
-  // Hard ceiling: a pool larger than 50 that is all off-language stops at 50 TMDB checks.
-  const many = Array.from({ length: 60 }, (_, i) => 'X' + i);
-  const b = screenSvc(many, many.map((n) => show(n, 'hi')));
-  await b.s.category({ favourites: FAVS, cityId: 'chennai', category: 'tv' });
-  assert.equal(b.searched.length, 50);
 });

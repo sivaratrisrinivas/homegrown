@@ -40,12 +40,7 @@
         "Himachal Pradesh",
         "Chhattisgarh",
         "Jharkhand",
-        "Maharashtra",
-        "Jammu & Kashmir",
-        "Ladakh",
-        "Arunachal Pradesh",
-        "Nagaland",
-        "Andaman & Nicobar Islands"
+        "Chandigarh"
       ],
       "statesLabel": "Uttar Pradesh, Bihar, Delhi & the Hindi belt"
     },
@@ -65,8 +60,7 @@
       "local": "বাংলা",
       "states": [
         "West Bengal",
-        "Tripura",
-        "Andaman & Nicobar Islands"
+        "Tripura"
       ],
       "statesLabel": "West Bengal & Tripura"
     },
@@ -85,10 +79,9 @@
       "name": "Punjabi",
       "local": "ਪੰਜਾਬੀ",
       "states": [
-        "Punjab",
-        "Chandigarh"
+        "Punjab"
       ],
-      "statesLabel": "Punjab & Chandigarh"
+      "statesLabel": "Punjab"
     }
   ],
   "cities": [

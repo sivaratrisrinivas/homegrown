@@ -141,7 +141,9 @@
     {
       "id": "en",
       "name": "English",
-      "local": "English"
+      "local": "English",
+      "explicitOnly": true,
+      "note": "Captain (HG-13): English is only for people who pick English to learn. Never a default, fallback or cross-city suggestion."
     },
     {
       "id": "ar",

@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, liveCats, pendingCats, categoryWords, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, liveCats, pendingCats, categoryWords, cityForLanguage, liveCitiesForLanguage, languageGroups, otherCities } from './logic.js';
 import { indiaSection } from './india.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { isMapReveal, mapFraming } from './maplogic.js';
@@ -349,8 +349,8 @@ function reveal() {
       track({ event: 'rating', rating: Number(rating.dataset.r), note: rating.querySelector('#note').value, shown: shownPicks().map((p) => `${p.category}:${p.title}:${p.verification?.source || ''}`.slice(0, 200)) });
       e.target.textContent = 'Thank you'; e.target.disabled = true;
     } }, 'Send'));
-  // Only other live cities are offered.
-  const others = (S.catalogue?.cities || []).filter((c) => c.live && c.id !== S.city.id);
+  // Only other live cities are offered, and never an explicit-only language (English) the learner didn't pick.
+  const others = S.catalogue ? otherCities(S.catalogue, S.city.id, S.lang?.id) : [];
   show(h('p', { class: 'kind', dir: 'auto' }, S.city.header), picks, rating,
     h('section', { class: 'card postcard-summary' }, h('h3', { class: 'serif' }, `Keep your ${S.city.name} self`),
       h('button', { onclick: (e) => { e.target.replaceWith(h('p', { class: 'muted' }, 'Saving with an email link is coming soon.')); } }, `Save my ${S.city.name} self`),

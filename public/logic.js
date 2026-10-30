@@ -51,6 +51,12 @@ export function liveCitiesForLanguage(catalogue, languageId) {
   const lang = catalogue.languages.find((l) => l.id === languageId);
   return (lang?.liveCities || []).map((id) => catalogue.cities.find((c) => c.id === id && c.live)).filter(Boolean);
 }
+// Cross-city "Try X" links: never offer a city in an explicit-only language (English) unless the
+// learner picked that language themselves (captain, HG-13).
+export function otherCities(catalogue, currentCityId, pickedLanguageId) {
+  const explicitOnly = new Set((catalogue.languages || []).filter((l) => l.explicitOnly).map((l) => l.id));
+  return (catalogue.cities || []).filter((c) => c.live && c.id !== currentCityId && (!explicitOnly.has(c.language) || c.language === pickedLanguageId));
+}
 export const languageGroups = (catalogue) => ({ live: catalogue.languages.filter((l) => l.live), soon: catalogue.languages.filter((l) => !l.live) });
 export function userCountryFromLocale(locale) {
   const m = /[-_]([A-Za-z]{2})\b/.exec(locale || '');

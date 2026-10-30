@@ -60,3 +60,7 @@ identical in-flight requests share one call; a global spend estimate from usage 
 if its worst case fits. Results, including "no match", are cached 7 days.
 Limitation: this state is in-memory per serverless instance. It resets on cold starts and isn't shared across
 instances, so the real daily spend can exceed one instance's cap. That's why the cap is half the $0.50 budget.
+
+## Why-lines and difficulty (HG-7)
+
+Each movie reveal makes at most one batched Claude call (`lib/whyllm.js`) for all its picks, waited on for at most 3 s; a late answer still fills the cache (keyed by pick + favourite + shared tags + overview). Claude sees only the favourite name, the shared Qloo tags, the TMDB overview and genres. Every returned line is validated: one sentence, 8 to 28 words, names the favourite, and any capitalised word, number or non-Latin word must appear in that input. A line that fails falls back to the tag-based line in `lib/why.js`. Claude also rates pace and dialogue density, and `lib/difficulty.js` combines those with TMDB genres and runtime. Without them, difficulty uses the genre-only heuristic. Subtitle availability is not used yet because OpenSubtitles needs an account and API key. Alternate names and why-lines share one $0.25/UTC-day budget (`lib/budget.js`). Why-lines are also limited to 20 calls per IP per day.

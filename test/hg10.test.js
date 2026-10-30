@@ -136,7 +136,7 @@ test('HG-10 why fallback names no vendor', () => {
 });
 
 test('HG-10 VS palette, type and tokens', () => {
-  for (const t of ['--paper:#F5F1EA', '--card:var(--paper)', '--ink:#1B1813', '--ink-2:#5E5953', '--ink-3:#8F8981', '--line:#E4DDD2', '--board:#17161A', '--board-2:#24232A', '--chalk:#F1E7D3', '--t-display:clamp(40px,11vw,96px)', '--t-body:18px', '--mono:ui-monospace', '--ease-reveal:cubic-bezier(.19,1,.22,1)', '--d-share-delay:1200ms', '--d-share:280ms']) assert.ok(css.includes(t), t);
+  for (const t of ['--paper:#F5F1EA', '--card:var(--paper)', '--ink:#161616', '--ink-2:#55585A', '--ink-3:#8A8D8F', '--line:#E2DED6', '--board:#17161A', '--board-2:#24232A', '--chalk:#F1E7D3', '--t-display:clamp(40px,10vw,56px)', '--t-body:18px', '--mono:ui-monospace', '--ease-reveal:cubic-bezier(.19,1,.22,1)', '--d-share-delay:1200ms', '--d-share:280ms']) assert.ok(css.includes(t), t);
   assert.match(css, /\[data-city=madrid\]\{--accent:#C8102E\}/);
   assert.doesNotMatch(css, /#3aa655|#e0a100|#d0453a|feTurbulence/, 'no traffic lights, no grain');
   assert.match(html, /family=Fraunces:opsz,wght@9\.\.144,400&family=Inter:wght@400;500&display=swap/);

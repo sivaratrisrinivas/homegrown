@@ -108,3 +108,14 @@ test('review 2: typeahead cache by (q, kind)', async () => {
   assert.equal(calls, 2);
   setDeps(undefined);
 });
+
+test('upstream errors log only status codes, never messages or URLs', async () => {
+  const { sendError } = await import('../lib/deps.js');
+  const lines = []; const orig = console.error; console.error = (l) => lines.push(l);
+  try {
+    const e = new Error('Qloo https://x/?api_key=SECRET failed'); e.status = 502; e.upstreamStatus = 401; e.source = 'qloo';
+    sendError({ setHeader() {}, end() {} }, e);
+  } finally { console.error = orig; }
+  assert.deepEqual(JSON.parse(lines[0]), { event: 'upstream_error', status: 502, upstream: 401, source: 'qloo' });
+  assert.doesNotMatch(lines.join(''), /SECRET|api_key|https/);
+});

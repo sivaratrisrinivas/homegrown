@@ -207,8 +207,9 @@ main:has(.board.compact){padding-top:var(--s4)}
   .reveal .poster{max-height:34vh}
   .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s2)}.tile .serif{white-space:nowrap}
 }
-/* HG-10 r4: on phone the hero why-line and tip are clamped (full text stays in the DOM for screen readers) so share stays above the fold */
-@media (max-width:699px){.ticket .why{font-size:16px;line-height:1.45;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}.ticket .tip{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;overflow:hidden}}
+/* HG-10 r5: on phone the hero why-line and tip are clamped until 'more' (aria-expanded) opens them so share stays above the fold */
+.more-wrap{display:flex;flex-direction:column;gap:var(--s2)}.more-row{display:flex;align-items:baseline;gap:var(--s2)}.more-row .tip{min-width:0;flex:1}.more{display:none}
+@media (max-width:699px){.ticket .why{font-size:16px;line-height:1.45}.more-wrap:not(.open) .why{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}.more-wrap:not(.open) .tip{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;line-clamp:1;overflow:hidden}.more:not([hidden]){display:inline-flex;position:relative;flex:none;font:400 var(--t-cap)/1.5 var(--mono);letter-spacing:.06em;min-height:0;min-width:0;padding:0;color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent-rule)}.more::before{content:'';position:absolute;inset:-14px -12px}}
 /* HG-11 India picker, on the HG-10 tokens (muted = --ink-2, AA on paper and on the card) */
 .india{margin-top:var(--s6);display:flex;flex-direction:column;gap:var(--s2)}
 .india h3{font:400 var(--t-title)/1.15 var(--serif);margin:0}

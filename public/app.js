@@ -460,8 +460,18 @@ const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 function whyLine(p) {
   const text = p.why?.text || ''; const names = (p.why?.favourite ? [p.why.favourite] : S.favs.map((f) => f.name)).filter(Boolean);
   if (!text) return null;
-  if (!names.length) return h('p', { class: 'why' }, text);
-  return h('p', { class: 'why' }, text.split(new RegExp(`(${names.map(esc).join('|')})`)).map((part) => (names.includes(part) ? h('em', {}, part) : part)));
+  if (!names.length) return h('p', { class: 'why clamp' }, text);
+  return h('p', { class: 'why clamp' }, text.split(new RegExp(`(${names.map(esc).join('|')})`)).map((part) => (names.includes(part) ? h('em', {}, part) : part)));
+}
+// Phone: the hero why-line and tip are clamped; one real button expands both (and collapses them again).
+// The button only shows when something is actually cut (checked after layout).
+function expandable(why, tip) {
+  const parts = [why, tip].filter(Boolean); if (!parts.length) return null;
+  const wrap = h('div', { class: 'more-wrap' }, why);
+  const btn = h('button', { class: 'quiet more', 'aria-expanded': 'false', hidden: '' }, 'more');
+  btn.onclick = () => { const open = btn.getAttribute('aria-expanded') !== 'true'; btn.setAttribute('aria-expanded', String(open)); btn.textContent = open ? 'less' : 'more'; wrap.classList.toggle('open', open); };
+  requestAnimationFrame(() => { if (parts.some((el) => el.scrollHeight > el.clientHeight + 1)) btn.hidden = false; });
+  wrap.append(h('div', { class: 'more-row' }, tip, btn)); return wrap;
 }
 function player(p) {
   const audio = h('audio', { preload: 'none', src: p.preview.url, onplay: () => track({ event: 'tap', action: 'listen', pick: p.title }) });
@@ -488,7 +498,7 @@ const enTitle = (p) => (p.englishTitle && p.englishTitle !== p.title ? p.english
 function heroMeta(p) {
   const diff = p.difficulty ? h('span', { class: 'diff', title: 'Estimated difficulty for a language learner' }, h('span', { class: `dot ${p.difficulty}`, 'aria-hidden': 'true' }), `${p.difficulty} (estimated)`) : null;
   if (!diff && !p.tip) return null;
-  return h('p', { class: 'tip' }, diff, diff && p.tip ? ' · ' : null, p.tip || null);
+  return h('p', { class: 'tip clamp' }, p.tip || null, diff && p.tip ? ' · ' : null, diff);
 }
 // Hero ticket: kind (mixed only) · title · English · poster · why · action · tip. Title sits above the
 // poster so the main action stays in the first phone viewport.
@@ -497,7 +507,7 @@ function pickCard(p, city, readOnly) {
   return h('article', { class: 'ticket', 'aria-label': `${kind}: ${p.title}, from ${city.name}` },
     !J.single && !readOnly ? h('p', { class: 'cap' }, kind) : null,
     h('div', {}, h('h2', { class: city.language === 'ko' ? 'ko' : '', lang: city.language }, p.title), enTitle(p) ? h('p', { class: 'en' }, enTitle(p)) : null),
-    readOnly ? null : action(p), art(p), readOnly ? null : whyLine(p), readOnly ? null : heroMeta(p));
+    readOnly ? null : action(p), art(p), readOnly ? null : expandable(whyLine(p), heroMeta(p)));
 }
 // Rows 01–04: type only, one name (local title) plus the English line when it differs.
 const pickRow = (p, n, city) => h('article', { class: 'prow', 'aria-label': `${KIND[p.category] || 'Pick'}: ${p.title}, from ${city.name}` },

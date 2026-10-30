@@ -2,8 +2,6 @@ import { JOURNEY_FAVS, journeyFor, revealHeader, journeyPicks, encodeShare, deco
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { CATEGORY } from './config.js';
 // HG-10 v1 is one journey: hello → language → city → 3 favourites → morph board → reveal → share.
-// Cut from the journey but kept on disk, unreachable (captain's call to delete): the hg-6 walkable
-// map reveal and its styles, the 5-stamp rating + note, the per-card ⋯ flag menu, the flap sound.
 const J = journeyFor(CATEGORY);
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
 

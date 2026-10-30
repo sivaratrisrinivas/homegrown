@@ -269,7 +269,7 @@ async function morph() {
   const status = h('p', { class: 'muted' }, `Asking people in ${c.name}…`);
   show(h('div', { class: 'board' }, hdr, rows), status);
 
-  const base = { favourites: S.favs.map(({ id, name, tags }) => ({ id, name, tags })), city: c.id, userCountry: userCountryFromLocale(navigator.language) };
+  const base = { favourites: S.favs.map(({ id, name, tags }) => ({ id, name, tags })), city: c.id, learnerLanguage: S.lang?.id, userCountry: userCountryFromLocale(navigator.language) };
   let flipped = 0;
   const land = (cat, r) => {
     if (!current()) return; // a newer city run started: drop stale responses

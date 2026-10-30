@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, liveCats, pendingCats, categoryWords, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, liveCats, pendingCats, categoryWords, cityForLanguage, liveCitiesForLanguage, languageGroups, otherCities } from './logic.js';
 import { indiaSection } from './india.js';
 import { aiReveal } from './aisuggest-client.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
@@ -90,7 +90,7 @@ function suggestCity() {
   const pick = (c) => {
     const others = liveCitiesForLanguage(S.catalogue, S.lang.id).filter((x) => x.id !== c.id);
     show(h('p', { class: 'muted' }, c.id === live.id ? `For ${S.lang.name}, we suggest` : `${S.lang.name} in`),
-      h('h2', { class: serif(c.language) }, `${c.local} ${c.flag}`),
+      h('h2', { class: serif(c.language), dir: 'auto' }, `${c.local} ${c.flag}`),
       c.lead ? h('p', { class: 'lead' }, c.lead.text) : null,
       h('button', { onclick: () => { S.city = c; favourite(); } }, `Go to ${c.name}`),
       others.length ? h('div', {}, others.map((o) => h('button', { class: 'ghost', onclick: () => pick(o) }, `Switch to ${o.name}`))) : null,
@@ -269,7 +269,7 @@ async function morph() {
   const status = h('p', { class: 'muted' }, `Asking people in ${c.name}…`);
   show(h('div', { class: 'board' }, hdr, rows), status);
 
-  const base = { favourites: S.favs.map(({ id, name, tags }) => ({ id, name, tags })), city: c.id, userCountry: userCountryFromLocale(navigator.language) };
+  const base = { favourites: S.favs.map(({ id, name, tags }) => ({ id, name, tags })), city: c.id, learnerLanguage: S.lang?.id, userCountry: userCountryFromLocale(navigator.language) };
   let flipped = 0;
   const land = (cat, r) => {
     if (!current()) return; // a newer city run started: drop stale responses
@@ -282,7 +282,7 @@ async function morph() {
   const qlooP = runCategories(liveCats(S.catalogue), (cat) => qlooPost({ ...base, category: cat }, current), land);
   await Promise.race([qlooP, new Promise((r) => setTimeout(r, MORPH_BUDGET_MS))]);
   if (!current()) return;
-  hdr.textContent = c.header; hdr.classList.toggle('ko', c.language === 'ko');
+  hdr.textContent = c.header; hdr.dir = 'auto'; hdr.classList.toggle('ko', c.language === 'ko');
   await new Promise((r) => setTimeout(r, reduced ? 200 : 1200));
   if (!current()) return;
   reveal();
@@ -352,9 +352,9 @@ function reveal() {
       track({ event: 'rating', rating: Number(rating.dataset.r), note: rating.querySelector('#note').value, shown: shownPicks().map((p) => `${p.category}:${p.title}:${p.verification?.source || ''}`.slice(0, 200)) });
       e.target.textContent = 'Thank you'; e.target.disabled = true;
     } }, 'Send'));
-  // Only other live cities are offered.
-  const others = (S.catalogue?.cities || []).filter((c) => c.live && c.id !== S.city.id);
-  show(h('p', { class: 'kind' }, S.city.header), picks, rating,
+  // Only other live cities are offered, and never an explicit-only language (English) the learner didn't pick.
+  const others = S.catalogue ? otherCities(S.catalogue, S.city.id, S.lang?.id) : [];
+  show(h('p', { class: 'kind', dir: 'auto' }, S.city.header), picks, rating,
     h('section', { class: 'card postcard-summary' }, h('h3', { class: 'serif' }, `Keep your ${S.city.name} self`),
       h('button', { onclick: (e) => { e.target.replaceWith(h('p', { class: 'muted' }, 'Saving with an email link is coming soon.')); } }, `Save my ${S.city.name} self`),
       h('div', {}, others.map((c) => h('button', { class: 'ghost', onclick: () => { track({ event: 'try_city', to: c.id }); S.city = c; morph(); } }, `Try ${c.name}`)))));

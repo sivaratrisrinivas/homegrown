@@ -82,6 +82,78 @@
         "Punjab"
       ],
       "statesLabel": "Punjab"
+    },
+    {
+      "id": "ja",
+      "name": "Japanese",
+      "local": "日本語"
+    },
+    {
+      "id": "zh",
+      "name": "Mandarin",
+      "local": "中文"
+    },
+    {
+      "id": "cn",
+      "name": "Cantonese",
+      "local": "粵語"
+    },
+    {
+      "id": "th",
+      "name": "Thai",
+      "local": "ไทย"
+    },
+    {
+      "id": "id",
+      "name": "Indonesian",
+      "local": "Bahasa Indonesia"
+    },
+    {
+      "id": "tl",
+      "name": "Tagalog",
+      "local": "Tagalog"
+    },
+    {
+      "id": "tr",
+      "name": "Turkish",
+      "local": "Türkçe"
+    },
+    {
+      "id": "fa",
+      "name": "Persian",
+      "local": "فارسی"
+    },
+    {
+      "id": "it",
+      "name": "Italian",
+      "local": "Italiano"
+    },
+    {
+      "id": "de",
+      "name": "German",
+      "local": "Deutsch"
+    },
+    {
+      "id": "ru",
+      "name": "Russian",
+      "local": "Русский"
+    },
+    {
+      "id": "en",
+      "name": "English",
+      "local": "English",
+      "explicitOnly": true,
+      "note": "Captain (HG-13): English is only for people who pick English to learn. Never a default, fallback or cross-city suggestion."
+    },
+    {
+      "id": "ar",
+      "name": "Arabic",
+      "local": "العربية"
+    },
+    {
+      "id": "pt",
+      "name": "Portuguese",
+      "local": "Português"
     }
   ],
   "cities": [
@@ -451,6 +523,397 @@
         "pakistani",
         "hindi",
         "bollywood"
+      ]
+    },
+    {
+      "id": "tokyo",
+      "name": "Tokyo",
+      "localName": "東京",
+      "country": "JP",
+      "releaseCountry": "Japan",
+      "flag": "🇯🇵",
+      "itunesCountry": "jp",
+      "countryNames": [
+        "tokyo",
+        "nippon",
+        "日本",
+        "japan",
+        "東京"
+      ],
+      "language": "ja",
+      "accent": "#BC002D",
+      "header": "東京のあなた",
+      "musicTag": "j-pop",
+      "subtitleTip": "Start with subtitles in Japanese.",
+      "musicLanguageTags": [
+        "j-pop",
+        "japanese",
+        "city_pop",
+        "j-rock"
+      ]
+    },
+    {
+      "id": "hong_kong",
+      "name": "Hong Kong",
+      "localName": "香港",
+      "country": "HK",
+      "releaseCountry": "Hong Kong",
+      "flag": "🇭🇰",
+      "itunesCountry": "hk",
+      "countryNames": [
+        "hong kong",
+        "香港",
+        "hk"
+      ],
+      "language": "cn",
+      "accent": "#A3122A",
+      "header": "香港嘅你",
+      "musicTag": "cantopop",
+      "subtitleTip": "Start with subtitles in Cantonese.",
+      "musicLanguageTags": [
+        "cantopop",
+        "cantonese"
+      ]
+    },
+    {
+      "id": "taipei",
+      "name": "Taipei",
+      "localName": "臺北",
+      "country": "TW",
+      "releaseCountry": "Taiwan",
+      "flag": "🇹🇼",
+      "itunesCountry": "tw",
+      "countryNames": [
+        "taipei",
+        "台灣",
+        "taiwan",
+        "臺灣",
+        "臺北",
+        "台北"
+      ],
+      "language": "zh",
+      "accent": "#0F4C81",
+      "header": "臺北的你",
+      "musicTag": "mandopop",
+      "subtitleTip": "Start with subtitles in Mandarin.",
+      "musicLanguageTags": [
+        "mandopop",
+        "taiwanese",
+        "c-pop"
+      ]
+    },
+    {
+      "id": "bangkok",
+      "name": "Bangkok",
+      "localName": "กรุงเทพฯ",
+      "country": "TH",
+      "releaseCountry": "Thailand",
+      "flag": "🇹🇭",
+      "itunesCountry": "th",
+      "countryNames": [
+        "bangkok",
+        "กรุงเทพ",
+        "thailand",
+        "krung thep",
+        "ไทย"
+      ],
+      "language": "th",
+      "accent": "#2D2A70",
+      "header": "คุณในกรุงเทพฯ",
+      "musicTag": "thai pop",
+      "subtitleTip": "Start with subtitles in Thai.",
+      "musicLanguageTags": [
+        "thai",
+        "t-pop",
+        "luk_thung"
+      ]
+    },
+    {
+      "id": "jakarta",
+      "name": "Jakarta",
+      "localName": "Jakarta",
+      "country": "ID",
+      "releaseCountry": "Indonesia",
+      "flag": "🇮🇩",
+      "itunesCountry": "id",
+      "countryNames": [
+        "jakarta",
+        "indonesia"
+      ],
+      "language": "id",
+      "accent": "#B3122E",
+      "header": "Kamu versi Jakarta",
+      "musicTag": "indonesian pop",
+      "subtitleTip": "Start with subtitles in Indonesian.",
+      "musicLanguageTags": [
+        "indonesian",
+        "dangdut",
+        "indonesian_pop"
+      ]
+    },
+    {
+      "id": "manila",
+      "name": "Manila",
+      "localName": "Maynila",
+      "country": "PH",
+      "releaseCountry": "Philippines",
+      "flag": "🇵🇭",
+      "itunesCountry": "ph",
+      "countryNames": [
+        "manila",
+        "pilipinas",
+        "metro manila",
+        "philippines",
+        "maynila"
+      ],
+      "language": "tl",
+      "accent": "#0038A8",
+      "header": "Ikaw sa Maynila",
+      "musicTag": "opm",
+      "subtitleTip": "Start with subtitles in Tagalog.",
+      "musicLanguageTags": [
+        "opm",
+        "filipino",
+        "pinoy",
+        "tagalog"
+      ]
+    },
+    {
+      "id": "istanbul",
+      "name": "Istanbul",
+      "localName": "İstanbul",
+      "country": "TR",
+      "releaseCountry": "Turkey",
+      "flag": "🇹🇷",
+      "itunesCountry": "tr",
+      "countryNames": [
+        "istanbul",
+        "turkey",
+        "turkiye",
+        "türkiye"
+      ],
+      "language": "tr",
+      "accent": "#C8102E",
+      "header": "İstanbullu sen",
+      "musicTag": "turkish pop",
+      "subtitleTip": "Start with subtitles in Turkish.",
+      "musicLanguageTags": [
+        "turkish",
+        "turkish_pop",
+        "arabesk"
+      ]
+    },
+    {
+      "id": "tehran",
+      "name": "Tehran",
+      "localName": "تهران",
+      "country": "IR",
+      "releaseCountry": "Iran",
+      "flag": "🇮🇷",
+      "itunesCountry": "ir",
+      "countryNames": [
+        "tehran",
+        "ایران",
+        "persia",
+        "iran",
+        "تهران"
+      ],
+      "language": "fa",
+      "accent": "#1F6B3A",
+      "header": "تو در تهران",
+      "musicTag": "persian pop",
+      "subtitleTip": "Start with subtitles in Persian.",
+      "musicLanguageTags": [
+        "persian",
+        "iranian",
+        "persian_pop"
+      ],
+      "itunesNote": "iTunes has no Iran storefront: itunesCountry 'ir' will not return music; music is not live for Tehran."
+    },
+    {
+      "id": "rome",
+      "name": "Rome",
+      "localName": "Roma",
+      "country": "IT",
+      "releaseCountry": "Italy",
+      "flag": "🇮🇹",
+      "itunesCountry": "it",
+      "countryNames": [
+        "rome",
+        "italia",
+        "roma",
+        "italy"
+      ],
+      "language": "it",
+      "accent": "#A11F2B",
+      "header": "Tu, romano",
+      "musicTag": "italian pop",
+      "subtitleTip": "Start with subtitles in Italian.",
+      "musicLanguageTags": [
+        "italian",
+        "italian_pop",
+        "cantautori"
+      ]
+    },
+    {
+      "id": "berlin",
+      "name": "Berlin",
+      "localName": "Berlin",
+      "country": "DE",
+      "releaseCountry": "Germany",
+      "flag": "🇩🇪",
+      "itunesCountry": "de",
+      "countryNames": [
+        "berlin",
+        "germany",
+        "deutschland"
+      ],
+      "language": "de",
+      "accent": "#1F1F1F",
+      "header": "Du in Berlin",
+      "musicTag": "german pop",
+      "subtitleTip": "Start with subtitles in German.",
+      "musicLanguageTags": [
+        "german",
+        "deutschrap",
+        "schlager",
+        "krautrock"
+      ]
+    },
+    {
+      "id": "moscow",
+      "name": "Moscow",
+      "localName": "Москва",
+      "country": "RU",
+      "releaseCountry": "Russia",
+      "flag": "🇷🇺",
+      "itunesCountry": "ru",
+      "countryNames": [
+        "moscow",
+        "russia",
+        "moskva",
+        "москва",
+        "россия"
+      ],
+      "language": "ru",
+      "accent": "#8C1C13",
+      "header": "Ты в Москве",
+      "musicTag": "russian pop",
+      "subtitleTip": "Start with subtitles in Russian.",
+      "musicLanguageTags": [
+        "russian",
+        "russian_pop",
+        "russian_rock"
+      ]
+    },
+    {
+      "id": "london",
+      "name": "London",
+      "localName": "London",
+      "country": "GB",
+      "releaseCountry": "United Kingdom",
+      "flag": "🇬🇧",
+      "itunesCountry": "gb",
+      "countryNames": [
+        "london",
+        "britain",
+        "united kingdom",
+        "great britain",
+        "england",
+        "gb",
+        "uk"
+      ],
+      "language": "en",
+      "accent": "#012169",
+      "header": "London you",
+      "musicTag": "britpop",
+      "subtitleTip": "Start with subtitles in English.",
+      "musicLanguageTags": [
+        "british",
+        "britpop",
+        "uk_garage",
+        "grime"
+      ]
+    },
+    {
+      "id": "dublin",
+      "name": "Dublin",
+      "localName": "Baile Átha Cliath",
+      "country": "IE",
+      "releaseCountry": "Ireland",
+      "flag": "🇮🇪",
+      "itunesCountry": "ie",
+      "countryNames": [
+        "dublin",
+        "eire",
+        "éire",
+        "ireland",
+        "baile átha cliath"
+      ],
+      "language": "en",
+      "accent": "#14653B",
+      "header": "Dublin you",
+      "musicTag": "irish",
+      "subtitleTip": "Start with subtitles in English.",
+      "musicLanguageTags": [
+        "irish",
+        "irish_folk",
+        "celtic"
+      ]
+    },
+    {
+      "id": "cairo",
+      "name": "Cairo",
+      "localName": "القاهرة",
+      "country": "EG",
+      "releaseCountry": "Egypt",
+      "flag": "🇪🇬",
+      "itunesCountry": "eg",
+      "countryNames": [
+        "cairo",
+        "القاهرة",
+        "egypt",
+        "مصر",
+        "misr"
+      ],
+      "language": "ar",
+      "accent": "#7A3B0A",
+      "header": "أنت في القاهرة",
+      "musicTag": "egyptian pop",
+      "subtitleTip": "Start with subtitles in Arabic.",
+      "musicLanguageTags": [
+        "egyptian",
+        "arabic",
+        "arabic_pop",
+        "mahraganat"
+      ]
+    },
+    {
+      "id": "sao_paulo",
+      "name": "São Paulo",
+      "localName": "São Paulo",
+      "country": "BR",
+      "releaseCountry": "Brazil",
+      "flag": "🇧🇷",
+      "itunesCountry": "br",
+      "countryNames": [
+        "são paulo",
+        "brazil",
+        "sampa",
+        "brasil",
+        "sao paulo"
+      ],
+      "language": "pt",
+      "accent": "#00703C",
+      "header": "Você paulistano",
+      "musicTag": "mpb",
+      "subtitleTip": "Start with subtitles in Portuguese.",
+      "musicLanguageTags": [
+        "brazilian",
+        "mpb",
+        "samba",
+        "bossa_nova",
+        "sertanejo"
       ]
     }
   ]

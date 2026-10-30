@@ -1,4 +1,5 @@
 import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { createAltTrigger } from './altnames-client.js';
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
 
 const app = document.getElementById('app');
@@ -83,7 +84,21 @@ function favourite() {
   const input = h('input', { 'aria-label': p.label, placeholder: 'Start typing…', autocomplete: 'off' });
   const sugs = h('ul', { class: 'sugs' }); const msg = h('p', { class: 'muted' });
   let t, seq = 0;
+  const alt = createAltTrigger();
+  const pick = (e) => h('li', {}, h('button', { onclick: () => { S.favs.push(e); favourite(); } }, e.name, e.year ? ` (${e.year})` : ''));
+  // Enter on a query with no results: ask the server for Qloo-verified alternate names (HG-8).
+  input.addEventListener('keydown', async (ev) => {
+    if (ev.key !== 'Enter') return;
+    const q = input.value.trim(); const my = seq;
+    if (q.length < 2) return;
+    msg.textContent = 'Looking for other names…';
+    const found = await alt.submit(p.kind, q);
+    if (found === null || my !== seq) { if (my === seq && msg.textContent === 'Looking for other names…') msg.textContent = 'Nothing found. Try something like it.'; return; }
+    msg.textContent = found.length ? 'Found it under another name:' : 'Nothing found. Try something like it.';
+    sugs.replaceChildren(...found.slice(0, 3).map(pick));
+  });
   input.addEventListener('input', () => {
+    alt.onInput();
     clearTimeout(t);
     t = setTimeout(async () => {
       const q = input.value.trim(); const my = ++seq;
@@ -95,14 +110,7 @@ function favourite() {
         r = await qlooGate(async () => {
           if (my !== seq) return SKIP; // superseded while waiting for the gate: don't spend a Qloo call
           const res = await fetch(`/api/search?kind=${p.kind}&q=${encodeURIComponent(q)}`);
-          const out = { ok: res.ok, body: await res.json().catch(() => ({})) };
-          // HG-8: Qloo found nothing for the typed name -> server asks Claude for alternate names, Qloo-verified only.
-          // Only on an empty result (not on partial typeahead hits) so the per-IP cap isn't spent while typing.
-          if (out.ok && !out.body.results?.length && my === seq) {
-            const alt = await fetch(`/api/altnames?kind=${p.kind}&q=${encodeURIComponent(q)}`).then((x) => x.json()).catch(() => ({}));
-            if (alt.results?.length) out.body = { ...out.body, results: alt.results };
-          }
-          return out;
+          return { ok: res.ok, body: await res.json().catch(() => ({})) };
         });
         if (r === SKIP) return;
         if (r?.ok) searchMemo.set(sk, r);
@@ -110,8 +118,9 @@ function favourite() {
       if (!r || my !== seq) return;
       const body = r.body;
       if (!r.ok) { msg.textContent = body.message || 'Search is unavailable right now.'; return; }
-      msg.textContent = body.results.length ? '' : 'Nothing found. Try something like it.';
-      sugs.replaceChildren(...body.results.slice(0, 3).map((e) => h('li', {}, h('button', { onclick: () => { S.favs.push(e); favourite(); } }, e.name, e.year ? ` (${e.year})` : ''))));
+      alt.noteResults(q, body.results.length);
+      msg.textContent = body.results.length ? '' : 'Nothing found. Press Enter to try other names.';
+      sugs.replaceChildren(...body.results.slice(0, 3).map(pick));
     }, 600);
   });
   const shelf = h('div', { class: 'shelf', 'aria-label': 'Your favourites' }, S.favs.map((f) => h('span', { class: 'chip' }, f.name)));

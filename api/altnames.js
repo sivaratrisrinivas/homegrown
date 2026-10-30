@@ -9,8 +9,17 @@ export default async function handler(req, res) {
     const q = String(req.query?.q || '').trim().slice(0, 100);
     const kind = Object.hasOwn(QLOO_TYPES, req.query?.kind) ? req.query.kind : 'any';
     if (q.length < 2) return sendJson(res, { results: [] });
-    const ip = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || 'unknown';
+    const ip = clientIp(req);
     const { results } = await getDeps().altnames({ q, kind, types: QLOO_TYPES[kind], ip });
     sendJson(res, { results: results.map(({ id, name, type, year, tags, image }) => ({ id, name, type, year, tags: (tags || []).slice(0, 20), image })) });
   } catch { sendJson(res, { results: [] }); }
+}
+
+// Per-IP key. On Vercel, x-vercel-forwarded-for / x-real-ip are set by the edge to the real client.
+// The first x-forwarded-for entry is client-supplied (the edge appends), so trusting it would let
+// anyone rotate a fake IP per request and bypass the per-IP cap; it is deliberately ignored.
+export function clientIp(req) {
+  const h = req.headers || {};
+  const v = String(h['x-vercel-forwarded-for'] || '').split(',')[0].trim() || String(h['x-real-ip'] || '').trim();
+  return v || req.socket?.remoteAddress || 'unknown';
 }

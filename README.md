@@ -46,12 +46,14 @@ When a key is missing, the API returns `503 {"error":"missing_key","key":"..."}`
 
 ## Claude alternate-name fallback (HG-8)
 
-When `/api/search` returns nothing for a typed favourite, the client calls `GET /api/altnames?q=&kind=`.
+When `/api/search` returned nothing for a typed favourite and the user presses Enter, the client calls `GET /api/altnames?q=&kind=`.
 The server asks `claude-haiku-5-5` (max_tokens 100, thinking off) for up to 3 alternate/official names as JSON,
-re-resolves each with Qloo search (7 s throttle) and returns only an entity whose Qloo name equals one of them.
+re-resolves at most 2 with Qloo search (7 s throttle) and returns only an entity whose Qloo name equals one of them.
 Claude never sources picks. Needs `ANTHROPIC_API_KEY`; without it, or on any error, the endpoint returns `{ results: [] }`.
 
-Caps (`lib/altnames.js`): 10 Claude calls per IP per UTC day; a global spend estimate from usage tokens
+Caps (`lib/altnames.js`): 10 Claude calls per IP per UTC day (IP from `x-vercel-forwarded-for`/`x-real-ip`);
+at most 40 Qloo searches per UTC day for this feature; worst-case cost reserved before each call;
+identical in-flight requests share one call; a global spend estimate from usage tokens
 (priced at Haiku 5.5's higher long-prompt rates, $0.50/$2.50 per MTok) stopped at $0.25 per UTC day; a call starts only
 if its worst case fits. Results, including "no match", are cached 7 days.
 Limitation: this state is in-memory per serverless instance. It resets on cold starts and isn't shared across

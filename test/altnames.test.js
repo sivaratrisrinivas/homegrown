@@ -222,7 +222,7 @@ test('app integration: missed favourites get Try other names; verified match nev
   assert.match(src, /Try other names for \$\{m\.name\}/);
   assert.match(src, /alt\.lookup\(m\.kind, m\.name\)/);
   const add = src.slice(src.indexOf('const addVerified'), src.indexOf('// Secondary trigger'));
-  assert.match(add, /verifiedFavourite\(e, kind, S\.favs, S\.pending\)/); assert.match(add, /S\.favs\.push\(v\.fav\)/);
+  assert.match(add, /verifiedFavourite\(e, kind, S\.favs, S\.pending, from\)/); assert.match(add, /S\.favs\.push\(v\.fav\)/);
   assert.ok(!add.includes('bestQlooMatch') && !add.includes('pendingMatches'));
   assert.match(src, /const i = S\.favs\.length \+ S\.pending\.length;/);
   assert.ok(!src.includes('qlooGate(() => alt') && !src.includes('/api/altnames')); // outside the gate, URL only in client module
@@ -240,4 +240,55 @@ test('app integration: keeps /api/suggest + AbortController + DEBOUNCE_MS; seq b
 test('server keeps /api/suggest, .ico and /api/altnames', async () => {
   const src = (await import('node:fs')).readFileSync(new URL('../server.js', import.meta.url), 'utf8');
   assert.match(src, /'\/api\/suggest': suggest/); assert.match(src, /'\/api\/altnames': altnames/); assert.match(src, /'\.ico': 'image\/x-icon'/);
+});
+
+// Review round 5
+import { missedNote } from '../public/altnames-client.js';
+import { settleFavourites } from '../public/logic.js';
+test('R5.1: every favourite() re-render on the missed screen passes the missed list through', async () => {
+  const src = await appSrc();
+  const fav = src.slice(src.indexOf('function favourite('), src.indexOf('async function matchFavourites'));
+  assert.ok(!/[^.\w]favourite\(\)/.test(fav), 'no bare favourite() re-render on this screen');
+  assert.equal((fav.match(/favourite\(missNote\(rest\), rest\)/g) || []).length, 1); // after a verified match
+  assert.equal((fav.match(/favourite\(missNote\(missed\), missed\)/g) || []).length, 1); // after picking a suggestion
+});
+test('R5.2: screenGen guards S.favs and every screen replace aborts the alt lookup', async () => {
+  const src = await appSrc();
+  assert.match(src, /const show = \(\.\.\.els\) => \{ screenGen\+\+; screenAbort\?\.\(\); screenAbort = null;/);
+  assert.match(src, /const gen = screenGen; screenAbort = \(\) => alt\.onInput\(\);/);
+  const add = src.slice(src.indexOf('const addVerified'), src.indexOf('// Secondary trigger'));
+  assert.ok(add.indexOf('if (gen !== screenGen) return false;') < add.indexOf('S.favs.push'));
+  // alt.onInput() aborts an in-flight lookup (resolves null, nothing added)
+  const fetch = (u, { signal }) => new Promise((_, rej) => signal.addEventListener('abort', () => rej(new Error('a'))));
+  const t = createAltTrigger({ fetch }); const p = t.lookup('show', 'x'); t.onInput(); assert.equal(await p, null);
+});
+test('R5.3: dup is not success: the button is reset, not left on "Looking…"', async () => {
+  const src = await appSrc();
+  const btn = src.slice(src.indexOf('const tryOthers'), src.indexOf('const shelf'));
+  assert.match(btn, /if \(added === true\) return;/);
+  assert.match(btn, /if \(added === 'dup'\) \{ b\.textContent = label; b\.disabled = false; return; \}/);
+  assert.ok(!/if \(found\?\.length && addVerified/.test(btn));
+});
+test('R5.4: note after a match keeps "Pick N more." while fewer than 3 are chosen', () => {
+  assert.equal(missedNote([{ name: 'A' }, { name: 'B' }], 1), "We couldn't match A, B. Pick 2 more.");
+  assert.equal(missedNote([{ name: 'A' }], 3), "We couldn't match A.");
+  assert.equal(missedNote([], 0), '');
+});
+test('R5.5: missed picks are matched by pending key, not by name', async () => {
+  const pending = [{ key: 'k1', name: 'Dark', pick: 'show|dark|' }, { key: 'k2', name: 'Dark', pick: 'movie|dark|' }];
+  const r = settleFavourites([], pending, new Map([['k1', { id: 'q-d', tags: [] }], ['k2', null]]));
+  assert.deepEqual(r.missedKeys, ['k2']); assert.deepEqual(r.missed, ['Dark']);
+  assert.match(await appSrc(), /S\.pending\.filter\(\(f\) => missedKeys\.includes\(f\.key\)\)/);
+});
+test('R5.6: verified favourite keeps the typed name for display, Qloo id/pick', () => {
+  const v = verifiedFavourite({ id: 'q-mh', name: 'Money Heist', year: 2017, tags: [] }, 'show', [], [], 'La casa de papel');
+  assert.equal(v.fav.name, 'La casa de papel'); assert.equal(v.fav.id, 'q-mh'); assert.equal(v.fav.pick, pickKey('show', 'Money Heist', 2017));
+});
+test('R5.7: per-IP map is capped; new IPs past the cap fail closed', async () => {
+  const claude = mockClaude([]);
+  const f = createAltNames({ qloo: mockQloo({}), claude, caps: { ...ALT_CAPS, maxIps: 3 } });
+  for (let i = 0; i < 3; i++) await f({ q: 'q' + i, kind: 'show', ip: 'ip' + i });
+  assert.deepEqual(await f({ q: 'new', kind: 'show', ip: 'ip9' }), { results: [], capped: 'ips' });
+  assert.equal((await f({ q: 'again', kind: 'show', ip: 'ip0' })).capped, undefined); // known IP still served
+  assert.equal(claude.calls, 4); assert.equal(ALT_CAPS.maxIps, 10000);
 });

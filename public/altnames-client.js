@@ -18,6 +18,7 @@ export function createAltTrigger({ fetch = globalThis.fetch } = {}) {
     } catch { return null; } finally { if (ctl === my) ctl = null; }
   }
   return {
+    abort,
     // Record the latest suggest outcome: only an empty result makes the query eligible for Enter.
     noteResults(q, count) { emptyQ = count === 0 ? q : null; },
     eligible(q) { return !!q && q === emptyQ; },
@@ -32,9 +33,17 @@ export function createAltTrigger({ fetch = globalThis.fetch } = {}) {
 
 // An alt-names match is already a verified Qloo entity: it goes straight into S.favs (never back
 // through bestQlooMatch). -> { fav } to push, or { dup: true } when it's already picked/pending.
-export function verifiedFavourite(e, kind, favs, pending) {
+// Display name is what the user typed (`from`); id and pick come from the Qloo entity.
+export function verifiedFavourite(e, kind, favs, pending, from) {
   if (!e || typeof e.id !== 'string' || !e.id) return { invalid: true };
   const pick = pickKey(kind, e.name, e.year);
   if (isPicked(pick, favs, pending) || favs.some((f) => f.id === e.id)) return { dup: true };
-  return { fav: { id: e.id, name: e.name, pick, tags: Array.isArray(e.tags) ? e.tags : [] } };
+  return { fav: { id: e.id, name: String(from || '').trim() || e.name, pick, tags: Array.isArray(e.tags) ? e.tags : [] } };
+}
+
+// "We couldn't match X." plus HG-5's "Pick N more." while fewer than 3 favourites are chosen.
+export function missedNote(missed, chosen) {
+  if (!missed.length) return '';
+  const n = 3 - chosen;
+  return `We couldn't match ${missed.map((m) => m.name).join(', ')}.${n > 0 ? ` Pick ${n} more.` : ''}`;
 }

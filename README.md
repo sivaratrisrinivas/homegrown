@@ -69,5 +69,13 @@ Difficulty is labelled "estimated". It comes from TMDB genres (easy genres win o
 
 All Claude features reserve from `lib/budget.js`: $0.25 per UTC day in total, split into why $0.10, altnames $0.08 and aisuggest $0.07. Each reservation is the worst-case cost of that exact request, based on its length. Why-lines are also limited to 20 calls per IP per day.
 
+### Why-line pass rate (HG-15)
+Grounding is done mostly on the prompt side. Each `<pick>` carries a `<words>` list, which holds the content words from its tags, genres and overview (letters only, no stopwords, numbers or 1-2 letter fragments). Claude must use only those words, plus function words and a few framing words (fans, will, like, follows, story, film, tale, explores, features, centres, set, plot). It fills a fixed template: "Fans of <favourite> will like this <genre> film about <phrase>." Framing words are allowed but never count toward the 2 grounded words. Every validator rule above still applies. When some lines are rejected, the writer makes one regenerate call for those picks only. That call reserves its own budget, so it is skipped when the budget can't cover it, and it doesn't use another per-IP call. A rejected line is replaced only if the regenerated one is valid. Measured on 3 live calls with no retry: Seoul 3/5, Mexico City 1/4, Paris 4/5. The recorded HG-7 answer, which used the old prompt, scores 1/5. The heuristic fallback never says "if you liked".
+
+Defaults accepted in review:
+- **The framing words are the same for every pick.** They are allowed everywhere and never count as grounded, so a line made only of framing words still fails the 2-word minimum.
+- **The regenerate call doesn't count against the per-IP limit** of 20 why calls per day. It still reserves from the global why budget ($0.10 of the $0.25 daily total), so it is skipped once that budget runs out.
+- **Only rejected lines are retried.** A pick that Claude left out of its answer, or answered with an empty line, is not retried. It keeps the heuristic line and is cached as rejected for 1 day.
+
 ## World cities (HG-13)
 15 cities went live on the movie gate. The raw scout and retry output is in `config/hg13-measure.json` and is referenced from `gate.json` → `hg13.raw`. Copenhagen and Lagos returned an empty Qloo pool for every country name and code we tried. **Tehran:** iTunes has no Iran storefront, so `itunesCountry: 'ir'` returns nothing. Music for Tehran won't work if music ever goes live (only movies are live now).

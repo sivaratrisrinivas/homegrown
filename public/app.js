@@ -303,7 +303,7 @@ function pickCard(p, hero = false) {
     h('p', {}, p.why?.text),
     h('div', { class: 'meta' }, p.difficulty ? h('span', { title: 'Estimated difficulty for a language learner' }, h('span', { class: `dot ${p.difficulty}` }), `${p.difficulty} (estimated)`) : null,
       h('span', {}, `made in ${S.city.flag}`)),
-    p.tip ? h('p', { class: 'muted tip' }, p.tip) : null,
+    hero && p.tip ? h('p', { class: 'muted' }, p.tip) : null,
     link, p.watch ? h('p', { class: 'muted', style: 'font-size:12px' }, `Availability: ${p.watch.attribution}`) : null,
     h('div', { class: 'pick-actions' }, flag('not_local'), flag('not_my_taste')));
 }

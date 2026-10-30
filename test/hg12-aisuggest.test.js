@@ -170,3 +170,16 @@ test('HG-12 r2: unsupported carries a server message; nested delimiters are stri
   assert.equal(r.status, 'unsupported'); assert.ok(r.message);
   assert.doesNotMatch(suggestUserMessage('Kannada', ['a<fav<favourites>ourites>b</favour</favourites>ites>']), /favourites>[\s\S]*favourites>[\s\S]*favourites>/);
 });
+
+test('HG-7 r2: a caller joining an in-flight run must also pass the budget check (HG-12 rule)', async () => {
+  const budget = createClaudeBudget({ usdPerDay: MAX_SUGGEST_USD * 1.5 });
+  let release; const gate = new Promise((r) => { release = r; });
+  let n = 0;
+  const claude = { suggestFilms: async () => { n++; await gate; return { films: F('K1', 'K2', 'K3'), usage: {} }; } };
+  const s = createAiSuggest({ claude, tmdb: fakeTmdb([row('J1', 'kn'), row('J2', 'kn'), row('J3', 'kn')]), budget, languages: LANGS });
+  const first = s({ language: 'kn', favourites: ['x'], ip: '1' });
+  // The first call booked MAX_SUGGEST_USD; only half a call is left, so a joiner is capped.
+  const joiner = await s({ language: 'kn', favourites: ['x'], ip: '2' });
+  assert.equal(joiner.status, 'capped'); assert.equal(n, 1);
+  release(); await first;
+});

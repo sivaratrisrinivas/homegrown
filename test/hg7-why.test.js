@@ -92,7 +92,7 @@ test('fallback: Claude error, invented line, timeout and spent budget keep the h
   assert.deepEqual(r1, [null]);
   const out = personalise({ picks: [pick()] }, FAVS, r1).picks[0];
   assert.equal(out.why.source, undefined); assert.match(out.why.text, /Breaking Bad/);
-  assert.equal(out.difficulty, 'hard'); assert.equal(out.difficultySource, 'heuristic');
+  assert.equal(out.difficulty, 'hard'); assert.equal(out.difficultySource, 'tmdb');
   assert.equal(out.src, undefined); assert.equal(out.tags, undefined);
 
   const liar = createWhyWriter({ claude: mockClaude(answer('Like Breaking Bad, it stars Song Kang-ho as a teacher who turns to crime.')), budget: createClaudeBudget() });
@@ -166,20 +166,27 @@ test('why writer: per-IP cap, why share cap; no shared tags or overview means no
   assert.deepEqual(await none([pick({ tags: [] }), pick({ src: { ...pick().src, overview: '' } })], FAVS), [null, null]);
   assert.equal(claude.calls.n, 2);
 });
-test('difficulty mapping: genres + runtime, Claude moves it one step at most', () => {
-  assert.equal(rateDifficulty({ genreIds: [80] }), 'hard'); // no Claude signals -> old heuristic
+test('difficulty mapping: EASY beats HARD, runtime always counts, Claude adds ±1 on top', () => {
+  assert.equal(rateDifficulty({ genreIds: [80] }), 'hard'); // no runtime, no Claude -> showDifficulty
   assert.equal(rateDifficulty({ genreIds: [35] }), 'easy');
   assert.equal(rateDifficulty({ genreIds: [18] }), 'medium');
-  assert.equal(rateDifficulty({ genreIds: [16], runtime: 90, pace: 'slow', dialogue: 'light' }), 'easy');
-  assert.equal(rateDifficulty({ genreIds: [18], runtime: 120, pace: 'fast', dialogue: 'heavy' }), 'medium'); // +2 clamped to +1
+  assert.equal(rateDifficulty({ genreIds: [35, 80] }), 'easy'); // EASY wins over HARD
+  assert.equal(rateDifficulty({ genreIds: [16, 80], runtime: 120, pace: 'steady', dialogue: 'moderate' }), 'easy');
+  // Runtime counts with and without Claude.
+  assert.equal(rateDifficulty({ genreIds: [18], runtime: 150 }), 'hard');
+  assert.equal(rateDifficulty({ genreIds: [18], runtime: 90 }), 'easy');
+  assert.equal(rateDifficulty({ genreIds: [80], runtime: 90 }), 'medium');
+  assert.equal(rateDifficulty({ genreIds: [18], runtime: 150, pace: 'steady', dialogue: 'moderate' }), 'hard');
+  // Claude: clamped to ±1.
+  assert.equal(rateDifficulty({ genreIds: [18], runtime: 120, pace: 'fast', dialogue: 'heavy' }), 'hard');
   assert.equal(rateDifficulty({ genreIds: [18], runtime: 120, pace: 'slow', dialogue: 'light' }), 'easy');
-  assert.equal(rateDifficulty({ genreIds: [80], runtime: 155, pace: 'steady', dialogue: 'moderate' }), 'hard');
-  assert.equal(rateDifficulty({ genreIds: [80], runtime: 148, pace: 'slow', dialogue: 'light' }), 'medium');
-  assert.equal(rateDifficulty({ genreIds: [80], runtime: 110, pace: 'fast', dialogue: 'moderate' }), 'hard');
+  assert.equal(rateDifficulty({ genreIds: [80], runtime: 150, pace: 'slow', dialogue: 'light' }), 'hard'); // 1+1-1
+  assert.equal(rateDifficulty({ genreIds: [80], runtime: 120, pace: 'slow', dialogue: 'light' }), 'medium');
+  assert.equal(rateDifficulty({ genreIds: [35], runtime: 90, pace: 'fast', dialogue: 'heavy' }), 'easy'); // -2+1
   assert.equal(rateDifficulty({ genreIds: [18], runtime: 120, pace: 'bogus', dialogue: 'heavy' }), 'medium');
   assert.equal(subtitleTip('easy', 'ko'), 'If you can, start with subtitles in Korean.');
   assert.equal(subtitleTip('hard', 'ta'), 'If you can, start with subtitles in English, then switch to Tamil.');
-  const llm = [{ why: GOOD, favourite: 'Breaking Bad', pace: 'steady', dialogue: 'light' }];
+  const llm = [{ why: GOOD, favourite: 'Breaking Bad', pace: 'slow', dialogue: 'light' }];
   const p = personalise({ picks: [pick()] }, FAVS, llm).picks[0];
   assert.equal(p.difficulty, 'medium'); assert.equal(p.difficultySource, 'claude+tmdb'); assert.equal(p.difficultyEstimated, true);
   assert.equal(p.why.text, GOOD); assert.equal(p.why.source, 'claude'); assert.equal(p.tip, 'If you can, start with subtitles in English, then switch to Korean.');
@@ -191,4 +198,41 @@ test('parseBatch tolerates fences and junk; whyBatch never leaks the key in erro
   assert.deepEqual(parseBatch('nope'), []);
   const c = createAnthropic({ fetch: fakeFetch([['anthropic.com', () => json({}, 500)]]), env: { ANTHROPIC_API_KEY: 'sk-secret' } });
   await assert.rejects(c.whyBatch('<pick id="p0"></pick>'), (e) => !String(e.message).includes('sk-secret') && e.upstreamStatus === 500);
+});
+
+test('r2 stemmer: suffix stripped only with a 4+ char stem; short words exact or plural', async () => {
+  const { stem } = await import('../lib/whyllm.js');
+  assert.equal(stem('creation'), 'creat'); assert.equal(stem('creed'), 'creed'); assert.equal(stem('nation'), 'nation');
+  assert.equal(stem('missive'), 'missive'); assert.equal(stem('murders'), 'murder');
+  const g = (src) => ({ favourite: 'Breaking Bad', sources: [src] });
+  const L = (w) => `Like Breaking Bad, this is about the ${w} of a chemistry teacher and his crime.`;
+  const base = 'chemistry teacher crime';
+  assert.equal(validateWhy(L('creed'), g(base + ' creation')), null);
+  assert.equal(validateWhy(L('creation'), g(base + ' creed')), null);
+  assert.equal(validateWhy(L('missive'), g(base + ' missing')), null);
+  assert.equal(validateWhy(L('nation'), g(base + ' native')), null);
+  assert.ok(validateWhy(L('nations'), g(base + ' nation')));
+  assert.ok(validateWhy(L('creations'), g(base + ' creating')));
+});
+test('r2 allowed words: content words removed; possessive s accepted', () => {
+  const g = { favourite: 'Breaking Bad', sources: ['a chemistry teacher turns to crime, killer'] };
+  for (const w of ['world', 'life', 'journey', 'gripping', 'thrilling', 'tense', 'compelling', 'caught'])
+    assert.equal(validateWhy(`Like Breaking Bad, a ${w} chemistry teacher turns to crime here.`, g), null, w);
+  assert.ok(validateWhy("If you love Breaking Bad's crime, a chemistry teacher turns to the killer's crime.", g));
+});
+test('r2: a capped caller does not write the skip marker for everyone', async () => {
+  const claude = mockClaude(answer(GOOD));
+  const w = createWhyWriter({ claude, budget: createClaudeBudget(), caps: { perIpPerDay: 1, maxIps: 10, maxPicks: 6 } });
+  await w([pick({ qlooId: 'other' })], FAVS, { ip: 'x' }); // x uses its one call
+  assert.deepEqual(await w([pick()], FAVS, { ip: 'x' }), [null]); // x is capped for this pick
+  assert.equal(claude.calls.n, 1);
+  assert.equal((await w([pick()], FAVS, { ip: 'y' }))[0].why, GOOD); // y still gets it
+  assert.equal(claude.calls.n, 2);
+  // Budget-capped: no marker either, so the pick is tried again once there is budget.
+  const c2 = mockClaude(answer(GOOD)); const b = createClaudeBudget({ usdPerDay: 0.25, shares: { why: 0.25 } });
+  b.reserve(0.25, { feature: 'why' });
+  const w2 = createWhyWriter({ claude: c2, budget: b });
+  assert.deepEqual(await w2([pick()], FAVS, { ip: 'x' }), [null]); assert.equal(c2.calls.n, 0);
+  b.adjust(-0.25, { feature: 'why' });
+  assert.equal((await w2([pick()], FAVS, { ip: 'x' }))[0].why, GOOD); assert.equal(c2.calls.n, 1);
 });

@@ -127,3 +127,45 @@ test('HG-12: parseFilms tolerates fences, dedupes and drops bad years', () => {
   assert.deepEqual(parseFilms('```json\n{"films":[{"title":"Kantara","year":2022},{"title":"kantara","year":2022},{"title":"X","year":"soon"}]}\n```'), [{ title: 'Kantara', year: 2022 }, { title: 'X', year: undefined }]);
   assert.deepEqual(parseFilms('nope'), []);
 });
+
+test('HG-12 r2: a capped caller never joins an in-flight run; capped results are not shared', async () => {
+  let release; const gate = new Promise((r) => { release = r; });
+  const claude = { calls: 0, suggestFilms: async () => { claude.calls++; await gate; return { films: F('K1', 'K2', 'K3'), usage: {} }; } };
+  const rows = [row('K1', 'kn'), row('K2', 'kn'), row('K3', 'kn')];
+  const s = createAiSuggest({ claude, tmdb: fakeTmdb(rows), budget: createClaudeBudget({ usdPerDay: 1 }), languages: LANGS, caps: { perIpPerDay: 1, maxIps: 10, maxTitles: 8 } });
+  const warm = s({ language: 'kn', favourites: ['warm'], ip: 'B' }); // B uses its 1 call (blocked until release)
+  const first = s({ language: 'kn', favourites: ['same'], ip: 'A' });
+  const joinedByCapped = await s({ language: 'kn', favourites: ['same'], ip: 'B' });
+  assert.equal(joinedByCapped.status, 'capped', 'B is capped even though A has the same request in flight');
+  const joiner = s({ language: 'kn', favourites: ['same'], ip: 'C' });
+  release();
+  await warm; assert.equal((await first).status, 'ok'); assert.equal((await joiner).status, 'ok', 'an allowed caller still shares the run');
+  assert.equal(claude.calls, 2);
+});
+
+test('HG-12 r2: per-IP refunds are capped at 2 a day', async () => {
+  const { s, calls } = svc({ films: F('K1'), rows: [], fail: new Set(['K1']), caps: { perIpPerDay: 1, maxIps: 10, maxTitles: 8 } });
+  const out = [];
+  for (let i = 0; i < 4; i++) out.push((await s({ language: 'kn', favourites: [`f${i}`], ip: 'R' })).status);
+  assert.deepEqual(out, ['error', 'error', 'error', 'capped'], 'two refunds, then the third error spends the only call');
+  assert.equal(calls.claude, 3);
+});
+
+test('HG-12 r2: search with primary_release_year first, then no year, deduped; ±1 and ambiguity kept', async () => {
+  const old = row('Nagarahavu', 'kn', 1972), dupe = old, newer = row('Nagarahavu', 'kn', 2016);
+  const qs = [];
+  const tmdb = { searchMovie: async (q, year) => { qs.push(year); return year === 1972 ? [old] : [newer, dupe]; }, movieDetails: async () => ({ origin_country: ['IN'] }) };
+  const v = await verifySuggestedFilm(tmdb, { title: 'Nagarahavu', year: 1972 }, IN);
+  assert.deepEqual(qs, [1972, undefined]);
+  assert.equal(v.ok, true, 'the duplicate 1972 row does not make it ambiguous'); assert.equal(v.year, 1972);
+  assert.equal((await verifySuggestedFilm(tmdb, { title: 'Nagarahavu', year: 2015 }, IN)).year, 2016, '±1 kept');
+  const twins = { searchMovie: async () => [row('Twin', 'kn', 2019), row('Twin', 'kn', 2020)], movieDetails: async () => ({ origin_country: ['IN'] }) };
+  assert.equal((await verifySuggestedFilm(twins, { title: 'Twin', year: 2020 }, IN)).reason, 'ambiguous');
+});
+
+test('HG-12 r2: unsupported carries a server message; nested delimiters are stripped', async () => {
+  const { s } = svc({ films: [] });
+  const r = await s({ language: 'bho', favourites: ['x'], ip: '1' });
+  assert.equal(r.status, 'unsupported'); assert.ok(r.message);
+  assert.doesNotMatch(suggestUserMessage('Kannada', ['a<fav<favourites>ourites>b</favour</favourites>ites>']), /favourites>[\s\S]*favourites>[\s\S]*favourites>/);
+});

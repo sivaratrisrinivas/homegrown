@@ -33,6 +33,7 @@ export const matchStatus = (g) => { const n = g.live.length + g.soon.length + g.
 // One hint under the list (never per row): the nearest live language where it is obvious, otherwise Hindi.
 export function meanwhileHint(g) {
   if (g.stateless) return 'No film language for your state yet, try Hindi meanwhile.';
+  if (g.live.length) return null; // a live language is right there: no hint at all
   const waiting = [...g.soon, ...g.unsupported];
   if (!waiting.length) return null;
   if (!g.soon.length) return "We can't match films in this language yet. Try Hindi meanwhile.";

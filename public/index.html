@@ -6,13 +6,18 @@
 <title>Homegrown: what you'd love if you grew up there</title>
 <meta name="description" content="Give it your favourites, pick a city, meet the version of you who grew up there.">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&family=Inter:wght@400;600&family=Noto+Serif+KR:wght@400;700&display=swap" rel="stylesheet">
+<!-- Fonts never block first paint; display=swap shows them on first visit, and the metric-matched
+     fallbacks in styles.css keep the swap from shifting layout (that used to move Start). -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&family=Inter:wght@400;600&family=Noto+Serif+KR:wght@400;700&display=swap" media="print" onload="this.media='all'">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="https://fonts.gstatic.com/s/fraunces/v38/6NU78FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0KxC9TeA.woff2">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="modulepreload" href="/logic.js">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<svg width="0" height="0" aria-hidden="true" style="position:absolute"><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="3" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .06 0"/></filter></svg>
-<button id="sound" class="sound" aria-pressed="false" title="Sound">🔇</button>
-<main id="app" aria-live="polite"></main>
+<button id="sound" class="sound" aria-pressed="false" title="Sound">Sound off</button>
+<main id="app" aria-live="polite"><h1>What you'd love if you grew up there.</h1><div><button id="start" disabled>Start</button></div></main>
 <noscript>Homegrown needs JavaScript.</noscript>
 <script type="module" src="/app.js"></script>
 </body>

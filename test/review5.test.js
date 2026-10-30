@@ -42,7 +42,7 @@ test('review 5: cached why-lines use the requester names, not the first caller',
   assert.match(a.picks[0].why.text, /EVIL/);
   const b = await s.category({ favourites: FAVS, cityId: 'mexico_city', category: 'music' });
   assert.equal(b.cached, true);
-  assert.equal(b.picks[0].why.text, 'Because you liked Breaking Bad: both are crime.');
+  assert.equal(b.picks[0].why.text, 'Shares the crime thread with Breaking Bad.');
   assert.equal(b.picks[0].tags, undefined, 'internal tags are not exposed');
 });
 

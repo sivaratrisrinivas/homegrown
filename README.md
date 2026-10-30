@@ -73,25 +73,9 @@ Only films are live right now. The code can also handle TV shows and music, but 
 
 ```mermaid
 flowchart LR
-  B["Browser<br/>(public/)"]
-  subgraph V["Vercel functions (api/)"]
-    S["/api/suggest<br/>typing suggestions"]
-    Q["/api/search<br/>find a favourite"]
-    T["/api/twin<br/>city picks"]
-    A["/api/altnames<br/>other names"]
-    AI["/api/aisuggest<br/>coming-soon films"]
-    L[("Claude budget ledger<br/>$0.25 a day, in memory")]
-  end
-  B --> S & Q & T & A & AI
-  S --> TM["TMDB"] & IT["iTunes"] & OL["Open Library"]
-  Q --> QL["Qloo"]
-  T --> QL
-  T --> TM
-  T --> MB["MusicBrainz<br/>(music, switched off)"]
-  T -- reason lines --> L
-  A --> L
-  AI --> L
-  A --> QL
-  AI --> TM
-  L --> C["Claude"]
+  U["You (browser)"] --> H["Homegrown on Vercel"]
+  H -->|"finds taste matches"| Q["Qloo"]
+  H -->|"checks the film is local"| T["TMDB"]
+  H -->|"writes why-lines and AI picks"| C["Claude"]
+  H -->|"your city's picks"| U
 ```

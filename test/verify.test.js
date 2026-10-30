@@ -25,8 +25,8 @@ test('TMDB: v3 key as param, v4 token as bearer', async () => {
 test('TMDB: native accepted, anime and US shows rejected', async () => {
   const t = createTmdb({ fetch: tmdbFetch(), env: { TMDB_API_KEY: 'k' } });
   assert.equal((await verifyShow(t, { name: 'Diablero', year: 2018 }, MX)).ok, true);
-  assert.equal((await verifyShow(t, { name: 'Attack on Titan' }, MX)).reason, 'not_native');
-  assert.equal((await verifyShow(t, { name: 'Narcos' }, MX)).reason, 'not_native');
+  assert.equal((await verifyShow(t, { name: 'Attack on Titan' }, MX)).reason, 'off_language');
+  assert.equal((await verifyShow(t, { name: 'Narcos' }, MX)).reason, 'off_language');
   assert.equal((await verifyShow(t, { name: 'Nope' }, MX)).reason, 'no_tmdb_match');
   assert.equal((await verifyShow(t, { name: 'Diablero' }, KR)).ok, false);
 });

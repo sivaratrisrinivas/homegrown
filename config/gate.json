@@ -1,113 +1,222 @@
 {
   "threshold": 0.6,
+  "minSeen": 5,
   "categories": [
     "tv",
     "movie",
     "music"
   ],
-  "measuredAt": "2026-10-29T20:24:36.701Z",
-  "source": "npm run measure: top 15 per category, every candidate checked, MusicBrainz errors retried (1.1 s backoff) and excluded from the denominator; seeds Breaking Bad, Radiohead, Parasite",
+  "liveCategories": [
+    "movie"
+  ],
+  "measuredAt": "2026-10-30T21:31:12.118Z",
+  "source": "npm run measure (HG-9 language-aware): Qloo pool of 50 filtered by language (TMDB original_language for tv/movie, Qloo genre tags for music), then top 15 per category, every candidate checked, MusicBrainz errors retried (1.1 s backoff) and excluded from the denominator; seeds Breaking Bad, Radiohead, Parasite",
   "results": {
     "mexico_city": {
       "tv": {
         "seen": 15,
-        "accepted": 9,
-        "errors": 0
+        "accepted": 10,
+        "errors": 0,
+        "filtered": 4,
+        "languageShare": 0.79
       },
       "movie": {
-        "seen": 15,
-        "accepted": 6,
-        "errors": 0
+        "seen": 10,
+        "accepted": 7,
+        "errors": 0,
+        "filtered": 8,
+        "languageShare": 0.56
       },
       "music": {
         "seen": 15,
         "accepted": 12,
-        "errors": 0
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
       }
     },
     "madrid": {
       "tv": {
         "seen": 15,
         "accepted": 13,
-        "errors": 0
+        "errors": 0,
+        "filtered": 2,
+        "languageShare": 0.88
       },
       "movie": {
         "seen": 15,
-        "accepted": 12,
-        "errors": 0
+        "accepted": 14,
+        "errors": 0,
+        "filtered": 3,
+        "languageShare": 0.83
       },
       "music": {
         "seen": 15,
         "accepted": 11,
-        "errors": 0
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
       }
     },
     "buenos_aires": {
       "tv": {
-        "seen": 11,
+        "seen": 10,
         "accepted": 8,
-        "errors": 0
+        "errors": 0,
+        "filtered": 1,
+        "languageShare": 0.91
       },
       "movie": {
-        "seen": 15,
-        "accepted": 13,
-        "errors": 0
+        "seen": 14,
+        "accepted": 14,
+        "errors": 0,
+        "filtered": 2,
+        "languageShare": 0.88
       },
       "music": {
         "seen": 6,
         "accepted": 5,
-        "errors": 0
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
       }
     },
     "seoul": {
       "tv": {
         "seen": 15,
-        "accepted": 11,
-        "errors": 0
+        "accepted": 14,
+        "errors": 0,
+        "filtered": 1,
+        "languageShare": 0.94
       },
       "movie": {
         "seen": 15,
-        "accepted": 13,
-        "errors": 0
+        "accepted": 15,
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
       },
       "music": {
         "seen": 15,
         "accepted": 13,
-        "errors": 0
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
       }
     },
     "paris": {
       "tv": {
         "seen": 15,
-        "accepted": 9,
-        "errors": 0
+        "accepted": 12,
+        "errors": 0,
+        "filtered": 1,
+        "languageShare": 0.94
       },
       "movie": {
         "seen": 15,
-        "accepted": 6,
-        "errors": 0
+        "accepted": 14,
+        "errors": 0,
+        "filtered": 2,
+        "languageShare": 0.88
       },
       "music": {
         "seen": 15,
         "accepted": 12,
-        "errors": 0
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
       }
     },
     "chennai": {
       "tv": {
-        "seen": 15,
-        "accepted": 2,
-        "errors": 0
+        "seen": 5,
+        "accepted": 4,
+        "errors": 0,
+        "filtered": 45,
+        "languageShare": 0.1
       },
       "movie": {
         "seen": 15,
-        "accepted": 6,
-        "errors": 0
+        "accepted": 15,
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
       },
       "music": {
         "seen": 15,
         "accepted": 13,
-        "errors": 0
+        "errors": 0,
+        "filtered": 4,
+        "languageShare": 0.79
+      }
+    },
+    "mumbai": {
+      "tv": {
+        "seen": 15,
+        "accepted": 14,
+        "errors": 0,
+        "filtered": 1,
+        "languageShare": 0.94
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 14,
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
+      },
+      "music": {
+        "seen": 15,
+        "accepted": 10,
+        "errors": 0,
+        "filtered": 3,
+        "languageShare": 0.83
+      }
+    },
+    "hyderabad": {
+      "tv": {
+        "seen": 5,
+        "accepted": 2,
+        "errors": 0,
+        "filtered": 45,
+        "languageShare": 0.1
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 13,
+        "errors": 0,
+        "filtered": 0,
+        "languageShare": 1
+      },
+      "music": {
+        "seen": 1,
+        "accepted": 1,
+        "errors": 0,
+        "filtered": 2,
+        "languageShare": 0.33
+      }
+    },
+    "kolkata": {
+      "tv": {
+        "seen": 2,
+        "accepted": 1,
+        "errors": 0,
+        "filtered": 48,
+        "languageShare": 0.04
+      },
+      "movie": {
+        "seen": 7,
+        "accepted": 6,
+        "errors": 0,
+        "filtered": 43,
+        "languageShare": 0.14
+      },
+      "music": {
+        "seen": 1,
+        "accepted": 0,
+        "errors": 0,
+        "filtered": 3,
+        "languageShare": 0.25
       }
     }
   }

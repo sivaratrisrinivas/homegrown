@@ -1,8 +1,10 @@
-import { JOURNEY_FAVS, journeyFor, revealHeader, journeyPicks, encodeShare, decodeShare, QLOO_ORDER, flapSteps, padTo, userCountryFromLocale, createRunGuard, createSpacer, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { JOURNEY_FAVS, journeyFor, revealHeader, journeyPicks, encodeShare, decodeShare, QLOO_ORDER, liveCats, pendingCats, flapSteps, padTo, userCountryFromLocale, createRunGuard, createSpacer, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { CATEGORY } from './config.js';
 // HG-10 v1 is one journey: hello → language → city → 3 favourites → morph board → reveal → share.
 const J = journeyFor(CATEGORY);
+// HG-9: run, wait on and note only the catalogue's live categories (within this journey's category).
+const runCats = () => { const live = liveCats(S.catalogue); const cats = J.order.filter((c) => live.includes(c)); return cats.length ? cats : J.order; };
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
 
 const app = document.getElementById('app');
@@ -415,7 +417,7 @@ async function morph() {
   };
   // Every category is Qloo-backed, so they go one at a time through the 7 s browser gate.
   // One failed category must not stop the ones after it.
-  const qlooP = runCategories(J.order, (cat) => qlooPost({ ...base, category: cat }, current), land);
+  const qlooP = runCategories(runCats(), (cat) => qlooPost({ ...base, category: cat }, current), land);
   await Promise.race([qlooP, wait(T('d-flip-cap'))]);
   await Promise.race([flips, wait(T('d-flip-cap'))]);
   if (!current()) return;
@@ -494,8 +496,10 @@ function riseIn(el, key, n) {
 
 function picksView() {
   const { hero, rows } = journeyPicks(S.results, J);
-  const pending = J.order.filter((k) => !S.results[k]);
-  const notes = J.order.filter((k) => S.results[k]?.note).map((k) => (S.results[k].error ? `${CAT[k]} didn't come through this time.` : S.results[k].note));
+  const cats = runCats();
+  const pending = pendingCats(cats, S.results);
+  const thin = S.catalogue?.cities?.find((x) => x.id === S.city.id)?.thinNote; // HG-9 thin-pool note; the lead line stays cut (§C)
+  const notes = cats.filter((k) => S.results[k]?.note).map((k) => (S.results[k].error ? `${CAT[k]} didn't come through this time.` : S.results[k].note));
   const watched = [hero, ...rows, ...scarcePicks(S.results)].filter(Boolean).find((p) => p.watch?.attribution);
   return {
     hero: hero ? riseIn(pickCard(hero, S.city), `h|${hero.title}`, 0) : pending.length ? null : h('p', { class: 'body' }, 'We couldn’t find picks local enough for your taste here. Try another city.'),
@@ -503,6 +507,7 @@ function picksView() {
       rows.length ? h('div', { class: 'list' }, rows.map((p, n) => riseIn(pickRow(p, n + 1, S.city), `${p.category}|${p.title}`, n + 1))) : null,
       pending.map((k) => h('div', { class: 'skel' }, `${CAT[k]} — landing…`)),
       notes.map((n) => h('p', { class: 'note-row' }, n)),
+      thin ? h('p', { class: 'note-row thin-note' }, thin) : null,
     ].flat().filter(Boolean),
     foot: watched ? h('p', { class: 'foot-line' }, `Where-to-watch data: ${watched.watch.attribution}.`) : null,
     hasHero: !!hero,

@@ -50,7 +50,7 @@ test('review 7: MusicBrainz budget capped by caller deadline; skip when none lef
 
 test('review 7: no iTunes preview after the deadline', async () => {
   let t = 0; let previews = 0;
-  const qloo = { insights: async () => [{ id: 'a', name: 'A', tags: [] }] };
+  const qloo = { insights: async () => [{ id: 'a', name: 'A', tags: [{ id: 'urn:tag:genre:music:mexican', name: 'Mexican' }] }] };
   const mb = { searchArtist: async () => { t = 50000; return [{ id: 'm', name: 'A', score: 100, country: 'MX' }]; } };
   const s = createTwinService({ qloo, tmdb: {}, mb, itunes: { previewForArtist: async () => { previews++; return { url: 'u' }; } }, now: () => t });
   const r = await s.category({ favourites: FAVS, cityId: 'mexico_city', category: 'music' });

@@ -326,3 +326,17 @@ test('r6: pick ids must look like p<number> before they go in an attribute', asy
   assert.match(buildContent([{ input: { ...p, id: 'p0' } }]), /<pick id="p0">/);
   assert.throws(() => buildContent([{ input: { ...p, id: 'p0"><x' } }]));
 });
+
+test('r7: a spaced hyphen used as a dash, and [ ] { } / are rejected outside the favourite', () => {
+  for (const line of ['Like Breaking Bad, this crime drama - about a killer and revenge here.', '- Like Breaking Bad, this crime drama is about a killer and revenge.',
+    'Like Breaking Bad, this crime drama [about a killer] is revenge here.', 'Like Breaking Bad, this crime drama {about a killer} is revenge here.',
+    'Like Breaking Bad, this crime drama about a killer and/or revenge here.'])
+    assert.equal(validateWhy(line, R6), null, line);
+  assert.ok(validateWhy('Like Breaking Bad, this crime drama is about a killer-revenge plot here.', { ...R6, sources: ['A crime drama about a killer, revenge and a plot.'] }));
+  assert.ok(validateWhy('Fans of AC/DC - Live will like this crime drama about a killer and revenge.', { ...R6, favourite: 'AC/DC - Live' }));
+});
+test('r7: STOP has no duplicates and no words the validator already rejects', async () => {
+  const { STOP } = await import('../lib/whyllm.js');
+  for (const w of ['nor', 'than', 'if', 'not', 'no', 'without', 'll', 're', 've', "it's"]) assert.equal(STOP.has(w), false, w);
+  assert.ok(STOP.has('its') && STOP.has('whose') && STOP.has('may'));
+});

@@ -8,9 +8,10 @@ import feedback from './api/feedback.js';
 import health from './api/health.js';
 import cities from './api/cities.js';
 import suggest from './api/suggest.js';
+import altnames from './api/altnames.js';
 
-const routes = { '/api/search': search, '/api/twin': twin, '/api/feedback': feedback, '/api/health': health, '/api/cities': cities, '/api/suggest': suggest };
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+const routes = { '/api/search': search, '/api/twin': twin, '/api/feedback': feedback, '/api/health': health, '/api/cities': cities, '/api/suggest': suggest, '/api/altnames': altnames };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.png': 'image/png' };
 const PUB = join(import.meta.dirname, 'public');
 
 export function createServer() {

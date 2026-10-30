@@ -129,15 +129,68 @@ export function lookupOutcome(r, sug) {
 export const matchingProgress = (done, total) => `Matching ${Math.min(done + 1, total)} of ${total}`;
 
 export function settleFavourites(favs, pending, matches) {
-  const out = [...favs]; const missed = []; const failed = []; const ids = new Set(favouriteIds(favs));
+  const out = [...favs]; const missed = []; const missedKeys = []; const failed = []; const ids = new Set(favouriteIds(favs));
   for (const f of pending) {
     const m = matches.get(f.key);
     if (m === LOOKUP_FAILED || m?.failed) { failed.push(f); continue; } // keep the pick; let the user retry
-    if (!(m && typeof m.id === 'string' && m.id)) { missed.push(f.name); continue; }
+    if (!(m && typeof m.id === 'string' && m.id)) { missed.push(f.name); missedKeys.push(f.key); continue; }
     if (ids.has(m.id)) continue; // two picks resolved to the same Qloo entity: keep the first
     ids.add(m.id);
     out.push({ id: m.id, name: f.name, pick: f.pick, tags: Array.isArray(m.tags) ? m.tags : [] });
   }
-  return { favs: out, missed, failed };
+  return { favs: out, missed, missedKeys, failed };
 }
 export const favouriteIds = (favs) => favs.map((f) => f.id).filter((id) => typeof id === 'string' && id);
+
+// HG-10: the single journey asks for exactly 3 favourites. `category` is config.js CATEGORY.
+// Single-category: three prompts of that kind, one Qloo category, header "Your TV self, in Madrid".
+// 'mixed' (default until HG-9): today's show / band / film prompts and every Qloo category.
+export const JOURNEY_FAVS = 3;
+const SINGLE = {
+  tv: { kind: 'show', noun: 'TV', labels: ["A show you'd rewatch", 'Another show you love', 'One more show'], examples: ['e.g. Breaking Bad', 'e.g. Fleabag', 'e.g. Dark'] },
+  movie: { kind: 'movie', noun: 'film', labels: ['A film you could quote', 'Another film you love', 'One more film'], examples: ['e.g. Amélie', 'e.g. Parasite', 'e.g. Spirited Away'] },
+  music: { kind: 'band', noun: 'music', labels: ['A band you always come back to', 'Another artist you love', 'One more artist'], examples: ['e.g. Radiohead', 'e.g. Daft Punk', 'e.g. Bad Bunny'] },
+};
+const MIXED_EXAMPLES = ['e.g. Breaking Bad', 'e.g. Radiohead', 'e.g. Amélie'];
+export function journeyFor(category) {
+  const s = SINGLE[category];
+  if (!s) return { single: false, category: 'mixed', order: QLOO_ORDER, prompts: PROMPTS.slice(0, JOURNEY_FAVS).map((p, i) => ({ ...p, placeholder: MIXED_EXAMPLES[i] })) };
+  return { single: true, category, noun: s.noun, order: [category], prompts: s.labels.map((label, i) => ({ kind: s.kind, label, placeholder: s.examples[i] })) };
+}
+// Reveal header: single-category says what the list is; mixed keeps the city's own line.
+export const revealHeader = (j, city) => (j.single ? `Your ${j.noun} self, in ${city.name}` : city.header);
+// Reveal list: hero + up to 4 rows. Single-category: that category only. Mixed: all categories, one list.
+export const MAX_ROWS = 4;
+export function journeyPicks(byCat, j) {
+  const only = Object.fromEntries(Object.entries(byCat).filter(([c]) => j.order.includes(c)));
+  const { hero, rest } = rankPicks(only);
+  return { hero, rows: rest.slice(0, MAX_ROWS) };
+}
+
+// Share link (§S): the result itself rides in ?r= (base64url JSON), no storage.
+// Titles are encoded directly: Qloo results aren't deterministic, so IDs can't be re-resolved.
+const b64u = { enc: (s) => btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+  dec: (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))) };
+const posterPath = (url) => (String(url || '').match(/^https:\/\/image\.tmdb\.org\/t\/p\/[^/]+(\/[\w-]+\.(?:jpg|png))$/) || [])[1] || '';
+const clip = (s, n) => String(s || '').slice(0, n);
+export function encodeShare({ lang, city, category, favs, hero, rows }) {
+  const p = [hero, ...rows].filter(Boolean).slice(0, 1 + MAX_ROWS)
+    .map((x) => [clip(x.title, 60), x.englishTitle && x.englishTitle !== x.title ? clip(x.englishTitle, 60) : '', x.category || '', posterPath(x.image)]);
+  return b64u.enc(JSON.stringify({ v: 1, l: lang, c: city, cat: category, f: favs.slice(0, 3).map((f) => clip(f, 40)), p }));
+}
+// Returns null for anything malformed: a friend's link must never break the app.
+export function decodeShare(r, cities = []) {
+  try {
+    if (typeof r !== 'string' || r.length > 2000) return null;
+    const o = JSON.parse(b64u.dec(r));
+    if (!o || o.v !== 1 || typeof o.c !== 'string' || !Array.isArray(o.p) || !o.p.length) return null;
+    const city = cities.find((c) => c.id === o.c); if (!city) return null;
+    const str = (s, n) => (typeof s === 'string' ? s.slice(0, n) : '');
+    const picks = o.p.slice(0, 1 + MAX_ROWS).filter(Array.isArray).map(([title, en, category, img]) => ({
+      title: str(title, 60), englishTitle: str(en, 60) || null, category: ['tv', 'movie', 'music'].includes(category) ? category : null,
+      image: /^\/[\w-]+\.(jpg|png)$/.test(img || '') ? `https://image.tmdb.org/t/p/w342${img}` : null,
+    })).filter((p) => p.title);
+    if (!picks.length) return null;
+    return { city, lang: str(o.l, 8), category: str(o.cat, 8), favs: (Array.isArray(o.f) ? o.f : []).slice(0, 3).map((f) => str(f, 40)).filter(Boolean), hero: picks[0], rows: picks.slice(1) };
+  } catch { return null; }
+}

@@ -12,7 +12,8 @@ test('flag gating: only ?reveal=map turns the map on', () => {
   const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
   // map.js is only imported lazily, inside the flagged branch; the default path still calls updateReveal().
   assert.doesNotMatch(app, /^import .*map\.js/m);
-  assert.match(app, /if \(isMapReveal\(location\.search\)\) \{[\s\S]*?return;\s*\}\s*updateReveal\(\);/);
+  // HG-10 v1: the map is cut from the journey; the code stays on disk, unreachable from app.js.
+  assert.doesNotMatch(app, /map\.js|maplogic|isMapReveal|reveal=map|See it as a map/);
 });
 
 test('resistance scales with native %: strict is heavy with ticks, borderline is light', () => {
@@ -84,9 +85,6 @@ test('map lifecycle: destroy closes the sheet and key listener; shut restores fo
   assert.match(map, /removeEventListener\('keydown', keys\)/);
   assert.match(map, /origin\.focus\(\)/); assert.match(map, /e\.key !== 'Tab'/);
   assert.doesNotMatch(map, /viaKeyboard|localStorage/);
-  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
-  assert.match(app, /\.catch\(\(\) => \{[^\n]*picksView\(\)/);
-  assert.match(app, /revealEls\?\.destroy\?\.\(\)/);
 });
 
 import { spotKey, sameSpot, mapFraming } from '../public/maplogic.js';
@@ -108,8 +106,6 @@ test('map.js: unique mask id, touch tap opens spot, dwell saves walk first', () 
   assert.match(map, /!walking && e\?\.pointerType === 'touch'\) \{ const tapped = nearSpot\(start, spots\)/);
   assert.match(map, /commitWalk\(\); openPull\(hit\.pick/);
   assert.match(map, /sameSpot\(hit, lastHit\)/);
-  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
-  assert.match(app, /mapFraming\(picksView\(\)\)/); assert.match(app, /mine\.update = refresh/);
 });
 
 import { OPEN_PX, sinkDepth, dragToOpen, MIN_SPOT_GAP } from '../public/maplogic.js';
@@ -167,9 +163,6 @@ test('spots are reused by key across updates; shut re-resolves origin by key; re
   const map = readFileSync(new URL('../public/map.js', import.meta.url), 'utf8');
   assert.match(map, /let g = spotEls\.get\(sp\.key\)/); assert.doesNotMatch(map, /spotsG\.replaceChildren\(\)/);
   assert.match(map, /const origin = spotEls\.get\(originKey\)/);
-  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
-  assert.match(app, /try \{ m\.update\(\);[\s\S]*?catch \{[^\n]*delete mine\.update; delete mine\.destroy; picks\.replaceChildren\(\.\.\.picksView\(\)\)/);
-  assert.match(app, /\.catch\(\(\) => \{ if \(revealEls === mine\) \{ delete mine\.update; delete mine\.destroy;/);
 });
 
 test('walk state resets after a dwell-open (current already null) and in openPull', () => {

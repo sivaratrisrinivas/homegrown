@@ -169,3 +169,16 @@ test('spots are reused by key across updates; shut re-resolves origin by key; re
   assert.match(app, /try \{ m\.update\(\);[\s\S]*?catch \{[^\n]*delete mine\.update; delete mine\.destroy; picks\.replaceChildren\(\.\.\.picksView\(\)\)/);
   assert.match(app, /\.catch\(\(\) => \{ if \(revealEls === mine\) \{ delete mine\.update; delete mine\.destroy;/);
 });
+
+test('walk state resets after a dwell-open (current already null) and in openPull', () => {
+  const map = readFileSync(new URL('../public/map.js', import.meta.url), 'utf8');
+  assert.match(map, /const resetWalk = \(\) => \{ lastHit = null; setTimeout\(\(\) => \{ walking = false; \}, 0\); \};/);
+  assert.match(map, /if \(!current\) return resetWalk\(\);/, 'early return still resets');
+  assert.match(map, /if \(sheet\) return; current = null; clearTimeout\(dwell\); resetWalk\(\);/);
+  // Simulate the bug sequence with the same reset rule: dwell-open, then pointerup with current=null.
+  let walking = true, lastHit = { key: 'k' }, current = null; const ticks = [];
+  const resetWalk = () => { lastHit = null; ticks.push(() => { walking = false; }); };
+  const end = () => { if (!current) return resetWalk(); };
+  end(); ticks.forEach((f) => f());
+  assert.equal(walking, false); assert.equal(lastHit, null);
+});

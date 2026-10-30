@@ -71,18 +71,21 @@ export function createMapReveal({ h, city, getResults, picks, pickCard, reduced,
   });
   // Save the walked path before anything (like openPull) clears it.
   function commitWalk() { if (current?.length > 1) paths = saveWalk(store, city.id, [...paths, current]); current = null; drawPaths(); }
-  const end = (e) => { if (e?.pointerId !== activePointer) return; activePointer = null; clearTimeout(dwell); if (!current) return;
+  // Walk state is reset on every pointer end, even after a dwell-open already cleared `current`.
+  // `walking` clears on the next tick so the click that follows a walk doesn't count as a tap.
+  const resetWalk = () => { lastHit = null; setTimeout(() => { walking = false; }, 0); };
+  const end = (e) => { if (e?.pointerId !== activePointer) return; activePointer = null; clearTimeout(dwell); if (!current) return resetWalk();
     const start = current[0], stopAt = nearSpot(current.at(-1), spots);
-    commitWalk(); lastHit = null;
+    commitWalk();
     if (walking && stopAt) openPull(stopAt.pick, stopAt.key);
     else if (!walking && e?.pointerType === 'touch') { const tapped = nearSpot(start, spots); if (tapped) openPull(tapped.pick, tapped.key); }
-    setTimeout(() => { walking = false; }, 0); };
+    resetWalk(); };
   svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
 
   // "Pull from the ground": the card sits sunk below a ledge; drag the handle up to lift it.
   let sheet = null; // tied to this map: destroy() removes it and its key listener
   function openPull(pick, originKey) {
-    if (sheet) return; current = null; clearTimeout(dwell);
+    if (sheet) return; current = null; clearTimeout(dwell); resetWalk();
     const res = resistanceFor(nativePct(pick, getResults()));
     const card = pickCard(pick, true); card.classList.add('ground-card');
     const handle = h('button', { class: 'pull-handle', 'aria-label': `Pull up ${pick.title} (${res.label}). Press Enter to open.` }, res.heavy ? 'Pull hard ↑' : 'Pull ↑');

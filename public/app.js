@@ -1,5 +1,6 @@
 import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
+import { isMapReveal, mapFraming } from './maplogic.js';
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
 
 const app = document.getElementById('app');
@@ -252,7 +253,7 @@ function flapRow(text, width) {
 const runs = createRunGuard();
 async function morph() {
   if (!(await matchFavourites())) return;
-  const current = runs.start(); revealEls = null;
+  const current = runs.start(); revealEls?.destroy?.(); revealEls = null;
   const c = S.city; document.documentElement.style.setProperty('--accent', c.accent);
   S.results = {};
   const width = Math.min(22, Math.max(12, ...S.favs.map((f) => f.name.length)));
@@ -319,9 +320,15 @@ function picksView() {
   ].flat().filter(Boolean);
 }
 // Only the picks region re-renders as categories land; the rating/note form keeps its state.
-function updateReveal() { revealEls.picks.replaceChildren(...picksView()); }
+function updateReveal() { if (revealEls.update) return revealEls.update(); revealEls.picks.replaceChildren(...picksView()); }
 function shownPicks() { const { hero, rest } = rankPicks(S.results); return [hero, ...rest].filter(Boolean); }
 
+// HG-6 prototype: ?reveal=map swaps the picks list for a walkable map. Without the flag nothing changes.
+async function mapPicks() {
+  const { createMapReveal } = await import('./map.js');
+  const m = createMapReveal({ h, city: S.city, getResults: () => S.results, picks: () => [...shownPicks(), ...scarcePicks(S.results)], pickCard, reduced, ping: click });
+  return m;
+}
 function reveal() {
   const picks = h('div', { style: 'display:flex;flex-direction:column;gap:16px' });
   revealEls = { picks };
@@ -341,6 +348,23 @@ function reveal() {
     h('section', { class: 'card postcard-summary' }, h('h3', { class: 'serif' }, `Keep your ${S.city.name} self`),
       h('button', { onclick: (e) => { e.target.replaceWith(h('p', { class: 'muted' }, 'Saving with an email link is coming soon.')); } }, `Save my ${S.city.name} self`),
       h('div', {}, others.map((c) => h('button', { class: 'ghost', onclick: () => { track({ event: 'try_city', to: c.id }); S.city = c; morph(); } }, `Try ${c.name}`)))));
+  if (isMapReveal(location.search)) {
+    updateReveal(); // the normal reveal shows first, so the area is never blank
+    const mine = revealEls;
+    mapPicks().then((m) => {
+      if (revealEls !== mine) return m.destroy();
+      // The map holds the picks; the postcard line, lead, notes and "still flipping in" stay beneath it.
+      const framing = h('div', { class: 'map-framing' });
+      const refresh = () => {
+        try { m.update(); framing.replaceChildren(...mapFraming(picksView())); }
+        catch { try { m.destroy(); } catch {} delete mine.update; delete mine.destroy; picks.replaceChildren(...picksView()); }
+      };
+      picks.replaceChildren(h('h2', {}, 'Territory you walk'), m.el, framing);
+      mine.update = refresh; mine.destroy = m.destroy; refresh();
+    })
+        .catch(() => { if (revealEls === mine) { delete mine.update; delete mine.destroy; picks.replaceChildren(...picksView()); } });
+    return;
+  }
   updateReveal();
 }
 

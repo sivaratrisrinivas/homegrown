@@ -1,5 +1,6 @@
 // HG-6 prototype reveal: "Territory you walk" + "Pull from the ground". Only loaded behind ?reveal=map.
-import { nativePct, resistanceFor, pullOutcome, motionPlan, pickSpots, loadWalk, saveWalk, pathStyle, nearSpot, MAP_W, MAP_H, seeded, safeStorage } from './maplogic.js';
+import { nativePct, resistanceFor, pullOutcome, motionPlan, pickSpots, loadWalk, saveWalk, pathStyle, nearSpot, MAP_W, MAP_H, seeded, safeStorage, sameSpot } from './maplogic.js';
+let maskSeq = 0; // unique mask id per map instance
 const NS = 'http://www.w3.org/2000/svg';
 const s = (tag, attrs = {}) => { const el = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); return el; };
 const buzz = (ms) => { try { navigator.vibrate?.(ms); } catch {} };
@@ -14,9 +15,9 @@ export function createMapReveal({ h, city, getResults, picks, pickCard, reduced,
   // Static streets: a faint seeded grid, so the city feels like a place, not a chart.
   const streets = s('g', { class: 'streets' }); const r = seeded(`streets|${city.id}`);
   for (let i = 0; i < 14; i++) streets.append(s('line', { x1: r() * MAP_W, y1: 0, x2: r() * MAP_W, y2: MAP_H }), s('line', { x1: 0, y1: r() * MAP_H, x2: MAP_W, y2: r() * MAP_H }));
-  const defs = s('defs'), mask = s('mask', { id: 'fogmask' });
+  const defs = s('defs'), maskId = `fogmask-${++maskSeq}`, mask = s('mask', { id: maskId });
   const maskPaths = s('g'); mask.append(s('rect', { width: MAP_W, height: MAP_H, fill: 'white' }), maskPaths); defs.append(mask);
-  const fog = s('rect', { width: MAP_W, height: MAP_H, class: 'fog', mask: 'url(#fogmask)' });
+  const fog = s('rect', { width: MAP_W, height: MAP_H, class: 'fog', mask: `url(#${maskId})` });
   const lit = s('g', { class: 'lit' }), spotsG = s('g');
   svg.append(defs, streets, lit, fog, spotsG);
 
@@ -48,15 +49,17 @@ export function createMapReveal({ h, city, getResults, picks, pickCard, reduced,
     if (Math.hypot(pt[0] - last[0], pt[1] - last[1]) < 1.5) return;
     walking = true; e.preventDefault(); current.push(pt); drawPaths();
     const hit = nearSpot(pt, spots);
-    if (hit && hit !== lastHit) { buzz(20); ping(); if (motion.pulse) { hit.el.classList.remove('pulse'); void hit.el.getBBox(); hit.el.classList.add('pulse'); } }
+    if (hit && !sameSpot(hit, lastHit)) { buzz(20); ping(); if (motion.pulse) { hit.el.classList.remove('pulse'); void hit.el.getBBox(); hit.el.classList.add('pulse'); } }
     lastHit = hit; clearTimeout(dwell);
-    if (hit) dwell = setTimeout(() => { if (current && nearSpot(current.at(-1), spots) === hit) openPull(hit.pick, hit.el); }, 700);
+    if (hit) dwell = setTimeout(() => { if (current && sameSpot(nearSpot(current.at(-1), spots), hit)) { commitWalk(); openPull(hit.pick, hit.el); } }, 700);
   });
-  const end = () => { clearTimeout(dwell); if (!current) return;
-    const stopAt = nearSpot(current.at(-1), spots);
-    if (current.length > 1) paths = saveWalk(store, city.id, [...paths, current]);
-    current = null; drawPaths(); lastHit = null;
+  // Save the walked path before anything (like openPull) clears it.
+  function commitWalk() { if (current?.length > 1) paths = saveWalk(store, city.id, [...paths, current]); current = null; drawPaths(); }
+  const end = (e) => { clearTimeout(dwell); if (!current) return;
+    const start = current[0], stopAt = nearSpot(current.at(-1), spots);
+    commitWalk(); lastHit = null;
     if (walking && stopAt) openPull(stopAt.pick, stopAt.el);
+    else if (!walking && e?.pointerType === 'touch') { const tapped = nearSpot(start, spots); if (tapped) openPull(tapped.pick, tapped.el); }
     setTimeout(() => { walking = false; }, 0); };
   svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
 

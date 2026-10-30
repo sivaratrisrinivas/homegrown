@@ -86,3 +86,26 @@ test('map lifecycle: destroy closes the sheet and key listener; shut restores fo
   assert.match(app, /\.catch\(\(\) => \{[^\n]*picksView\(\)/);
   assert.match(app, /revealEls\?\.destroy\?\.\(\)/);
 });
+
+import { spotKey, sameSpot, mapFraming } from '../public/maplogic.js';
+test('spots are keyed by city|category|title and do not move when categories land', () => {
+  const tv = [{ category: 'tv', title: 'A' }, { category: 'tv', title: 'B' }];
+  const before = pickSpots(tv, 'seoul'), after = pickSpots([{ category: 'music', title: 'Z' }, ...tv, { category: 'movie', title: 'M' }], 'seoul');
+  for (const b of before) { const a = after.find((x) => x.key === b.key); assert.equal(a.x, b.x); assert.equal(a.y, b.y); }
+  assert.equal(spotKey('seoul', tv[0]), 'seoul|tv|A');
+  assert.ok(sameSpot(before[0], after[1])); assert.ok(!sameSpot(before[0], before[1])); assert.ok(!sameSpot(null, before[0]));
+});
+test('map framing keeps lead, postcard line, notes, pending; drops pick cards', () => {
+  const el = (tag, hasArticle = false, cls = '') => ({ cls, matches: (s) => s === 'article' && tag === 'article', querySelector: (s) => (s === 'article' && hasArticle ? {} : null) });
+  const lead = el('p', false, 'lead'), hero = el('article'), grid = el('div', true), pend = el('p', false, 'pending'), note = el('p', false, 'note'), scarce = el('section', true);
+  assert.deepEqual(mapFraming([lead, hero, grid, pend, note, scarce]), [lead, pend, note]);
+});
+test('map.js: unique mask id, touch tap opens spot, dwell saves walk first', () => {
+  const map = readFileSync(new URL('../public/map.js', import.meta.url), 'utf8');
+  assert.match(map, /fogmask-\$\{\+\+maskSeq\}/); assert.doesNotMatch(map, /'url\(#fogmask\)'/);
+  assert.match(map, /!walking && e\?\.pointerType === 'touch'\) \{ const tapped = nearSpot\(start, spots\)/);
+  assert.match(map, /commitWalk\(\); openPull\(hit\.pick/);
+  assert.match(map, /sameSpot\(hit, lastHit\)/);
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.match(app, /mapFraming\(picksView\(\)\)/); assert.match(app, /mine\.update = refresh/);
+});

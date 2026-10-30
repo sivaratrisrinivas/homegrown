@@ -28,10 +28,13 @@ export function seeded(str) {
   return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 10000) / 10000; };
 }
 export const MAP_W = 100, MAP_H = 140;
+// Each spot is seeded from its own stable key, so spots never move when other categories land.
+export const spotKey = (cityId, p) => `${cityId}|${p?.category ?? ''}|${p?.title ?? ''}`;
 export function pickSpots(picks, cityId) {
-  const r = seeded(`spots|${cityId}`);
-  return picks.map((p, i) => ({ pick: p, x: 14 + r() * 72, y: 16 + ((i + r() * 0.8) / Math.max(1, picks.length)) * 110 }));
+  return picks.map((p) => { const key = spotKey(cityId, p), r = seeded(`spot|${key}`); return { key, pick: p, x: 14 + r() * 72, y: 16 + r() * 110 }; });
 }
+// Same spot = same key, so a re-render mid-walk doesn't count as passing a new pick.
+export const sameSpot = (a, b) => Boolean(a && b && a.key === b.key);
 // Three lit starter paths so the map is never blank.
 export function seedPaths(cityId) {
   const r = seeded(`seed|${cityId}`);
@@ -65,3 +68,5 @@ export const pathStyle = (index, total) => ({ width: +(1.2 + Math.min(2.4, (inde
 export const nearSpot = ([x, y], spots, radius = 6) => spots.find((s) => Math.hypot(s.x - x, s.y - y) <= radius) || null;
 // localStorage can throw on access (privacy modes, sandboxed iframes); read it through a guard.
 export function safeStorage(get = () => globalThis.localStorage) { try { return get() || null; } catch { return null; } }
+// Map mode: everything picksView shows except the pick cards themselves (those live on the map).
+export const mapFraming = (els) => els.filter((el) => !(el?.matches?.('article') || el?.querySelector?.('article')));

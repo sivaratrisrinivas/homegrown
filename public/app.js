@@ -1,5 +1,5 @@
 import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
-import { isMapReveal } from './maplogic.js';
+import { isMapReveal, mapFraming } from './maplogic.js';
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
 
 const app = document.getElementById('app');
@@ -233,7 +233,14 @@ function reveal() {
   if (isMapReveal(location.search)) {
     updateReveal(); // the normal reveal shows first, so the area is never blank
     const mine = revealEls;
-    mapPicks().then((m) => { if (revealEls !== mine) return m.destroy(); picks.replaceChildren(h('h2', {}, 'Territory you walk'), m.el); mine.update = m.update; mine.destroy = m.destroy; })
+    mapPicks().then((m) => {
+      if (revealEls !== mine) return m.destroy();
+      // The map holds the picks; the postcard line, lead, notes and "still flipping in" stay beneath it.
+      const framing = h('div', { class: 'map-framing' });
+      const refresh = () => { m.update(); framing.replaceChildren(...mapFraming(picksView())); };
+      picks.replaceChildren(h('h2', {}, 'Territory you walk'), m.el, framing);
+      mine.update = refresh; mine.destroy = m.destroy; refresh();
+    })
       .catch(() => { if (revealEls === mine) { delete mine.update; picks.replaceChildren(...picksView()); } });
     return;
   }

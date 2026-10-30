@@ -9,7 +9,7 @@ import { CITIES } from '../lib/cities.js';
 import { fakeFetch, FAVS } from './helpers.js';
 
 const MX = CITIES.mexico_city;
-const band = (n) => ({ id: 'q' + n, name: 'Band' + n, tags: [] });
+const band = (n) => ({ id: 'q' + n, name: 'Band' + n, tags: [{ id: 'urn:tag:genre:music:mexican', name: 'Mexican' }] });
 
 test('review 6: Qloo re-checks the deadline inside the throttle and skips the call', async () => {
   let t = 0; let fetched = 0;

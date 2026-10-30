@@ -8,7 +8,7 @@ import { createSpacer, SKIP } from '../public/logic.js';
 import { FAVS } from './helpers.js';
 
 const base = { favourites: FAVS, cityId: 'mexico_city' };
-const artists = (n) => Array.from({ length: n }, (_, i) => normaliseEntity({ entity_id: 'a' + i, name: 'A' + i }));
+const artists = (n) => Array.from({ length: n }, (_, i) => normaliseEntity({ entity_id: 'a' + i, name: 'A' + i, tags: [{ tag_id: 'urn:tag:genre:music:mexican', name: 'Mexican' }] }));
 
 test('verify_error results cached for 10 min, not 7 days', async () => {
   let t = 0, calls = 0;

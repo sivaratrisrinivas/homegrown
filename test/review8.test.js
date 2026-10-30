@@ -6,7 +6,7 @@ import { createCache } from '../lib/cache.js';
 import { shouldMemoTwin } from '../public/logic.js';
 import { FAVS } from './helpers.js';
 
-const qloo = { insights: async () => [{ id: 'a', name: 'A', tags: [] }] };
+const qloo = { insights: async () => [{ id: 'a', name: 'A', tags: [{ id: 'urn:tag:genre:music:mexican', name: 'Mexican' }] }] };
 const svc = (searchArtist) => createTwinService({ qloo, tmdb: {}, mb: { searchArtist }, itunes: { previewForArtist: async () => null }, cache: createCache() });
 const req = { favourites: FAVS, cityId: 'mexico_city', category: 'music' };
 

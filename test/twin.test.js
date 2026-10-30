@@ -48,7 +48,7 @@ test('never pads: fewer native picks -> fewer results + honest note', async () =
 
 test('music: genre tag filter + MusicBrainz country', async () => {
   const { s, qcalls } = svc({
-    qlooEntities: { 'urn:entity:artist': [{ entity_id: 'a1', name: 'Bad Bunny' }, { entity_id: 'a2', name: 'Café Tacvba', tags: [{ tag_id: 'urn:tag:genre:alt', name: 'alternative' }] }] },
+    qlooEntities: { 'urn:entity:artist': [{ entity_id: 'a1', name: 'Bad Bunny', tags: [{ tag_id: 'urn:tag:genre:music:mexican', name: 'Mexican' }] }, { entity_id: 'a2', name: 'Café Tacvba', tags: [{ tag_id: 'urn:tag:genre:alt', name: 'alternative' }, { tag_id: 'urn:tag:genre:music:mexican', name: 'Mexican' }] }] },
     mbArtists: { 'Bad Bunny': [{ id: 'x', name: 'Bad Bunny', score: 100, country: 'PR' }], 'Café Tacvba': [{ id: 'y', name: 'Café Tacvba', score: 100, country: 'MX' }] },
   });
   const r = await s.category({ ...base, category: 'music' });

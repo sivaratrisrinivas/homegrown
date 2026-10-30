@@ -207,6 +207,20 @@ main:has(.board.compact){padding-top:var(--s4)}
   .reveal .poster{max-height:34vh}
   .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s2)}.tile .serif{white-space:nowrap}
 }
+/* HG-10 r5 (captain): one combobox per choice (language, city, favourites); favourites are removable tokens */
+.cb{position:relative;display:flex;flex-direction:column;gap:var(--s2)}
+.cb-list{list-style:none;margin:0;padding:var(--s1) 0;max-height:288px;overflow-y:auto;overscroll-behavior:contain;background:var(--card);border:1.5px solid var(--line);border-radius:var(--r)}
+.cb-list[hidden]{display:none}
+.cb-opt{min-height:48px;padding:var(--s2) var(--s4);display:flex;gap:var(--s2);align-items:baseline;align-content:center;flex-wrap:wrap;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background-color var(--d-hover) var(--ease-out)}
+.cb-opt+.cb-opt{border-top:1px solid var(--line)}
+.cb-opt[aria-selected=true],.cb-opt:hover{background:var(--accent-soft)}
+.cb-opt .yr{color:var(--ink-3)}
+.cb-opt .serif{font-size:var(--t-body)}
+ul.shelf{list-style:none;flex-wrap:wrap;overflow:visible;margin:0;padding:0}
+.token{display:inline-flex;align-items:center;gap:var(--s1);font:400 var(--t-body)/1.2 var(--serif);padding:0 0 0 var(--s4);border:1px solid var(--line);border-radius:var(--r);background:var(--card);max-width:100%}
+.token span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.token-x{min-width:44px;min-height:40px;color:var(--ink-2);font-size:var(--t-cap)}
+.token-x:hover{color:var(--ink)}
 /* HG-10 r5: on phone the hero why-line and tip are clamped until 'more' (aria-expanded) opens them so share stays above the fold */
 .more-wrap{display:flex;flex-direction:column;gap:var(--s2)}.more-row{display:flex;align-items:baseline;gap:var(--s2)}.more-row .tip{min-width:0;flex:1}.more{display:none}
 @media (max-width:699px){.ticket .why{font-size:16px;line-height:1.45}.more-wrap:not(.open) .why{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}.more-wrap:not(.open) .tip{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;line-clamp:1;overflow:hidden}.more:not([hidden]){display:inline-flex;position:relative;flex:none;font:400 var(--t-cap)/1.5 var(--mono);letter-spacing:.06em;min-height:0;min-width:0;padding:0;color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent-rule)}.more::before{content:'';position:absolute;inset:-14px -12px}}

@@ -1,6 +1,7 @@
-import { JOURNEY_FAVS, journeyFor, revealHeader, journeyPicks, encodeShare, decodeShare, QLOO_ORDER, liveCats, pendingCats, runCatsFor, NOT_READY, flapSteps, padTo, userCountryFromLocale, createRunGuard, createSpacer, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, scarcePicks, cityForLanguage, otherCities, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { JOURNEY_FAVS, MAX_FAVS, journeyFor, revealHeader, journeyPicks, encodeShare, decodeShare, QLOO_ORDER, liveCats, pendingCats, runCatsFor, NOT_READY, flapSteps, padTo, userCountryFromLocale, createRunGuard, createSpacer, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, scarcePicks, cityForLanguage, otherCities, liveCitiesForLanguage, languageGroups } from './logic.js';
 import { aiReveal } from './aisuggest-client.js';
 import { indiaSection } from './india.js';
+import { combobox } from './combobox.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { CATEGORY } from './config.js';
 // HG-10 v1 is one journey: hello → language → city → 3 favourites → morph board → reveal → share.
@@ -149,9 +150,11 @@ async function pickLanguage() {
   // Indian languages (those with states) are listed language-first in their own section (HG-11, india.js).
   const { live: all } = languageGroups(S.catalogue);
   const live = all.filter((l) => !l.states);
-  show(h('h2', {}, 'You’re learning…'),
-    h('div', { class: 'tiles' }, live.map((l) => h('button', { class: 'tile', onclick: () => { S.ai = null; chooseLanguage(l); suggestCity(); } },
-      h('span', { class: serif(l.id), lang: l.id }, l.local), h('span', { class: 'cap' }, l.name)))),
+  // One searchable combobox (r5, captain): native name + English name, filtered as you type.
+  const cb = combobox({ h, label: 'Language you’re learning', placeholder: 'Search languages', options: live, open: true,
+    keys: (l) => [l.name, l.local, l.id], render: (l) => [h('span', { class: serif(l.id), lang: l.id }, l.local), h('span', { class: 'cap' }, l.name)],
+    onPick: (l) => { S.ai = null; chooseLanguage(l); suggestCity(); } });
+  show(h('h2', {}, 'You’re learning…'), cb.el,
     indiaSection(S.catalogue, { h, onPick: (l) => { S.ai = null; chooseLanguage(l); suggestCity(); }, onSuggest: (l) => { S.ai = l; S.city = null; favourite(); } }));
 }
 function chooseLanguage(l) { S.lang = l; if (l.id === 'ko') loadKorean(); }
@@ -167,13 +170,15 @@ function suggestCity(chosen) {
   const c = chosen || (S.city?.language === S.lang.id ? S.city : best);
   setCity(c);
   const others = liveCitiesForLanguage(S.catalogue, S.lang.id).filter((x) => x.id !== c.id);
+  // Other live cities of the same language: one combobox (r5, captain), best match marked.
+  const cb = others.length ? combobox({ h, label: `Other ${S.lang.name} cities`, placeholder: `Switch city (${others.length} more)`, options: others,
+    keys: (o) => [o.name, o.local], render: (o) => [h('span', { class: serif(o.language), lang: o.language, dir: 'auto' }, o.local), h('span', { class: 'cap' }, o.id === best.id ? `${o.name} · Best match` : o.name)],
+    onPick: (o) => suggestCity(o) }) : null;
   show(back,
     h('div', {}, h('p', { class: 'cap' }, c.id === best.id ? `${S.lang.name} · Best match` : S.lang.name),
       h('h2', { class: `city-name ${serif(c.language)}`, lang: c.language, dir: 'auto', style: 'margin:12px 0 8px' }, c.local),
       h('p', { class: 'flagline' }, c.local !== c.name ? `${c.name} ${c.flag}` : c.flag)),
-    others.length ? h('p', { class: 'or' }, 'or') : null,
-    others.length ? h('div', { class: 'tiles' }, others.map((o) => h('button', { class: 'tile', onclick: (e) => suggestCity(o, e) },
-      h('span', { class: serif(o.language), lang: o.language }, o.local), h('span', { class: 'cap' }, o.name)))) : null,
+    cb ? h('p', { class: 'or' }, 'or') : null, cb?.el,
     h('div', { class: 'cta pin' }, h('button', { class: 'primary', onclick: () => { S.city = c; favourite(); } }, `Choose ${c.name}`)));
 }
 
@@ -202,12 +207,15 @@ let landed = false; // a chip just landed: it fades in, and the dot fills
 function favourite(note) {
   const missed = S.missed;
   const i = S.favs.length + S.pending.length; // pending picks count toward the slot index
-  if (i >= JOURNEY_FAVS) return morph();
+  // 3 to 5 favourites (r5, captain): the first JOURNEY_FAVS are prompted; up to MAX_FAVS are optional.
+  if (i >= MAX_FAVS) return morph();
   nav('fav', i);
-  const p = J.prompts[i];
-  const input = h('input', { 'aria-label': p.label, placeholder: p.placeholder, autocomplete: 'off', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'search' });
-  const field = h('div', { class: 'field' }, input, h('div', { class: 'hair', 'aria-hidden': 'true' }, h('i')));
-  const sugs = h('ul', { class: 'sugs' });
+  const extra = i >= JOURNEY_FAVS;
+  const p = extra ? { ...J.prompts.at(-1), label: 'One more? (optional)' } : J.prompts[i];
+  let onPick = () => {};
+  const cb = combobox({ h, label: p.label, placeholder: p.placeholder, load: () => {}, render: (e) => [h('span', {}, e.name), e.year ? h('span', { class: 'yr' }, e.year) : null], onPick: (e) => onPick(e), inputAttrs: { enterkeyhint: 'search' } });
+  const input = cb.input;
+  const field = h('div', { class: 'field' }, cb.el, h('div', { class: 'hair', 'aria-hidden': 'true' }, h('i')));
   const msg = h('p', { class: 'status', 'aria-live': 'polite' }, note || '');
   const sr = h('span', { class: 'sr', 'aria-live': 'polite' });
   let t, seq = 0, ctl, busyT;
@@ -244,7 +252,7 @@ function favourite(note) {
     t = setTimeout(async () => {
       const q = input.value.trim();
       if (my !== seq) return;
-      if (q.length < 2) { sugs.replaceChildren(); msg.textContent = note || ''; busy(false); return; }
+      if (q.length < 2) { cb.fill([]); msg.textContent = note || ''; busy(false); return; }
       const sk = searchKey(p.kind, q);
       let r = suggestMemo.get(sk);
       if (!r) {
@@ -262,14 +270,15 @@ function favourite(note) {
       const results = r.body.results || [];
       alt.noteResults(q, results.length); // zero suggest results (not zero Qloo results) make Enter eligible
       msg.textContent = results.length ? '' : 'Nothing found. Press Enter to try other names, or try something like it.';
-      sugs.replaceChildren(...results.slice(0, 3).map((e) => h('li', {}, h('button', { onclick: () => {
+      onPick = (e) => {
         const kind = e.kind || p.kind; const pick = pickKey(kind, e.name, e.year);
         if (isPicked(pick, S.favs, S.pending)) { msg.textContent = `${e.name} is already in your favourites.`; return; }
         const key = `${pick}|${S.pending.length + S.favs.length}`;
         pendingMatches.set(key, resolveFavourite(e, kind));
         S.pending.push({ key, pick, name: e.name, sug: e, kind });
         landed = true; favourite(missNote(S.missed)); // S.missed keeps the 'Try other names' actions
-      } }, h('span', {}, e.name), e.year ? h('span', { class: 'yr' }, e.year) : null))));
+      };
+      cb.fill(results.slice(0, 3));
     }, DEBOUNCE_MS);
   });
   // Primary trigger: favourites HG-5 marked as missed get a 'Try other names' action, same server caps.
@@ -288,11 +297,19 @@ function favourite(note) {
     return h('span', {}, b, x);
   })) : null;
   const chosen = [...S.favs, ...S.pending];
-  const index = h('p', { class: 'cap', 'aria-label': `Favourite ${i + 1} of ${JOURNEY_FAVS}` }, `${i + 1}/${JOURNEY_FAVS}`);
-  const shelf = h('div', { class: 'shelf', 'aria-label': 'Your favourites' }, chosen.map((f) => h('span', { class: 'chip' }, f.name)));
+  const index = extra ? h('p', { class: 'cap', 'aria-label': `${chosen.length} favourites chosen, up to ${MAX_FAVS}` }, `${chosen.length}/${MAX_FAVS}`)
+    : h('p', { class: 'cap', 'aria-label': `Favourite ${i + 1} of ${JOURNEY_FAVS}` }, `${i + 1}/${JOURNEY_FAVS}`);
+  // Selected favourites are small removable tokens.
+  const remove = (f) => {
+    if (f.key && S.pending.includes(f)) { S.pending = S.pending.filter((x) => x !== f); pendingMatches.delete(f.key); } else S.favs = S.favs.filter((x) => x !== f);
+    favourite(missNote(S.missed));
+  };
+  const shelf = h('ul', { class: 'shelf', 'aria-label': 'Your favourites' }, chosen.map((f) => h('li', { class: 'token' }, h('span', {}, f.name),
+    h('button', { class: 'token-x', 'aria-label': `Remove ${f.name}`, onclick: () => remove(f) }, '✕'))));
+  const go = extra ? h('div', { class: 'cta pin' }, h('button', { class: 'primary', onclick: () => morph() }, `Match my ${chosen.length} favourites`)) : null;
   const justLanded = landed; landed = false;
-  show(h('div', { class: 'dots-row' }, index), shelf, h('h2', { id: 'prompt' }, p.label), field, msg, sr, tryOthers, sugs,
-    opts({ focus: input, still: justLanded ? '.dots-row,.shelf' : null }));
+  show(h('div', { class: 'dots-row' }, index), shelf, h('h2', { id: 'prompt' }, p.label), field, msg, sr, tryOthers, go,
+    opts({ focus: extra ? null : input, still: justLanded ? '.dots-row,.shelf' : null }));
   const gen = screenGen; screenAbort = () => alt.onInput(); // this screen's generation (show() just bumped it)
   if (justLanded && shelf.lastElementChild) { stamp(shelf.lastElementChild); shelf.scrollLeft = shelf.scrollWidth; }
 }

@@ -159,8 +159,8 @@ test('HG-10 motion: tokens in CSS, transform/opacity only, reduced motion honour
   assert.match(app, /flapSteps\(cell\.textContent, target\[k\], 7\)/);
 });
 
-test('HG-10 journey: back goes one step; exactly 3 favourites; HG-5 data model intact', () => {
-  for (const s of ["nav('lang')", "nav('city')", "nav('fav', i)", "nav('reveal')", "addEventListener('popstate'", 'if (i >= JOURNEY_FAVS) return morph();']) assert.ok(app.includes(s), s);
+test('HG-10 journey: back goes one step; 3 prompted favourites (up to 5); HG-5 data model intact', () => {
+  for (const s of ["nav('lang')", "nav('city')", "nav('fav', i)", "nav('reveal')", "addEventListener('popstate'", 'if (i >= MAX_FAVS) return morph();', 'const extra = i >= JOURNEY_FAVS;']) assert.ok(app.includes(s), s);
   assert.equal(JOURNEY_FAVS, 3);
   assert.match(app, /settleFavourites\(S\.favs, S\.pending, matches\)/);
   assert.match(app, /const key = `\$\{pick\}\|\$\{S\.pending\.length \+ S\.favs\.length\}`/);
@@ -236,4 +236,22 @@ test('HG-10 r4: blobs are smaller, contained and paused while the tab is hidden;
   assert.ok(css.includes('[data-hidden] .acid i{animation-play-state:paused}'));
   assert.ok(app.includes("document.documentElement.toggleAttribute('data-hidden', document.hidden)"));
   assert.ok(app.includes("'Taste-matched by Qloo'") && app.includes('`Taste-matched by Qloo · Where-to-watch data:'));
+});
+
+// r5 (captain): language, city and favourites are one ARIA combobox each; favourites are removable tokens, 3 to 5.
+test('HG-10 r5 combobox: ARIA roles, keyboard, filtering, and every screen uses it', async () => {
+  const { matches } = await import('../public/combobox.js');
+  assert.ok(matches('espan', ['Spanish', 'Español'])); assert.ok(matches('', ['x'])); assert.ok(!matches('zz', ['Spanish']));
+  assert.ok(matches('cairo', ['Cairo', 'القاهرة'])); assert.ok(matches('القا', ['Cairo', 'القاهرة']));
+  const cb = readFileSync(new URL('../public/combobox.js', import.meta.url), 'utf8');
+  for (const s of ["role: 'combobox'", "'aria-autocomplete': 'list'", "'aria-expanded'", "'aria-controls'", "role: 'listbox'", "role: 'option'", "'aria-activedescendant'", "'ArrowDown'", "'ArrowUp'", "'Enter'", "'Escape'"]) assert.ok(cb.includes(s), s);
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.equal((app.match(/combobox\(\{ h,/g) || []).length, 3, 'language, city and favourites');
+  assert.ok(!app.includes("class: 'tile'") && !app.includes("class: 'chip'"), 'no chip spreads left');
+  // HG-12: the AI language path is still wired from the India section next to the language combobox.
+  assert.ok(app.includes("onSuggest: (l) => { S.ai = l; S.city = null; favourite(); }"));
+  // Favourites: removable tokens, 3 prompted, up to MAX_FAVS, explicit "Match" after 3.
+  assert.ok(app.includes("'aria-label': `Remove ${f.name}`") && app.includes('`Match my ${chosen.length} favourites`'));
+  const css = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.cb-opt\{min-height:48px/); assert.match(css, /\.token-x\{min-width:44px/);
 });

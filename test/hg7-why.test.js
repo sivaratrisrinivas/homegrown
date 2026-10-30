@@ -74,11 +74,11 @@ const GOOD = 'Like Breaking Bad, it follows a chemistry teacher who turns to cri
 
 test('batch: all picks of a reveal go in one call, then the cache serves pick+favourite', async () => {
   const claude = mockClaude(answer(GOOD));
-  const w = createWhyWriter({ claude, budget: createClaudeBudget() });
+  const w = createWhyWriter({ retry: false, claude, budget: createClaudeBudget() });
   const picks = [pick(), pick({ qlooId: 'q2' }), pick({ qlooId: 'q3' })];
   const a = await w(picks, FAVS, { ip: 'x' });
   assert.equal(claude.calls.n, 1); assert.deepEqual(ids(claude.calls.last), ['p0', 'p1', 'p2']);
-  assert.match(claude.calls.last, /<favourite>Breaking Bad<\/favourite>\n<tags>moral decay; crime<\/tags>/);
+  assert.match(claude.calls.last, /<favourite>Breaking Bad<\/favourite>\n<words>[^<]*<\/words>\n<tags>moral decay; crime<\/tags>/);
   assert.equal(a[0].why, GOOD);
   const b = await w(picks, FAVS, { ip: 'y' });
   assert.equal(claude.calls.n, 1); assert.deepEqual(b, a);
@@ -115,7 +115,7 @@ test('cache: failures get a 10-minute skip marker; rejected lines live 1 day, go
   let t = Date.parse('2026-10-31T00:00:00Z'); const now = () => t;
   let mode = 'fail';
   const claude = mockClaude((c) => { if (mode === 'fail') throw Object.assign(new Error('x'), { status: 502 }); return answer(mode === 'bad' ? 'Like Breaking Bad, directed by christopher nolan and loved by many people.' : GOOD)(c); });
-  const w = createWhyWriter({ claude, budget: createClaudeBudget({ now }), now });
+  const w = createWhyWriter({ retry: false, claude, budget: createClaudeBudget({ now }), now });
   await w([pick()], FAVS, { ip: 'x' }); await w([pick()], FAVS, { ip: 'x' });
   assert.equal(claude.calls.n, 1); // skip marker
   t += 11 * 60 * 1000; mode = 'bad';
@@ -296,7 +296,7 @@ test("r5: curly apostrophes are normalised in the favourite and the line; 'll/'r
 });
 test('r5: system prompt bans contractions and first person', async () => {
   const { WHY_SYSTEM } = await import('../lib/anthropic.js');
-  assert.match(WHY_SYSTEM, /No contractions, no first person/);
+  assert.match(WHY_SYSTEM, /no contractions, no first person/i);
 });
 
 const R6 = { favourite: 'Breaking Bad', sources: ['A crime drama about a killer and revenge.'] };
@@ -339,4 +339,75 @@ test('r7: STOP has no duplicates and no words the validator already rejects', as
   const { STOP } = await import('../lib/whyllm.js');
   for (const w of ['nor', 'than', 'if', 'not', 'no', 'without', 'll', 're', 've', "it's"]) assert.equal(STOP.has(w), false, w);
   assert.ok(STOP.has('its') && STOP.has('whose') && STOP.has('may'));
+});
+
+// HG-15: prompt-side grounding and one regenerate.
+test('HG-15: each pick carries its allowed word list (content words from tags, genres, overview)', async () => {
+  const { allowedWords, STOP } = await import('../lib/whyllm.js');
+  const ws = allowedWords(['moral decay', 'Crime, Drama', 'A chemistry teacher turns to crime in 2008 with three partners and loves it.']);
+  assert.deepEqual(ws.slice(0, 4), ['moral', 'decay', 'crime', 'drama']);
+  for (const w of ['the', 'with', 'and', 'loves', 'three', '2008', 'a', 'in']) assert.ok(!ws.includes(w), w);
+  assert.ok(ws.includes('chemistry') && ws.includes('partners'));
+  assert.ok(ws.every((w) => /^[\p{L}\p{M}]+$/u.test(w) && !STOP.has(w)));
+  const claude = mockClaude(answer(GOOD));
+  await createWhyWriter({ retry: false, claude, budget: createClaudeBudget() })([pick()], FAVS, { ip: 'x' });
+  assert.match(claude.calls.last, /<words>[^<]*chemistry[^<]*<\/words>/);
+});
+test('HG-15: system prompt gives a fixed template, the word list rule and framing words; safety rules stay', async () => {
+  const { WHY_SYSTEM } = await import('../lib/anthropic.js');
+  assert.match(WHY_SYSTEM, /Fans of <favourite> will like this/);
+  assert.match(WHY_SYSTEM, /ONLY content words/);
+  for (const w of ['follows', 'story', 'film', 'fans', 'tale']) assert.ok(WHY_SYSTEM.includes(w), w);
+  assert.match(WHY_SYSTEM, /untrusted/); assert.match(WHY_SYSTEM, /No negation/); assert.match(WHY_SYSTEM, /no contractions/);
+});
+test('HG-15: template lines built from list words pass; framing words are allowed but never count as grounding', () => {
+  const g = { favourite: 'Breaking Bad', titles: ['Burning'], sources: ['Mystery, Drama', 'A delivery boy meets a mysterious young man and a woman who vanishes.'] };
+  assert.ok(validateWhy('Fans of Breaking Bad will like this mystery drama film about a delivery boy and a mysterious young man.', g));
+  assert.ok(validateWhy('Fans of Breaking Bad will like this mystery film that explores a woman who vanishes.', g));
+  assert.equal(validateWhy('Fans of Breaking Bad will like this film, a tale that explores the plot and story set here.', g), null);
+  // Safety rules unchanged.
+  assert.equal(validateWhy('Fans of Breaking Bad will like this mystery film about a boy who does not vanish.', g), null);
+  assert.equal(validateWhy("Fans of Breaking Bad will like this mystery film if a woman vanishes, it's dark.", g), null);
+  assert.equal(validateWhy('Fans of Breaking Bad will like this mystery film about two young men and a woman.', g), null);
+});
+test('HG-15: one regenerate for only the rejected picks, within budget; no extra per-IP call', async () => {
+  let n = 0;
+  const claude = mockClaude((c) => {
+    n++;
+    const ps = ids(c);
+    if (n === 1) return { text: JSON.stringify({ picks: [{ id: 'p0', why: GOOD, pace: 'slow', dialogue: 'heavy' }, { id: 'p1', why: 'Like Breaking Bad, directed by christopher nolan and loved by many people.', pace: 'fast', dialogue: 'light' }] }), usage: { input_tokens: 500, output_tokens: 100 } };
+    assert.deepEqual(ps, ['p0']); // only the rejected pick, renumbered
+    return answer(GOOD)(c);
+  });
+  const w = createWhyWriter({ claude, budget: createClaudeBudget(), caps: { perIpPerDay: 1, maxIps: 10, maxPicks: 6 } });
+  const out = await w([pick(), pick({ qlooId: 'q2' })], FAVS, { ip: 'x' });
+  assert.equal(claude.calls.n, 2);
+  assert.equal(out[0].why, GOOD); assert.equal(out[1].why, GOOD);
+  // Retry did not use a second per-IP call: x had 1/day and is now capped for a new pick.
+  assert.deepEqual(await w([pick({ qlooId: 'q9' })], FAVS, { ip: 'x' }), [null]);
+});
+test('HG-15: a failed or still-bad regenerate keeps the first answer (heuristic + Claude difficulty); no third call', async () => {
+  const bad = 'Like Breaking Bad, directed by christopher nolan and loved by many people.';
+  const claude = mockClaude(answer(bad));
+  const w = createWhyWriter({ claude, budget: createClaudeBudget() });
+  const out = await w([pick()], FAVS, { ip: 'x' });
+  assert.equal(claude.calls.n, 2); assert.equal(out[0].why, null); assert.equal(out[0].pace, 'slow');
+  await w([pick()], FAVS, { ip: 'x' }); assert.equal(claude.calls.n, 2); // cached rejection
+  let k = 0;
+  const c2 = mockClaude((c) => { if (++k === 2) throw Object.assign(new Error('x'), { status: 502 }); return answer(bad)(c); });
+  const o2 = await createWhyWriter({ claude: c2, budget: createClaudeBudget() })([pick()], FAVS, { ip: 'y' });
+  assert.equal(c2.calls.n, 2); assert.equal(o2[0].why, null); assert.equal(o2[0].dialogue, 'heavy');
+});
+test('HG-15: no regenerate when the budget cannot cover it', async () => {
+  const real = createClaudeBudget(); let reserves = 0;
+  const budget = { ...real, reserve: (...a) => (++reserves === 1 ? real.reserve(...a) : false) };
+  const claude = mockClaude(answer('Like Breaking Bad, directed by christopher nolan and loved by many people.'));
+  const out = await createWhyWriter({ claude, budget })([pick()], FAVS, { ip: 'x' });
+  assert.equal(claude.calls.n, 1); assert.equal(reserves, 2); assert.equal(out[0].why, null);
+});
+test('HG-15: the fallback line never says "if you liked"', async () => {
+  const { phrase } = await import('../lib/why.js');
+  for (const kind of ['theme', 'genre', 'plot', 'style', 'mood', 'keyword', 'character', 'audience'])
+    for (const tag of ['thriller', 'revenge', 'dark', 'slow burn', 'drug dealer'])
+      for (let v = 0; v < 4; v++) assert.doesNotMatch(phrase({ favourite: 'Heat', tag, kind }, 'movie', v), /\bif\b/i);
 });

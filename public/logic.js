@@ -9,6 +9,12 @@ export const PROMPTS = [
 export const MIN_FAVS = 3, MAX_FAVS = 5;
 export const canSkip = (n) => n >= MIN_FAVS && n < MAX_FAVS;
 export const QLOO_ORDER = ['tv', 'movie', 'music'];
+// HG-9 v1: the one list of categories the app runs, waits on and notes: the catalogue's live categories, in Qloo order.
+// A missing or empty list falls back to every category.
+export const liveCats = (catalogue) => { const live = catalogue?.categories; return QLOO_ORDER.filter((c) => (Array.isArray(live) && live.length ? live : QLOO_ORDER).includes(c)); };
+const CAT_WORD = { tv: 'TV', movie: 'movies', music: 'music' };
+export const categoryWords = (cats) => { const w = (Array.isArray(cats) && cats.length ? cats : QLOO_ORDER).map((c) => CAT_WORD[c] || c); return w.length > 1 ? `${w.slice(0, -1).join(', ')} and ${w.at(-1)}` : w[0]; };
+export const pendingCats = (cats, results) => cats.filter((k) => !results[k]);
 export const MORPH_BUDGET_MS = 8000;
 
 export const FLAP_CHARS = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

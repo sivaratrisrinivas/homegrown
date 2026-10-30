@@ -19,6 +19,21 @@
       "id": "ta",
       "name": "Tamil",
       "local": "தமிழ்"
+    },
+    {
+      "id": "hi",
+      "name": "Hindi",
+      "local": "हिन्दी"
+    },
+    {
+      "id": "te",
+      "name": "Telugu",
+      "local": "తెలుగు"
+    },
+    {
+      "id": "bn",
+      "name": "Bengali",
+      "local": "বাংলা"
     }
   ],
   "cities": [
@@ -42,7 +57,11 @@
       "header": "Tu yo chilango",
       "musicTag": "mexican",
       "itunesCountry": "mx",
-      "subtitleTip": "Start with subtitles in Spanish."
+      "subtitleTip": "Start with subtitles in Spanish.",
+      "musicLanguageTags": [
+        "mexican",
+        "regional_mexican"
+      ]
     },
     {
       "id": "madrid",
@@ -62,7 +81,10 @@
       "header": "Tu yo madrileño",
       "musicTag": "spanish",
       "itunesCountry": "es",
-      "subtitleTip": "Start with subtitles in Spanish."
+      "subtitleTip": "Start with subtitles in Spanish.",
+      "musicLanguageTags": [
+        "spanish"
+      ]
     },
     {
       "id": "buenos_aires",
@@ -80,7 +102,12 @@
       "header": "Tu yo porteño",
       "musicTag": "argentine",
       "itunesCountry": "ar",
-      "subtitleTip": "Start with subtitles in Spanish."
+      "subtitleTip": "Start with subtitles in Spanish.",
+      "musicLanguageTags": [
+        "argentine",
+        "argentina",
+        "argentinian"
+      ]
     },
     {
       "id": "seoul",
@@ -102,7 +129,13 @@
       "header": "서울의 너",
       "musicTag": "k_pop",
       "itunesCountry": "kr",
-      "subtitleTip": "Start with subtitles in Korean."
+      "subtitleTip": "Start with subtitles in Korean.",
+      "musicLanguageTags": [
+        "k_pop",
+        "kpop",
+        "korean"
+      ],
+      "screenTag": "urn:tag:keyword:qloo:korean_cinema"
     },
     {
       "id": "paris",
@@ -120,7 +153,12 @@
       "header": "Toi, version parisienne",
       "musicTag": "french",
       "itunesCountry": "fr",
-      "subtitleTip": "Start with subtitles in French."
+      "subtitleTip": "Start with subtitles in French.",
+      "musicLanguageTags": [
+        "french",
+        "chanson_francaise"
+      ],
+      "screenTag": "urn:tag:keyword:qloo:french_cinema"
     },
     {
       "id": "chennai",
@@ -142,7 +180,148 @@
       "header": "சென்னை நீ",
       "musicTag": "tamil",
       "itunesCountry": "in",
-      "subtitleTip": "Start with subtitles in Tamil."
+      "subtitleTip": "Start with subtitles in Tamil.",
+      "musicLanguageTags": [
+        "tamil",
+        "kollywood"
+      ],
+      "musicConflictTags": [
+        "hindi",
+        "bollywood",
+        "telugu",
+        "tollywood",
+        "bengali",
+        "bangla",
+        "malayalam",
+        "kannada",
+        "punjabi",
+        "bangladesh",
+        "bangladeshi",
+        "pakistani"
+      ],
+      "screenTag": "urn:tag:keyword:qloo:tamil_cinema"
+    },
+    {
+      "id": "mumbai",
+      "name": "Mumbai",
+      "localName": "मुंबई",
+      "country": "IN",
+      "releaseCountry": "India",
+      "flag": "🇮🇳",
+      "itunesCountry": "in",
+      "countryNames": [
+        "india",
+        "mumbai",
+        "bombay",
+        "maharashtra",
+        "भारत",
+        "मुंबई"
+      ],
+      "language": "hi",
+      "accent": "#D2691E",
+      "header": "मुंबई वाला तू",
+      "musicTag": "hindi",
+      "subtitleTip": "Start with subtitles in Hindi.",
+      "musicLanguageTags": [
+        "hindi",
+        "bollywood"
+      ],
+      "musicConflictTags": [
+        "tamil",
+        "kollywood",
+        "telugu",
+        "tollywood",
+        "bengali",
+        "bangla",
+        "malayalam",
+        "kannada",
+        "punjabi",
+        "bangladesh",
+        "bangladeshi",
+        "pakistani"
+      ],
+      "screenTag": "urn:tag:keyword:qloo:bollywood"
+    },
+    {
+      "id": "hyderabad",
+      "name": "Hyderabad",
+      "localName": "హైదరాబాద్",
+      "country": "IN",
+      "releaseCountry": "India",
+      "flag": "🇮🇳",
+      "itunesCountry": "in",
+      "countryNames": [
+        "india",
+        "hyderabad",
+        "telangana",
+        "andhra pradesh",
+        "భారతదేశం",
+        "హైదరాబాద్"
+      ],
+      "language": "te",
+      "accent": "#8E44AD",
+      "header": "హైదరాబాద్ నువ్వు",
+      "musicTag": "tollywood",
+      "subtitleTip": "Start with subtitles in Telugu.",
+      "musicLanguageTags": [
+        "telugu",
+        "tollywood"
+      ],
+      "musicConflictTags": [
+        "hindi",
+        "bollywood",
+        "tamil",
+        "kollywood",
+        "bengali",
+        "bangla",
+        "malayalam",
+        "kannada",
+        "punjabi",
+        "bangladesh",
+        "bangladeshi",
+        "pakistani"
+      ],
+      "screenTag": "urn:tag:keyword:qloo:telugu_cinema"
+    },
+    {
+      "id": "kolkata",
+      "name": "Kolkata",
+      "localName": "কলকাতা",
+      "country": "IN",
+      "releaseCountry": "India",
+      "flag": "🇮🇳",
+      "itunesCountry": "in",
+      "countryNames": [
+        "india",
+        "kolkata",
+        "calcutta",
+        "west bengal",
+        "ভারত",
+        "কলকাতা"
+      ],
+      "language": "bn",
+      "accent": "#B22222",
+      "header": "কলকাতার তুমি",
+      "musicTag": "bengali",
+      "subtitleTip": "Start with subtitles in Bengali.",
+      "musicLanguageTags": [
+        "bengali",
+        "bangla"
+      ],
+      "musicConflictTags": [
+        "hindi",
+        "bollywood",
+        "tamil",
+        "kollywood",
+        "telugu",
+        "malayalam",
+        "kannada",
+        "punjabi",
+        "bangladesh",
+        "bangladeshi",
+        "pakistani"
+      ],
+      "screenTag": "urn:tag:keyword:qloo:bengali_cinema"
     }
   ]
 }

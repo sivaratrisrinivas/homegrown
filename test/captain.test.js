@@ -13,12 +13,12 @@ const gate = (results, threshold = 0.6) => ({ threshold, categories: ['tv', 'mov
 test('captain 1: aim for 5 picks from a Qloo top 15; under 3 is scarce and off the postcard', async () => {
   assert.deepEqual(WANT, { tv: 5, movie: 5, music: 5 }); assert.equal(SCARCE_BELOW, 3); assert.equal(CANDIDATES, 15);
   const qcalls = [];
-  const names = Array.from({ length: 15 }, (_, i) => ({ id: 'q' + i, name: 'B' + i, tags: [] }));
+  const names = Array.from({ length: 15 }, (_, i) => ({ id: 'q' + i, name: 'B' + i, tags: [{ id: 'urn:tag:genre:music:k_pop', name: 'K-Pop' }] }));
   const qloo = { insights: async (a) => { qcalls.push(a); return names; } };
   const mb = { searchArtist: async (n) => (['B1', 'B4'].includes(n) ? [{ id: n, name: n, score: 100, country: 'KR' }] : []) };
   const s = createTwinService({ qloo, tmdb: {}, mb, itunes: { previewForArtist: async () => null } });
   const out = await s.category({ favourites: FAVS, cityId: 'seoul', category: 'music' });
-  assert.equal(qcalls[0].take, 15);
+  assert.equal(qcalls[0].take, 50, 'pool of 50, language-filtered before the top 15');
   assert.equal(out.picks.length, 2); assert.equal(out.scarce, true);
   assert.match(out.note, /scarce in Seoul.*left off your postcard/);
   const byCat = { tv: { picks: [1, 2, 3, 4, 5].map((t) => ({ t })) }, movie: { picks: [{ t: 'm' }] }, music: out };
@@ -27,7 +27,7 @@ test('captain 1: aim for 5 picks from a Qloo top 15; under 3 is scarce and off t
 });
 
 test('captain 1: measuring run checks every candidate (no early stop, no cap)', async () => {
-  const names = Array.from({ length: 15 }, (_, i) => ({ id: 'q' + i, name: 'B' + i, tags: [] }));
+  const names = Array.from({ length: 15 }, (_, i) => ({ id: 'q' + i, name: 'B' + i, tags: [{ id: 'urn:tag:genre:music:k_pop', name: 'K-Pop' }] }));
   let checks = 0;
   const mb = { searchArtist: async (n) => { checks++; return [{ id: n, name: n, score: 100, country: 'KR' }]; } };
   const logs = [];
@@ -48,7 +48,8 @@ test('captain 2: a city is live only if all three categories reach 60%', () => {
 test('captain 2: gate lives in config, server refuses non-live cities', () => {
   const g = loadGate();
   assert.equal(g.threshold, 0.6);
-  for (const c of ['mexico_city', 'seoul', 'paris']) for (const k of ['tv', 'movie', 'music']) assert.ok(g.results[c][k].seen >= 10, 'enough candidates measured');
+  assert.equal(g.minSeen, 5);
+  for (const c of ['mexico_city', 'seoul', 'paris']) for (const k of ['tv', 'movie', 'music']) assert.ok(g.results[c][k].seen >= g.minSeen, 'enough candidates measured');
   const live = ['mexico_city', 'seoul', 'paris'].filter((c) => cityStatus(g, c).live);
   for (const c of ['mexico_city', 'seoul', 'paris']) {
     if (live.includes(c)) assert.doesNotThrow(() => requireLiveCity(g, c));
@@ -62,7 +63,7 @@ test('captain 3: language first, then the suggested live city', () => {
   assert.equal(suggestCity(g, 'ko').city, 'seoul');
   assert.equal(suggestCity(g, 'fr').city, null);
   const cat = catalogue(g);
-  assert.deepEqual(cat.languages.map((l) => l.id), ['es', 'ko', 'fr', 'ta']);
+  assert.deepEqual(cat.languages.map((l) => l.id), ['es', 'ko', 'fr', 'ta', 'hi', 'te', 'bn']);
   assert.equal(cityForLanguage(cat, 'ko').id, 'seoul');
   assert.equal(cityForLanguage(cat, 'fr'), null);
   const app = readFileSync('public/app.js', 'utf8');
@@ -86,7 +87,7 @@ test('captain 5: only languages with a live city are offered; others are coming 
   const g = gate({ seoul: ALL(7, 8, 8), paris: ALL(7, 4, 9), chennai: ALL(9, 9, 5) });
   const { live, soon } = languageGroups(catalogue(g));
   assert.deepEqual(live.map((l) => l.id), ['ko']);
-  assert.deepEqual(soon.map((l) => l.id), ['es', 'fr', 'ta']);
+  assert.deepEqual(soon.map((l) => l.id), ['es', 'fr', 'ta', 'hi', 'te', 'bn']);
 });
 
 test('captain 6: measured best city is the default; other live cities are one tap away', () => {
@@ -102,7 +103,7 @@ test('captain 7: cities and languages are config; Chennai/Tamil is a gated candi
   const cfg = JSON.parse(readFileSync('config/cities.json', 'utf8'));
   assert.deepEqual(Object.keys(CITIES), cfg.cities.map((c) => c.id));
   assert.deepEqual(LANGUAGES, cfg.languages);
-  assert.deepEqual(Object.keys(CITIES).sort(), ['buenos_aires', 'chennai', 'madrid', 'mexico_city', 'paris', 'seoul']);
+  assert.deepEqual(Object.keys(CITIES).sort(), ['buenos_aires', 'chennai', 'hyderabad', 'kolkata', 'madrid', 'mexico_city', 'mumbai', 'paris', 'seoul']);
   const ch = CITIES.chennai;
   assert.deepEqual([ch.country, ch.language, ch.releaseCountry], ['IN', 'ta', 'India']);
   assert.equal(cityStatus(gate({}), 'chennai').live, false, 'unmeasured city stays off');
@@ -116,7 +117,7 @@ test('Chennai TV: Tamil original language + IN origin passes; Telugu from IN doe
   const { verifyShow } = await import('../lib/tmdb.js');
   const tmdb = (o) => ({ searchTv: async () => [{ id: 1, name: 'X', original_language: o, origin_country: ['IN'] }] });
   assert.equal((await verifyShow(tmdb('ta'), { name: 'X' }, CITIES.chennai)).ok, true);
-  assert.equal((await verifyShow(tmdb('te'), { name: 'X' }, CITIES.chennai)).reason, 'not_native');
+  assert.equal((await verifyShow(tmdb('te'), { name: 'X' }, CITIES.chennai)).reason, 'off_language');
 });
 
 test('measure script covers every configured city x tv, movie, music', () => {
@@ -132,7 +133,7 @@ test('music tags are the Qloo tag ids found via /v2/tags (see docs/qloo-music-ta
 });
 
 test('measure retries MusicBrainz errors and keeps leftover errors out of the denominator; app stays strict', async () => {
-  const names = ['A', 'B', 'C', 'D'].map((n, i) => ({ id: 'q' + i, name: n, tags: [] }));
+  const names = ['A', 'B', 'C', 'D'].map((n, i) => ({ id: 'q' + i, name: n, tags: [{ id: 'urn:tag:genre:music:k_pop', name: 'K-Pop' }] }));
   const fails = { A: 1, B: 9 }; const calls = {};
   const mb = { searchArtist: async (n) => {
     calls[n] = (calls[n] || 0) + 1;

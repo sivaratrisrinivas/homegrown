@@ -29,7 +29,7 @@ test('TV: keeps only TMDB-native, applies country filter, grounded why-line', as
   assert.match(r.picks[0].why.text, /moral decay.*Breaking Bad|Breaking Bad.*moral decay/);
   assert.equal(r.picks[1].difficulty, 'easy');
   assert.equal(r.picks[0].watch.provider, 'Netflix');
-  assert.equal(r.scarce, true); assert.match(r.note, /scarce in Mexico City.*left off your postcard/);
+  assert.equal(r.scarce, true); assert.match(r.note, /scarce for your taste.*Mexico City.*left off your postcard/);
   assert.equal(qcalls[0].extra['filter.release_country'], 'Mexico');
   assert.equal(qcalls[0].extra['signal.location.query'], 'Mexico City');
   assert.deepEqual(r.rejected.map((x) => x.name), ['Attack on Titan', 'Narcos']);
@@ -40,15 +40,15 @@ test('never pads: fewer native picks -> fewer results + honest note', async () =
   const { s } = svc({ qlooEntities: { 'urn:entity:tv_show': ents } });
   const r = await s.category({ ...base, category: 'tv' });
   assert.equal(r.picks.length, 1);
-  assert.match(r.note, /Local shows are scarce/); assert.equal(r.scarce, true);
+  assert.match(r.note, /Spanish shows are scarce for your taste: Qloo mostly suggested shows in other languages/, 'every rejection was off-language'); assert.equal(r.scarce, true);
   const { s: s0 } = svc({ qlooEntities: { 'urn:entity:tv_show': ents.filter((e) => e.name !== 'Diablero') } });
   const r0 = await s0.category({ ...base, category: 'tv' });
-  assert.equal(r0.picks.length, 0); assert.match(r0.note, /not showing a fake/);
+  assert.equal(r0.picks.length, 0); assert.match(r0.note, /No Spanish shows came up for your taste/);
 });
 
 test('music: genre tag filter + MusicBrainz country', async () => {
   const { s, qcalls } = svc({
-    qlooEntities: { 'urn:entity:artist': [{ entity_id: 'a1', name: 'Bad Bunny' }, { entity_id: 'a2', name: 'Café Tacvba', tags: [{ tag_id: 'urn:tag:genre:alt', name: 'alternative' }] }] },
+    qlooEntities: { 'urn:entity:artist': [{ entity_id: 'a1', name: 'Bad Bunny', tags: [{ tag_id: 'urn:tag:genre:music:mexican', name: 'Mexican' }] }, { entity_id: 'a2', name: 'Café Tacvba', tags: [{ tag_id: 'urn:tag:genre:alt', name: 'alternative' }, { tag_id: 'urn:tag:genre:music:mexican', name: 'Mexican' }] }] },
     mbArtists: { 'Bad Bunny': [{ id: 'x', name: 'Bad Bunny', score: 100, country: 'PR' }], 'Café Tacvba': [{ id: 'y', name: 'Café Tacvba', score: 100, country: 'MX' }] },
   });
   const r = await s.category({ ...base, category: 'music' });

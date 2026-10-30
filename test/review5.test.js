@@ -9,7 +9,7 @@ import { CITIES } from '../lib/cities.js';
 import { FAVS } from './helpers.js';
 
 const MX = CITIES.mexico_city;
-const band = { id: 'q-mol', name: 'Molotov', tags: [{ id: 'urn:tag:keyword:crime', name: 'crime' }] };
+const band = { id: 'q-mol', name: 'Molotov', tags: [{ id: 'urn:tag:keyword:crime', name: 'crime' }, { id: 'urn:tag:genre:music:mexican', name: 'Mexican' }] };
 const mbOk = { searchArtist: async () => [{ id: 'mb1', name: 'Molotov', score: 100, country: 'MX' }] };
 
 function svc({ qlooFail = false } = {}) {

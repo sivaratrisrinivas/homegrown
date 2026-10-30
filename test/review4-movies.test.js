@@ -33,7 +33,7 @@ test('verifyMovie: exact title, language, production/origin country; no fallback
   const roma = await verifyMovie(t, { name: 'Roma', year: 2018 }, MX);
   assert.equal(roma.ok, true); assert.ok(roma.countries.includes('MX'));
   assert.equal((await verifyMovie(t, { name: 'Pan\'s Labyrinth' }, MX)).reason, 'not_native', 'Spanish but made in Spain');
-  assert.equal((await verifyMovie(t, { name: 'Coco' }, MX)).reason, 'not_native', 'US film about Mexico');
+  assert.equal((await verifyMovie(t, { name: 'Coco' }, MX)).reason, 'off_language', 'US film about Mexico');
   assert.equal((await verifyMovie(t, { name: 'Amores Perros' }, MX)).ok, true, 'matches original_title');
   assert.equal((await verifyMovie(t, { name: 'Y Tu Mamá También', year: 2001 }, MX)).reason, 'no_tmdb_match');
 });
@@ -121,7 +121,7 @@ test('native rate logged per request: counts only, no titles or user text', asyn
   const { s } = { s: createTwinService({ qloo: { insights: async () => ['Coco', 'Roma'].map((n, i) => normaliseEntity({ entity_id: 'm' + i, name: n })) }, tmdb: tmdb(), log: (o) => logs.push(o) }) };
   await s.category({ ...base, category: 'movie' });
   const rate = logs.find((l) => l.event === 'native_rate');
-  assert.deepEqual(rate, { event: 'native_rate', category: 'movie', city: 'mexico_city', seen: 2, accepted: 1, pct: 50 });
+  assert.deepEqual(rate, { event: 'native_rate', category: 'movie', city: 'mexico_city', seen: 1, accepted: 1, pct: 100 }, 'Coco is English, so the language filter drops it before the measured pool');
   const text = JSON.stringify(logs);
   for (const bad of ['Roma', 'Coco', 'Breaking Bad', 'Radiohead', 'TMDB_API_KEY']) assert.ok(!text.includes(bad), bad);
 });

@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, liveCats, pendingCats, categoryWords, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { isMapReveal, mapFraming } from './maplogic.js';
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
@@ -78,7 +78,7 @@ function suggestCity() {
   const live = cityForLanguage(S.catalogue, S.lang.id);
   if (!live) {
     return show(h('h2', {}, `${S.lang.name} isn't live yet.`),
-      h('p', { class: 'muted' }, `A city opens only when at least ${Math.round(S.catalogue.threshold * 100)}% of its picks in music, TV and movies are verified local. Its city hasn't reached that yet.`),
+      h('p', { class: 'muted' }, `A city opens only when at least ${Math.round(S.catalogue.threshold * 100)}% of its picks in ${categoryWords(liveCats(S.catalogue))} are verified local. Its city hasn't reached that yet.`),
       h('button', { class: 'ghost', onclick: pickLanguage }, 'Pick another language'));
   }
   // Default is the measured best city; switching to another live city is one tap.
@@ -272,7 +272,7 @@ async function morph() {
   };
   // Every category is Qloo-backed, so they go one at a time through the 7 s browser gate.
   // One failed category must not stop the ones after it.
-  const qlooP = runCategories(QLOO_ORDER, (cat) => qlooPost({ ...base, category: cat }, current), land);
+  const qlooP = runCategories(liveCats(S.catalogue), (cat) => qlooPost({ ...base, category: cat }, current), land);
   await Promise.race([qlooP, new Promise((r) => setTimeout(r, MORPH_BUDGET_MS))]);
   if (!current()) return;
   hdr.textContent = c.header; hdr.classList.toggle('ko', c.language === 'ko');
@@ -304,11 +304,14 @@ function pickCard(p, hero = false) {
 function picksView() {
   const { hero, rest } = rankPicks(S.results);
   const notes = Object.values(S.results).map((r) => r.note).filter(Boolean);
-  const pending = QLOO_ORDER.filter((k) => !S.results[k]);
+  const cats = liveCats(S.catalogue);
+  const pending = pendingCats(cats, S.results);
   const scarce = scarcePicks(S.results);
-  const lead = S.catalogue?.cities.find((x) => x.id === S.city.id)?.lead;
+  const cityInfo = S.catalogue?.cities.find((x) => x.id === S.city.id);
+  const lead = cityInfo?.lead;
   return [
     lead ? h('p', { class: 'lead' }, lead.text) : null,
+    cityInfo?.thinNote ? h('p', { class: 'muted thin-note' }, cityInfo.thinNote) : null,
     pending.length ? null : h('p', { class: 'muted' }, postcardCategories(S.results).length
       ? `On your postcard: ${postcardCategories(S.results).map((c) => ({ tv: 'shows', movie: 'films', music: 'bands' })[c]).join(', ')}`
       : 'Local picks are scarce for your taste here, so your postcard is empty this time.'),

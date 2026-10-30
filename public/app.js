@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
 
 const app = document.getElementById('app');
@@ -129,9 +129,11 @@ function favourite(note) {
       const results = r.body.results || [];
       msg.textContent = results.length ? '' : 'Nothing found. Try something like it.';
       sugs.replaceChildren(...results.slice(0, 5).map((e) => h('li', {}, h('button', { onclick: () => {
-        const kind = e.kind || p.kind; const key = `${kind}|${e.name}|${e.year || ''}|${S.pending.length + S.favs.length}`;
+        const kind = e.kind || p.kind; const pick = pickKey(kind, e.name, e.year);
+        if (isPicked(pick, S.favs, S.pending)) { msg.textContent = `${e.name} is already in your favourites.`; return; }
+        const key = `${pick}|${S.pending.length + S.favs.length}`;
         pendingMatches.set(key, resolveFavourite(e, kind));
-        S.pending.push({ key, name: e.name });
+        S.pending.push({ key, pick, name: e.name });
         favourite();
       } }, e.name, e.year ? ` (${e.year})` : ''))));
     }, DEBOUNCE_MS);

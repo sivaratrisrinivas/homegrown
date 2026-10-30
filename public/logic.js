@@ -114,12 +114,18 @@ export function bestQlooMatch(results, { name, year }) {
 }
 
 // Pending favourites become real ones only with a valid Qloo id; the user's chosen name is kept.
+// Identity of a picked suggestion, so the same pick can't be added twice.
+export const pickKey = (kind, name, year) => `${kind}|${String(name || '').trim().toLowerCase()}|${year || ''}`;
+export const isPicked = (pick, favs, pending) => [...favs, ...pending].some((f) => f.pick === pick);
+
 export function settleFavourites(favs, pending, matches) {
-  const out = [...favs]; const missed = [];
+  const out = [...favs]; const missed = []; const ids = new Set(favouriteIds(favs));
   for (const f of pending) {
     const m = matches.get(f.key);
-    if (m && typeof m.id === 'string' && m.id) out.push({ id: m.id, name: f.name, tags: Array.isArray(m.tags) ? m.tags : [] });
-    else missed.push(f.name);
+    if (!(m && typeof m.id === 'string' && m.id)) { missed.push(f.name); continue; }
+    if (ids.has(m.id)) continue; // two picks resolved to the same Qloo entity: keep the first
+    ids.add(m.id);
+    out.push({ id: m.id, name: f.name, pick: f.pick, tags: Array.isArray(m.tags) ? m.tags : [] });
   }
   return { favs: out, missed };
 }

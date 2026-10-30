@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { whyLine, phrase, plural } from '../lib/why.js';
 import { createSuggest, normaliseKind } from '../lib/suggest.js';
-import { present, bestQlooMatch, DEBOUNCE_MS, settleFavourites, favouriteIds } from '../public/logic.js';
+import { present, bestQlooMatch, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked } from '../public/logic.js';
 import { createServer } from '../server.js';
 import { setSuggest, suggestCache } from '../api/suggest.js';
 
@@ -147,4 +147,36 @@ test('2) pending favourites become real only with a valid Qloo id; track() gets 
   assert.deepEqual(missed, ['Nope', 'Bad']);
   assert.ok(out.every((f) => !('match' in f) && Array.isArray(f.tags)));
   assert.deepEqual(favouriteIds([{ id: 'a' }, { name: 'pending' }, { id: '' }, { id: 'b' }]), ['a', 'b']);
+});
+
+test('round 2 (1): the same pick, or two picks for one Qloo entity, never make duplicate favourites', () => {
+  const p1 = pickKey('show', 'Breaking Bad', 2008);
+  assert.equal(p1, pickKey('show', ' breaking bad ', 2008));
+  assert.notEqual(p1, pickKey('show', 'Breaking Bad', 2009));
+  assert.equal(isPicked(p1, [], [{ key: 'k', pick: p1 }]), true, 'already pending');
+  assert.equal(isPicked(p1, [{ id: 'q', pick: p1 }], []), true, 'already matched');
+  assert.equal(isPicked(pickKey('band', 'Breaking Bad', 2008), [{ id: 'q', pick: p1 }], []), false);
+  const favs = [{ id: 'q1', name: 'A', pick: 'show|a|', tags: [] }];
+  const pending = [{ key: 'k1', name: 'A again', pick: 'movie|a|' }, { key: 'k2', name: 'B', pick: 'show|b|' }, { key: 'k3', name: 'B (alt)', pick: 'show|b alt|' }];
+  const matches = new Map([['k1', { id: 'q1', tags: [] }], ['k2', { id: 'q2', tags: [] }], ['k3', { id: 'q2', tags: [] }]]);
+  const { favs: out, missed } = settleFavourites(favs, pending, matches);
+  assert.deepEqual(out.map((f) => f.id), ['q1', 'q2']);
+  assert.deepEqual(missed, []);
+  assert.equal(new Set(favouriteIds(out)).size, out.length);
+});
+
+test('round 2 (2): a missing TMDB key is configuration, so results stay cacheable; transient failures stay partial', async () => {
+  const missing = () => { const e = new Error('TMDB_API_KEY missing'); e.code = 'missing_key'; e.keyName = 'TMDB_API_KEY'; throw e; };
+  const fetchOk = async (u) => ({ ok: true, json: async () => (String(u).includes('itunes') ? { results: [{ artistName: 'Radiohead' }] } : { docs: [{ title: 'Ra', first_publish_year: 1999 }] }) });
+  const noKey = createSuggest({ fetch: fetchOk, tmdb: { searchTv: missing, searchMovie: missing } });
+  const r = await noKey.suggest('ra', 'any');
+  assert.equal(r.partial, false); assert.deepEqual(r.results.map((x) => x.kind).sort(), ['band', 'book']);
+  const blip = createSuggest({ fetch: fetchOk, tmdb: { searchTv: async () => { throw Object.assign(new Error('x'), { status: 502 }); }, searchMovie: missing } });
+  assert.equal((await blip.suggest('ra', 'any')).partial, true);
+  // and the handler caches the no-key answer
+  setSuggest(noKey); suggestCache.clear?.();
+  const res = await fetch(base + '/api/suggest?kind=any&q=nokeyq');
+  assert.match(res.headers.get('cache-control'), /s-maxage=3600/);
+  assert.ok(suggestCache.get('any|nokeyq'));
+  setSuggest(undefined);
 });

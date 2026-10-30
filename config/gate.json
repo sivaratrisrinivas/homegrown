@@ -1,0 +1,114 @@
+{
+  "threshold": 0.6,
+  "categories": [
+    "tv",
+    "movie",
+    "music"
+  ],
+  "measuredAt": "2026-10-29T20:24:36.701Z",
+  "source": "npm run measure: top 15 per category, every candidate checked, MusicBrainz errors retried (1.1 s backoff) and excluded from the denominator; seeds Breaking Bad, Radiohead, Parasite",
+  "results": {
+    "mexico_city": {
+      "tv": {
+        "seen": 15,
+        "accepted": 9,
+        "errors": 0
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 6,
+        "errors": 0
+      },
+      "music": {
+        "seen": 15,
+        "accepted": 12,
+        "errors": 0
+      }
+    },
+    "madrid": {
+      "tv": {
+        "seen": 15,
+        "accepted": 13,
+        "errors": 0
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 12,
+        "errors": 0
+      },
+      "music": {
+        "seen": 15,
+        "accepted": 11,
+        "errors": 0
+      }
+    },
+    "buenos_aires": {
+      "tv": {
+        "seen": 11,
+        "accepted": 8,
+        "errors": 0
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 13,
+        "errors": 0
+      },
+      "music": {
+        "seen": 6,
+        "accepted": 5,
+        "errors": 0
+      }
+    },
+    "seoul": {
+      "tv": {
+        "seen": 15,
+        "accepted": 11,
+        "errors": 0
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 13,
+        "errors": 0
+      },
+      "music": {
+        "seen": 15,
+        "accepted": 13,
+        "errors": 0
+      }
+    },
+    "paris": {
+      "tv": {
+        "seen": 15,
+        "accepted": 9,
+        "errors": 0
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 6,
+        "errors": 0
+      },
+      "music": {
+        "seen": 15,
+        "accepted": 12,
+        "errors": 0
+      }
+    },
+    "chennai": {
+      "tv": {
+        "seen": 15,
+        "accepted": 2,
+        "errors": 0
+      },
+      "movie": {
+        "seen": 15,
+        "accepted": 6,
+        "errors": 0
+      },
+      "music": {
+        "seen": 15,
+        "accepted": 13,
+        "errors": 0
+      }
+    }
+  }
+}

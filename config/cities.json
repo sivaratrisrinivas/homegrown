@@ -1,0 +1,148 @@
+{
+  "languages": [
+    {
+      "id": "es",
+      "name": "Spanish",
+      "local": "Español"
+    },
+    {
+      "id": "ko",
+      "name": "Korean",
+      "local": "한국어"
+    },
+    {
+      "id": "fr",
+      "name": "French",
+      "local": "Français"
+    },
+    {
+      "id": "ta",
+      "name": "Tamil",
+      "local": "தமிழ்"
+    }
+  ],
+  "cities": [
+    {
+      "id": "mexico_city",
+      "name": "Mexico City",
+      "localName": "Ciudad de México",
+      "country": "MX",
+      "releaseCountry": "Mexico",
+      "countryNames": [
+        "mexico",
+        "méxico",
+        "mx",
+        "cdmx",
+        "mexico city",
+        "ciudad de mexico"
+      ],
+      "language": "es",
+      "flag": "🇲🇽",
+      "accent": "#E4007C",
+      "header": "Tu yo chilango",
+      "musicTag": "mexican",
+      "itunesCountry": "mx",
+      "subtitleTip": "Start with subtitles in Spanish."
+    },
+    {
+      "id": "madrid",
+      "name": "Madrid",
+      "localName": "Madrid",
+      "country": "ES",
+      "releaseCountry": "Spain",
+      "countryNames": [
+        "spain",
+        "españa",
+        "espana",
+        "madrid"
+      ],
+      "language": "es",
+      "flag": "🇪🇸",
+      "accent": "#C60B1E",
+      "header": "Tu yo madrileño",
+      "musicTag": "spanish",
+      "itunesCountry": "es",
+      "subtitleTip": "Start with subtitles in Spanish."
+    },
+    {
+      "id": "buenos_aires",
+      "name": "Buenos Aires",
+      "localName": "Buenos Aires",
+      "country": "AR",
+      "releaseCountry": "Argentina",
+      "countryNames": [
+        "argentina",
+        "buenos aires"
+      ],
+      "language": "es",
+      "flag": "🇦🇷",
+      "accent": "#3A7BD5",
+      "header": "Tu yo porteño",
+      "musicTag": "argentine",
+      "itunesCountry": "ar",
+      "subtitleTip": "Start with subtitles in Spanish."
+    },
+    {
+      "id": "seoul",
+      "name": "Seoul",
+      "localName": "서울",
+      "country": "KR",
+      "releaseCountry": "South Korea",
+      "countryNames": [
+        "korea",
+        "south korea",
+        "republic of korea",
+        "대한민국",
+        "한국",
+        "seoul"
+      ],
+      "language": "ko",
+      "flag": "🇰🇷",
+      "accent": "#2E8B57",
+      "header": "서울의 너",
+      "musicTag": "k_pop",
+      "itunesCountry": "kr",
+      "subtitleTip": "Start with subtitles in Korean."
+    },
+    {
+      "id": "paris",
+      "name": "Paris",
+      "localName": "Paris",
+      "country": "FR",
+      "releaseCountry": "France",
+      "countryNames": [
+        "france",
+        "paris"
+      ],
+      "language": "fr",
+      "flag": "🇫🇷",
+      "accent": "#1D4E89",
+      "header": "Toi, version parisienne",
+      "musicTag": "french",
+      "itunesCountry": "fr",
+      "subtitleTip": "Start with subtitles in French."
+    },
+    {
+      "id": "chennai",
+      "name": "Chennai",
+      "localName": "சென்னை",
+      "country": "IN",
+      "releaseCountry": "India",
+      "countryNames": [
+        "india",
+        "chennai",
+        "madras",
+        "tamil nadu",
+        "இந்தியா",
+        "சென்னை"
+      ],
+      "language": "ta",
+      "flag": "🇮🇳",
+      "accent": "#E8A317",
+      "header": "சென்னை நீ",
+      "musicTag": "tamil",
+      "itunesCountry": "in",
+      "subtitleTip": "Start with subtitles in Tamil."
+    }
+  ]
+}

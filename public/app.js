@@ -32,6 +32,7 @@ async function qlooPost(body, isCurrent = () => true) {
 // S.favs holds only Qloo-matched favourites ({id,name,tags}); chosen-but-unmatched ones live in
 // S.pending with their match promise kept separately in pendingMatches.
 const pendingMatches = new Map();
+const removedKeys = new Set(); // picks removed as tokens: their late Qloo lookups are ignored
 const S = { favs: [], pending: [], missed: [], city: null, results: {}, catalogue: null, lang: null };
 const h = (tag, attrs = {}, ...kids) => {
   const el = document.createElement(tag);
@@ -274,7 +275,7 @@ function favourite(note) {
         const kind = e.kind || p.kind; const pick = pickKey(kind, e.name, e.year);
         if (isPicked(pick, S.favs, S.pending)) { msg.textContent = `${e.name} is already in your favourites.`; return; }
         const key = `${pick}|${S.pending.length + S.favs.length}`;
-        pendingMatches.set(key, resolveFavourite(e, kind));
+        removedKeys.delete(key); pendingMatches.set(key, resolveFavourite(e, kind));
         S.pending.push({ key, pick, name: e.name, sug: e, kind });
         landed = true; favourite(missNote(S.missed)); // S.missed keeps the 'Try other names' actions
       };
@@ -301,7 +302,7 @@ function favourite(note) {
     : h('p', { class: 'cap', 'aria-label': `Favourite ${i + 1} of ${JOURNEY_FAVS}` }, `${i + 1}/${JOURNEY_FAVS}`);
   // Selected favourites are small removable tokens.
   const remove = (f) => {
-    if (f.key && S.pending.includes(f)) { S.pending = S.pending.filter((x) => x !== f); pendingMatches.delete(f.key); } else S.favs = S.favs.filter((x) => x !== f);
+    if (f.key && S.pending.includes(f)) { S.pending = S.pending.filter((x) => x !== f); pendingMatches.delete(f.key); removedKeys.add(f.key); } else S.favs = S.favs.filter((x) => x !== f);
     favourite(missNote(S.missed));
   };
   const shelf = h('ul', { class: 'shelf', 'aria-label': 'Your favourites' }, chosen.map((f) => h('li', { class: 'token' }, h('span', {}, f.name),
@@ -309,7 +310,7 @@ function favourite(note) {
   const go = extra ? h('div', { class: 'cta pin' }, h('button', { class: 'primary', onclick: () => morph() }, `Match my ${chosen.length} favourites`)) : null;
   const justLanded = landed; landed = false;
   show(h('div', { class: 'dots-row' }, index), shelf, h('h2', { id: 'prompt' }, p.label), field, msg, sr, tryOthers, go,
-    opts({ focus: extra ? null : input, still: justLanded ? '.dots-row,.shelf' : null }));
+    opts({ focus: extra ? go.querySelector('button') : input, still: justLanded ? '.dots-row,.shelf' : null }));
   const gen = screenGen; screenAbort = () => alt.onInput(); // this screen's generation (show() just bumped it)
   if (justLanded && shelf.lastElementChild) { stamp(shelf.lastElementChild); shelf.scrollLeft = shelf.scrollWidth; }
 }
@@ -347,7 +348,7 @@ const frames = () => h('div', { class: 'frames', 'aria-hidden': 'true' }, h('spa
 // Favourites Qloo doesn't know go back to the favourites screen with 'Try other names'.
 async function matchFavourites(board, rows) {
   if (!S.pending.length) return S.favs.length >= 3 || (favourite(S.missed.length ? missNote(S.missed) : 'Pick at least 3 favourites.'), false);
-  const pend = [...S.pending]; const total = pend.length; let done = 0;
+  const pend = S.pending.filter((f) => !removedKeys.has(f.key)); const total = pend.length; let done = 0;
   const progress = h('p', { class: 'foot', role: 'status', 'aria-live': 'polite' }, matchingProgress(done, total));
   board.append(progress);
   // A7: one blinking cursor, on the first row still being matched.
@@ -361,7 +362,7 @@ async function matchFavourites(board, rows) {
     return [f.key, m];
   })));
   progress.remove();
-  const { favs, missedKeys, failed } = settleFavourites(S.favs, S.pending, matches);
+  const { favs, missedKeys, failed } = settleFavourites(S.favs, S.pending, matches, removedKeys);
   // Matched by pending key (not name), so two picks with the same name can't be confused.
   const missedPicks = S.pending.filter((f) => missedKeys.includes(f.key)).map((f) => ({ key: f.key, pick: f.pick, name: f.name, kind: f.kind }));
   // Merge into the persistent list; a later successful match of the same pick resolves an earlier miss.
@@ -487,7 +488,10 @@ function expandable(why, tip) {
   const wrap = h('div', { class: 'more-wrap' }, why);
   const btn = h('button', { class: 'quiet more', 'aria-expanded': 'false', hidden: '' }, 'more');
   btn.onclick = () => { const open = btn.getAttribute('aria-expanded') !== 'true'; btn.setAttribute('aria-expanded', String(open)); btn.textContent = open ? 'less' : 'more'; wrap.classList.toggle('open', open); };
-  requestAnimationFrame(() => { if (parts.some((el) => el.scrollHeight > el.clientHeight + 1)) btn.hidden = false; });
+  // Show the button only when something is cut; re-check (debounced) when the layout width changes.
+  const check = () => { if (!wrap.isConnected) { ro?.disconnect(); return; } if (wrap.classList.contains('open')) return; btn.hidden = !parts.some((el) => el.scrollHeight > el.clientHeight + 1); };
+  let rt; const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(check, 120); }) : null;
+  requestAnimationFrame(() => { check(); ro?.observe(wrap); });
   wrap.append(h('div', { class: 'more-row' }, tip, btn)); return wrap;
 }
 function player(p) {

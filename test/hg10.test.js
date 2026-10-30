@@ -162,7 +162,7 @@ test('HG-10 motion: tokens in CSS, transform/opacity only, reduced motion honour
 test('HG-10 journey: back goes one step; 3 prompted favourites (up to 5); HG-5 data model intact', () => {
   for (const s of ["nav('lang')", "nav('city')", "nav('fav', i)", "nav('reveal')", "addEventListener('popstate'", 'if (i >= MAX_FAVS) return morph();', 'const extra = i >= JOURNEY_FAVS;']) assert.ok(app.includes(s), s);
   assert.equal(JOURNEY_FAVS, 3);
-  assert.match(app, /settleFavourites\(S\.favs, S\.pending, matches\)/);
+  assert.match(app, /settleFavourites\(S\.favs, S\.pending, matches(, removedKeys)?\)/);
   assert.match(app, /const key = `\$\{pick\}\|\$\{S\.pending\.length \+ S\.favs\.length\}`/);
   assert.match(app, /results\.slice\(0, 3\)/);
 });
@@ -254,4 +254,18 @@ test('HG-10 r5 combobox: ARIA roles, keyboard, filtering, and every screen uses 
   assert.ok(app.includes("'aria-label': `Remove ${f.name}`") && app.includes('`Match my ${chosen.length} favourites`'));
   const css = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
   assert.match(css, /\.cb-opt\{min-height:48px/); assert.match(css, /\.token-x\{min-width:44px/);
+});
+
+test('HG-10 r5: a removed favourite token ignores its late Qloo lookup; focus and resize wiring', async () => {
+  const { settleFavourites } = await import('../public/logic.js');
+  const pending = [{ key: 'a|0', pick: 'a', name: 'A' }, { key: 'b|1', pick: 'b', name: 'B' }, { key: 'c|2', pick: 'c', name: 'C' }];
+  const matches = new Map([['a|0', { id: 'qa' }], ['b|1', { id: 'qb' }], ['c|2', null]]);
+  const r = settleFavourites([], pending, matches, new Set(['b|1', 'c|2']));
+  assert.deepEqual(r.favs.map((f) => f.id), ['qa'], 'B resolved late but was removed');
+  assert.deepEqual(r.missed, [], 'a removed pick is never reported as a miss');
+  assert.deepEqual(settleFavourites([], pending, matches).favs.map((f) => f.id), ['qa', 'qb'], 'default: nothing removed');
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.ok(app.includes("focus: extra ? go.querySelector('button') : input"), 'One more? screen focuses Match');
+  assert.ok(app.includes('removedKeys.add(f.key)') && app.includes('removedKeys.delete(key)'));
+  assert.ok(app.includes('new ResizeObserver(') && app.includes('setTimeout(check, 120)'), 'more/less re-checked on resize');
 });

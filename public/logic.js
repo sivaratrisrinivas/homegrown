@@ -145,9 +145,11 @@ export function lookupOutcome(r, sug) {
 }
 export const matchingProgress = (done, total) => `Matching ${Math.min(done + 1, total)} of ${total}`;
 
-export function settleFavourites(favs, pending, matches) {
+// `removed`: keys of picks the user removed (r5 tokens); a late lookup for one of them is ignored.
+export function settleFavourites(favs, pending, matches, removed = new Set()) {
   const out = [...favs]; const missed = []; const missedKeys = []; const failed = []; const ids = new Set(favouriteIds(favs));
   for (const f of pending) {
+    if (removed.has(f.key)) continue;
     const m = matches.get(f.key);
     if (m === LOOKUP_FAILED || m?.failed) { failed.push(f); continue; } // keep the pick; let the user retry
     if (!(m && typeof m.id === 'string' && m.id)) { missed.push(f.name); missedKeys.push(f.key); continue; }

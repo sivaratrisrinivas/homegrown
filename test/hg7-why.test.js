@@ -200,19 +200,28 @@ test('parseBatch tolerates fences and junk; whyBatch never leaks the key in erro
   await assert.rejects(c.whyBatch('<pick id="p0"></pick>'), (e) => !String(e.message).includes('sk-secret') && e.upstreamStatus === 500);
 });
 
-test('r2 stemmer: suffix stripped only with a 4+ char stem; short words exact or plural', async () => {
-  const { stem } = await import('../lib/whyllm.js');
-  assert.equal(stem('creation'), 'creat'); assert.equal(stem('creed'), 'creed'); assert.equal(stem('nation'), 'nation');
-  assert.equal(stem('missive'), 'missive'); assert.equal(stem('murders'), 'murder');
+test('r3 word matching: exact, plural, or -ing/-ed/-ion whose stem is a source word', async () => {
+  const { matchesSource } = await import('../lib/whyllm.js');
+  const S = (...w) => new Set(w);
+  for (const [w, src] of [['mission', 'missing'], ['missing', 'mission'], ['passion', 'passing'], ['passing', 'passion'], ['station', 'states'], ['states', 'station'], ['singly', 'singing'], ['singing', 'singly'], ['creed', 'creation'], ['creation', 'creed'], ['missive', 'missing'], ['nation', 'native']])
+    assert.equal(matchesSource(w, S(src)), false, `${w} vs ${src}`);
+  assert.equal(matchesSource('turned', S('turn')), true);
+  assert.equal(matchesSource('turning', S('turn')), true);
+  assert.equal(matchesSource('nations', S('nation')), true);
+  assert.equal(matchesSource('murder', S('murders')), true);
+  assert.equal(matchesSource('families', S('family')), true);
   const g = (src) => ({ favourite: 'Breaking Bad', sources: [src] });
   const L = (w) => `Like Breaking Bad, this is about the ${w} of a chemistry teacher and his crime.`;
-  const base = 'chemistry teacher crime';
-  assert.equal(validateWhy(L('creed'), g(base + ' creation')), null);
-  assert.equal(validateWhy(L('creation'), g(base + ' creed')), null);
-  assert.equal(validateWhy(L('missive'), g(base + ' missing')), null);
-  assert.equal(validateWhy(L('nation'), g(base + ' native')), null);
-  assert.ok(validateWhy(L('nations'), g(base + ' nation')));
-  assert.ok(validateWhy(L('creations'), g(base + ' creating')));
+  assert.equal(validateWhy(L('mission'), g('chemistry teacher crime missing')), null);
+  assert.equal(validateWhy(L('passion'), g('chemistry teacher crime passing')), null);
+  assert.equal(validateWhy(L('station'), g('chemistry teacher crime states')), null);
+  assert.equal(validateWhy(L('singly'), g('chemistry teacher crime singing')), null);
+  assert.ok(validateWhy(L('nations'), g('chemistry teacher crime nation')));
+});
+test('r3: at least 2 grounded content words; a generic line is rejected', () => {
+  assert.equal(validateWhy('Fans of Breaking Bad will love this film, a story they will enjoy and find similar.', GROUND), null);
+  assert.equal(validateWhy('Fans of Breaking Bad will love this film about crime, a story they will enjoy.', GROUND), null); // only 1
+  assert.ok(validateWhy('Fans of Breaking Bad will love this film about a teacher and his crime.', GROUND));
 });
 test('r2 allowed words: content words removed; possessive s accepted', () => {
   const g = { favourite: 'Breaking Bad', sources: ['a chemistry teacher turns to crime, killer'] };

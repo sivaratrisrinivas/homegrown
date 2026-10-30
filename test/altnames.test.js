@@ -85,7 +85,7 @@ import { createAltTrigger } from '../public/altnames-client.js';
 
 test('spend is reserved before the await: concurrent calls cannot overshoot the global cap', async () => {
   let release; const gate = new Promise((r) => (release = r));
-  const claude = { calls: 0, async altNames() { claude.calls++; await gate; return { names: [], usage: {} }; } };
+  const claude = { calls: 0, async altNames() { claude.calls++; await gate; return { names: [], usage: { input_tokens: 0, output_tokens: 0 } }; } };
   const caps = { ...ALT_CAPS, perIpPerDay: 1e6, globalUsdPerDay: MAX_CALL_USD * 3 };
   const f = createAltNames({ qloo: mockQloo({}), claude, caps });
   const ps = Array.from({ length: 10 }, (_, i) => f({ q: 'q' + i, kind: 'show', ip: 'x' }));
@@ -162,15 +162,14 @@ test('deadline fixed at entry is passed to qloo.search; a deadline stop is incom
   const g = createAltNames({ qloo: mockQloo({}), claude: mockClaude(['A']), deadlineMs: -1 });
   await g({ q: 'bar', kind: 'show', ip: 'x' }); assert.equal((await g({ q: 'bar', kind: 'show', ip: 'x' })).cached, undefined);
 });
-test('real Qloo client: at most 1 retry, every HTTP attempt counts against the 40/day budget', async () => {
+test('real Qloo client: no 429 retry, every HTTP attempt counts against the daily budget', async () => {
   const qf = fakeFetch([['/search', () => json({}, 429)]]);
   const qloo = createQloo({ fetch: qf, env: { QLOO_API_KEY: 'k' }, sleep: async () => {}, gapMs: 0 });
-  const f = createAltNames({ qloo, claude: mockClaude(['A', 'B']), caps: { ...ALT_CAPS, perIpPerDay: 1e6, qlooPerDay: 3 } });
-  await f({ q: 'one', kind: 'show', ip: 'x' });
-  assert.equal(qf.calls.length, 2); // 1 attempt + 1 retry, then the 429 ends the request
-  await f({ q: 'two', kind: 'show', ip: 'x' });
-  assert.equal(qf.calls.length, 3); // budget hit mid-retry: the 4th attempt is never sent
-  assert.equal((await f({ q: 'three', kind: 'show', ip: 'x' })).capped, 'qloo'); assert.equal(qf.calls.length, 3);
+  const f = createAltNames({ qloo, claude: mockClaude(['A', 'B']), caps: { ...ALT_CAPS, perIpPerDay: 1e6, qlooPerDay: 2 } });
+  await f({ q: 'one', kind: 'show', ip: 'x' }); assert.equal(qf.calls.length, 1); // a 429 ends the request, no retry
+  await f({ q: 'two', kind: 'show', ip: 'x' }); assert.equal(qf.calls.length, 2);
+  assert.equal((await f({ q: 'three', kind: 'show', ip: 'x' })).capped, 'qloo'); assert.equal(qf.calls.length, 2);
+  assert.equal(ALT_CAPS.maxNames * (1 + 0), 2); // <= 2 throttle slots per request
 });
 test("Claude's names are cached per key: a retry after a Qloo failure skips Claude", async () => {
   let fail = true; const claude = mockClaude(['Alt']);
@@ -181,9 +180,34 @@ test("Claude's names are cached per key: a retry after a Qloo failure skips Clau
   assert.deepEqual((await f({ q: 'foo', kind: 'show', ip: 'x' })).results.map((e) => e.id), ['q-a']);
   assert.equal(claude.calls, 1); assert.equal(qloo.calls, 2);
 });
-test('app: an aborted/superseded altnames lookup leaves the message unchanged', async () => {
+test('app: the lookup message is set only when eligible and restored when submit returns null', async () => {
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
-  const line = src.split('\n').find((l) => l.includes('found === null'));
-  assert.ok(line && /return;/.test(line) && !/msg\.textContent/.test(line));
+  const body = src.slice(src.indexOf("key !== 'Enter'"), src.indexOf("input.addEventListener('input'"));
+  assert.ok(body.indexOf('!alt.eligible(q)') < body.indexOf("'Looking for other names…'"));
+  assert.match(body, /found === null\) \{ msg\.textContent = prev; return; \}/);
+});
+test('client eligible(): only the latest no-result query; cleared on input', () => {
+  const t = createAltTrigger({ fetch: () => assert.fail() });
+  assert.equal(t.eligible('foo'), false);
+  t.noteResults('foo', 0); assert.equal(t.eligible('foo'), true); assert.equal(t.eligible('bar'), false);
+  t.onInput(); assert.equal(t.eligible('foo'), false);
+});
+test('missing usage keeps the full reservation instead of settling to $0', async () => {
+  const caps = { ...ALT_CAPS, perIpPerDay: 1e6, globalUsdPerDay: MAX_CALL_USD * 2 };
+  for (const usage of [undefined, {}, { output_tokens: 5 }]) {
+    const claude = { calls: 0, async altNames() { claude.calls++; return { names: [], usage }; } };
+    const f = createAltNames({ qloo: mockQloo({}), claude, caps });
+    for (let i = 0; i < 5; i++) await f({ q: 'q' + i, kind: 'show', ip: 'x' });
+    assert.equal(claude.calls, 2);
+  }
+});
+test('missing_key / notSent refund the per-IP counter; a sent failure does not', async () => {
+  const caps = { ...ALT_CAPS, perIpPerDay: 2 };
+  for (const [err, expected] of [[{ code: 'missing_key' }, 5], [{ notSent: true }, 5], [{ status: 502 }, 2]]) {
+    const claude = { calls: 0, async altNames() { claude.calls++; throw Object.assign(new Error('x'), err); } };
+    const f = createAltNames({ qloo: mockQloo({}), claude, caps });
+    for (let i = 0; i < 5; i++) await f({ q: 'q' + i, kind: 'show', ip: 'x' });
+    assert.equal(claude.calls, expected);
+  }
 });

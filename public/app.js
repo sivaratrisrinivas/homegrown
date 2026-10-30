@@ -90,10 +90,12 @@ function favourite() {
   input.addEventListener('keydown', async (ev) => {
     if (ev.key !== 'Enter') return;
     const q = input.value.trim(); const my = seq;
-    if (q.length < 2) return;
+    if (q.length < 2 || !alt.eligible(q)) return;
+    const prev = msg.textContent;
     msg.textContent = 'Looking for other names…';
     const found = await alt.submit(p.kind, q);
-    if (found === null || my !== seq) return; // aborted/superseded: leave the message to the newer query
+    if (my !== seq) return; // superseded: the newer query owns the message
+    if (found === null) { msg.textContent = prev; return; } // aborted/failed: restore, never stuck
     msg.textContent = found.length ? 'Found it under another name:' : 'Nothing found. Try something like it.';
     sugs.replaceChildren(...found.slice(0, 3).map(pick));
   });

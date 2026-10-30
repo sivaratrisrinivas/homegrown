@@ -7,6 +7,8 @@ export function createAltTrigger({ fetch = globalThis.fetch } = {}) {
   return {
     // Record the latest typeahead outcome: only an empty result makes the query eligible.
     noteResults(q, count) { emptyQ = count === 0 ? q : null; },
+    // True only when q is the latest query that came back with no results (the UI sets its message on this).
+    eligible(q) { return !!q && q === emptyQ; },
     // Called on every keystroke: the query is superseded.
     onInput() { abort(); emptyQ = null; },
     // Explicit submit. Resolves to an array of Qloo-verified entities, or null when not eligible/aborted.

@@ -149,7 +149,7 @@ export const JOURNEY_FAVS = 3;
 const SINGLE = {
   tv: { kind: 'show', noun: 'TV', plural: 'shows', labels: ["A show you'd rewatch", 'Another show you love', 'One more show'], examples: ['e.g. Breaking Bad', 'e.g. Fleabag', 'e.g. Dark'] },
   movie: { kind: 'movie', noun: 'film', plural: 'films', labels: ['A film you could quote', 'Another film you love', 'One more film'], examples: ['e.g. Amélie', 'e.g. Parasite', 'e.g. Spirited Away'] },
-  music: { kind: 'band', noun: 'music', plural: 'songs', labels: ['A band you always come back to', 'Another artist you love', 'One more artist'], examples: ['e.g. Radiohead', 'e.g. Daft Punk', 'e.g. Bad Bunny'] },
+  music: { kind: 'band', noun: 'music', plural: 'artists', labels: ['A band you always come back to', 'Another artist you love', 'One more artist'], examples: ['e.g. Radiohead', 'e.g. Daft Punk', 'e.g. Bad Bunny'] },
 };
 const MIXED_EXAMPLES = ['e.g. Breaking Bad', 'e.g. Radiohead', 'e.g. Amélie'];
 const ALIAS = { movies: 'movie', film: 'movie', films: 'movie', shows: 'tv' };

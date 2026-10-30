@@ -22,7 +22,7 @@ test('HG-10 journey: cut copy and cut features are gone from the client journey'
 test('HG-10 journey: copy from the revised spec', () => {
   assert.match(html, /Pick 3 things you love\. Meet the local you\./);
   for (const s of ['You’re learning…', ' · Best match', '‹ Language', 'Not ready yet — we only open a city when its picks are truly local.', '`Choose ${c.name}`',
-    'Watch on ${p.watch.provider}', 'Feels like you?', "'Yes'", "'Not really'", '`Send my ${c.name} self`', 'I grew up in ${c.name} (apparently). Who are you there?', "'Copy link'", "'Save image'", "'Find yours'",
+    'Watch on ${p.watch.provider}', 'Feels like you?', "'Yes'", "'Not really'", '`Send my ${c.name} self`', 'My ${J.noun} self grew up in ${c.name} (apparently). Who’s yours?', "'Copy link'", "'Save image'", "'Find yours'",
     'Grow up in ${o.name} instead →', 'We couldn’t find picks local enough for your taste here. Try another city.', 'Where-to-watch data: ', 'Try other names for ${m.name}']) assert.ok(app.includes(s), s);
 });
 
@@ -115,7 +115,10 @@ test('HG-10 feedback: share events are sanitised, not trusted', () => {
   assert.equal(validateFeedback({ event: 'share', method: 'copy', city: 'toString' }).value.city, '', 'prototype keys are not cities');
   assert.equal(validateFeedback({ event: 'share', method: 'copy', city: 'madrid' }).value.city, 'madrid');
   assert.equal(validateFeedback({ event: 'share', method: 'link', city: 42, favourites: 'nope' }).value.favourites.length, 0);
-  assert.equal(validateFeedback({ event: 'rating', rating: 5, city: 'atlantis' }).ok, false, 'other events unchanged');
+  assert.equal(validateFeedback({ event: 'rating', rating: 5, city: 'atlantis' }).ok, false, 'other events still reject unknown cities');
+  assert.equal(validateFeedback({ event: 'rating', rating: 5, favourites: ['y'.repeat(99)] }).value.favourites[0].length, 40, 'cap applies to all events');
+  assert.equal(journeyFor('music').plural, 'artists');
+  assert.ok(app.includes("`Because they love ${fj.single ? `the ${fj.plural} ` : ''}"));
 });
 
 test('HG-10 feedback: share events validated; old events and flag payloads unchanged', () => {

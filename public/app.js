@@ -531,7 +531,7 @@ function shareBlock() {
   const c = S.city; const wrap = h('section', { class: 'share wait', 'aria-label': 'Share' });
   const status = h('p', { class: 'cap', role: 'status', 'aria-live': 'polite' });
   const card = () => { const { hero, rows } = journeyPicks(S.results, J); return postcard({ city: c, favs: S.favs.map((f) => f.name), picks: [hero, ...rows].filter(Boolean), url: shareUrl(shareCode()) }); };
-  const text = `I grew up in ${c.name} (apparently). Who are you there?`;
+  const text = J.single ? `My ${J.noun} self grew up in ${c.name} (apparently). Who’s yours?` : `I grew up in ${c.name} (apparently). Who are you there?`;
   const copy = async () => {
     const url = shareUrl(shareCode());
     try { await navigator.clipboard.writeText(url); status.textContent = 'Link copied'; } catch { status.textContent = url; }
@@ -598,7 +598,7 @@ async function friendView() {
   const board = h('div', { class: 'board compact city' }, h('h2', { class: 'hdr', lang: 'en' }, `A friend’s ${c.name} ${header}`), flapRow(c.name.toUpperCase(), [...c.name].length, false));
   const lang = (cat.languages || []).find((l) => l.id === (data.lang || c.language)) || (cat.languages || []).find((l) => l.id === c.language);
   const find = () => { history.replaceState({ step: 'hello' }, '', location.pathname); S.missed = []; S.favs = []; S.pending = []; if (lang) { chooseLanguage(lang); S.city = c; suggestCity(c); } else pickLanguage(); };
-  show(board, h('p', { class: 'cap shared-by' }, 'Shared by a friend · open yours for live picks'), h('p', { class: 'friend-cap' }, data.favs.length ? `Because they love ${data.favs.join(', ')}` : null),
+  show(board, h('p', { class: 'cap shared-by' }, 'Shared by a friend · open yours for live picks'), h('p', { class: 'friend-cap' }, data.favs.length ? `Because they love ${fj.single ? `the ${fj.plural} ` : ''}${data.favs.join(', ')}` : null),
     pickCard({ ...data.hero, why: null }, c, true),
     h('div', { class: 'cta' }, h('button', { class: 'primary', onclick: find }, 'Find yours')),
     data.rows.length ? h('div', { class: 'list' }, data.rows.map((p, n) => pickRow(p, n + 1, c))) : null, opts({ anim: false, focus: board.firstChild }));

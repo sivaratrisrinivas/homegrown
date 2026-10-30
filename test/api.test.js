@@ -20,7 +20,8 @@ test('serves the app', async () => {
   assert.equal((await fetch(base + '/nope.txt')).status, 404);
 });
 test('health reports key presence only', async () => {
-  assert.deepEqual(await (await fetch(base + '/api/health')).json(), { ok: true, keys: { QLOO_API_KEY: false, TMDB_API_KEY: false } });
+  const h = await (await fetch(base + '/api/health')).json();
+  assert.deepEqual(h.keys, { QLOO_API_KEY: false, TMDB_API_KEY: false }); assert.equal(h.keyLengths.QLOO_API_KEY.length, 0);
 });
 test('search without key -> 503 missing_key, no secret leakage', async () => {
   const r = await fetch(base + '/api/search?q=breaking&kind=show');

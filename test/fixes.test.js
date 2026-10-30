@@ -119,3 +119,15 @@ test('upstream errors log only status codes, never messages or URLs', async () =
   assert.deepEqual(JSON.parse(lines[0]), { event: 'upstream_error', status: 502, upstream: 401, source: 'qloo' });
   assert.doesNotMatch(lines.join(''), /SECRET|api_key|https/);
 });
+
+test('keys are trimmed; health reports lengths only', async () => {
+  const { requireEnv } = await import('../lib/cities.js');
+  assert.equal(requireEnv('K', { K: ' abc\n' }), 'abc');
+  const { default: health } = await import('../api/health.js');
+  const prev = process.env.QLOO_API_KEY; process.env.QLOO_API_KEY = 'secretvalue\n';
+  let body = ''; health({}, { setHeader() {}, end(b) { body = b; } });
+  if (prev === undefined) delete process.env.QLOO_API_KEY; else process.env.QLOO_API_KEY = prev;
+  const j = JSON.parse(body);
+  assert.deepEqual(j.keyLengths.QLOO_API_KEY, { set: true, length: 11, rawLength: 12 });
+  assert.doesNotMatch(body, /secretvalue/);
+});

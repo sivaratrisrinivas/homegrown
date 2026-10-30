@@ -17,7 +17,7 @@ test('search sends key in header and normalises entities', async () => {
   const c = clock();
   const r = await createQloo({ fetch: f, env, ...c }).search('breaking', 'urn:entity:tv_show');
   assert.equal(r[0].id, 'q-bb'); assert.equal(r[0].year, 2008); assert.equal(r[0].tags[0].name, 'crime');
-  assert.equal(f.calls[0].init.headers['X-Api-Key'], 'test-key-not-real');
+  assert.equal(f.calls[0].init.headers['x-api-key'], 'test-key-not-real');
   assert.ok(!f.calls[0].url.includes('test-key'), 'key never in URL');
 });
 

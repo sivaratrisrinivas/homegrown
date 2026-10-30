@@ -213,14 +213,15 @@ test('round 3 (b): matching progress counts up as lookups settle, in a polite li
   assert.match(src, /progress\.textContent = matchingProgress\(\+\+done, total\)/);
 });
 
-test('round 4: results lead uses the app serif, sound toggle is plain text, watch link stays one line', async () => {
+test('round 4 (HG-10): the reveal lead line uses the app serif; the flap sound and its toggle were removed on purpose; the watch button stays one line', async () => {
   const css = await readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
   const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
-  assert.match(css, /\.lead\{font-family:Fraunces,"Fraunces Fallback",serif/);
-  assert.doesNotMatch(css, /var\(--serif/, 'no undefined --serif variable');
-  assert.match(html, /<button id="sound"[^>]*>Sound off<\/button>/);
-  assert.doesNotMatch(html, /🔇/);
-  assert.match(css, /\.card \.btn\{display:block;[^}]*white-space:nowrap;[^}]*text-overflow:ellipsis/);
+  assert.doesNotMatch(html, /id="sound"|Sound off/, 'the flap sound was removed in HG-10 (deliberate cut), so there is no toggle');
+  assert.doesNotMatch(css, /\.sound\{/, 'no sound toggle styles left behind');
+  assert.match(css, /--serif:Fraunces,"Fraunces Fallback",serif/, '--serif is the app serif');
+  // The lead line of the reveal is the board header: it is set in the app serif.
+  assert.match(css, /\.board \.hdr\{font:400 var\(--t-title\)\/1\.15 var\(--serif\)/, 'the reveal lead line uses the app serif');
+  assert.match(css, /\.outline\{[^}]*white-space:nowrap;[^}]*text-overflow:ellipsis/);
 });
 
 test('round 4: the wildcard slot rejects the same work picked earlier; a different work of the same name is allowed', () => {

@@ -12,7 +12,7 @@ import altnames from './api/altnames.js';
 import aisuggest from './api/aisuggest.js';
 
 const routes = { '/api/search': search, '/api/twin': twin, '/api/feedback': feedback, '/api/health': health, '/api/cities': cities, '/api/suggest': suggest, '/api/altnames': altnames, '/api/aisuggest': aisuggest };
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.png': 'image/png' };
 const PUB = join(import.meta.dirname, 'public');
 
 export function createServer() {

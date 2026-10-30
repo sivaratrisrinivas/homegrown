@@ -96,7 +96,9 @@ test('captain 6: measured best city is the default; other live cities are one ta
   assert.equal(cityForLanguage(cat, 'es').id, 'madrid', 'highest weakest-category % wins');
   assert.deepEqual(liveCitiesForLanguage(cat, 'es').map((c) => c.id), ['madrid', 'mexico_city']);
   const app = readFileSync('public/app.js', 'utf8');
-  assert.match(app, /Switch to \$\{o\.name\}/);
+  // HG-10 r5: other live cities are one combobox under "or" (one tap opens it, one tap picks); the primary is "Choose <city>".
+  assert.match(app, /others\.length \? combobox\(\{ h, label: `Other \$\{S\.lang\.name\} cities`[\s\S]*?options: others,[\s\S]*?onPick: \(o\) => suggestCity\(o\) \}\)/);
+  assert.match(app, /`Choose \$\{c\.name\}`/);
 });
 
 test('captain 7: cities and languages are config; Chennai/Tamil is a gated candidate', () => {

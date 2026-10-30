@@ -1,0 +1,271 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { whyLine } from '../lib/why.js';
+import { validateFeedback } from '../lib/feedback.js';
+import { journeyFor, revealHeader, journeyPicks, encodeShare, decodeShare, JOURNEY_FAVS, MAX_ROWS } from '../public/logic.js';
+import { CATEGORY } from '../public/config.js';
+
+const read = (f) => readFileSync(new URL(`../public/${f}`, import.meta.url), 'utf8');
+const app = read('app.js'), css = read('styles.css'), html = read('index.html');
+const madrid = { id: 'madrid', name: 'Madrid', header: 'Tu yo madrileño', language: 'es' };
+const pick = (category, n, extra = {}) => ({ category, title: `${category}-${n}`, ...extra });
+const cat = (c, k) => ({ picks: Array.from({ length: k }, (_, i) => pick(c, i)) });
+
+test('HG-10 journey: cut copy and cut features are gone from the client journey', () => {
+  const all = app + html;
+  for (const s of ['Sound off', 'Coming soon', 'On your postcard', 'Availability:', 'made in', 'Save my', 'Skip, that', 'That’s enough', 'Where to watch ·', 'How did we do?', 'Start typing', 'Add a note', 'See it as a map', 'Not really local']) assert.ok(!all.includes(s), s);
+  assert.doesNotMatch(app, /\.lead\b|c\.lead|postcardCategories|AudioContext|flagMenu|stampIn|rateStrip/);
+  assert.ok(app.includes("`${p.difficulty} (estimated)`")); // HG-7: difficulty is back, hero only, always marked estimated
+  assert.doesNotMatch(app, /👎/);
+});
+
+test('HG-10 journey: copy from the revised spec', () => {
+  assert.match(html, /Pick 3 things you love\. Meet the local you\./);
+  for (const s of ['You’re learning…', ' · Best match', '‹ Language', 'Not ready yet — we only open a city when its picks are truly local.', '`Choose ${c.name}`',
+    'Watch on ${p.watch.provider}', 'Feels like you?', "'Yes'", "'Not really'", '`Send my ${c.name} self`', 'My ${J.noun} self grew up in ${c.name} (apparently). Who’s yours?', "'Copy link'", "'Save image'", "'Find yours'",
+    'Grow up in ${o.name} instead →', 'We couldn’t find picks local enough for your taste here. Try another city.', 'Where-to-watch data: ', 'Try other names for ${m.name}']) assert.ok(app.includes(s), s);
+});
+
+test('HG-10 category config: captain set v1 to movies only', () => {
+  assert.equal(CATEGORY, 'movies');
+  const j = journeyFor(CATEGORY);
+  assert.equal(j.single, true); assert.equal(j.category, 'movie'); assert.deepEqual(j.order, ['movie']);
+  assert.deepEqual(j.prompts.map((p) => p.kind), ['movie', 'movie', 'movie']);
+  assert.ok(j.prompts.every((p) => /film/i.test(p.label)), 'prompts read as films');
+  assert.equal(revealHeader(j, madrid), 'Your film self, in Madrid'); assert.equal(j.plural, 'films');
+  const r = journeyPicks({ tv: cat('tv', 5), movie: cat('movie', 5), music: cat('music', 5) }, j);
+  assert.ok([r.hero, ...r.rows].every((p) => p.category === 'movie'));
+  const code = encodeShare({ lang: 'ko', city: 'seoul', category: j.category, favs: ['Amélie'], hero: r.hero, rows: r.rows });
+  const d = decodeShare(code, [{ id: 'seoul', name: 'Seoul', language: 'ko' }]);
+  assert.equal(d.category, 'movie'); assert.equal(revealHeader(journeyFor(d.category), d.city), 'Your film self, in Seoul');
+  assert.doesNotMatch(readFileSync(new URL('../public/logic.js', import.meta.url), 'utf8').split('export function journeyFor')[1].split('\n}')[0], /madrid|seoul/i, 'no hard-coded cities');
+});
+
+test('HG-10 category config: mixed still works (pre-captain default)', () => {
+  assert.match(app, /const J = journeyFor\(CATEGORY\)/);
+  const mixed = journeyFor('mixed');
+  assert.equal(mixed.single, false); assert.deepEqual(mixed.order, ['tv', 'movie', 'music']);
+  assert.deepEqual(mixed.prompts.map((p) => p.kind), ['show', 'band', 'movie']); assert.equal(mixed.prompts.length, JOURNEY_FAVS);
+  assert.equal(revealHeader(mixed, madrid), 'Tu yo madrileño');
+  assert.equal(journeyFor('nonsense').single, false, 'unknown values fall back to mixed');
+});
+
+test('HG-10 category config: single-category renders "Your TV self, in Madrid" with that category only', () => {
+  const tv = journeyFor('tv');
+  assert.equal(tv.single, true); assert.deepEqual(tv.order, ['tv']);
+  assert.deepEqual(tv.prompts.map((p) => p.kind), ['show', 'show', 'show']);
+  assert.deepEqual(tv.prompts.map((p) => p.placeholder), ['e.g. Breaking Bad', 'e.g. Fleabag', 'e.g. Dark']);
+  assert.equal(revealHeader(tv, madrid), 'Your TV self, in Madrid');
+  assert.equal(revealHeader(journeyFor('music'), madrid), 'Your music self, in Madrid');
+  const byCat = { tv: cat('tv', 6), movie: cat('movie', 4), music: cat('music', 4) };
+  const r = journeyPicks(byCat, tv);
+  assert.equal(r.hero.title, 'tv-0'); assert.deepEqual(r.rows.map((p) => p.category), ['tv', 'tv', 'tv', 'tv']);
+  assert.equal(r.rows.length, MAX_ROWS);
+  const m = journeyPicks({ tv: cat('tv', 3), movie: cat('movie', 3) }, journeyFor('mixed'));
+  assert.deepEqual(m.rows.map((p) => p.title), ['tv-1', 'movie-0', 'tv-2', 'movie-1'], 'mixed: categories take turns in one list');
+});
+
+test('HG-10 share link: result rides in ?r=, round-trips, stays short, rejects junk', () => {
+  const hero = pick('tv', 0, { title: 'Las chicas del cable', englishTitle: 'Cable Girls', image: 'https://image.tmdb.org/t/p/w500/abcD_1-x.jpg' });
+  const rows = [pick('tv', 1, { title: 'Élite' }), pick('tv', 2, { title: 'La casa de papel', englishTitle: 'Money Heist' }), pick('music', 3, { title: 'Rosalía', image: 'https://qloo.example/x.png' })];
+  const code = encodeShare({ lang: 'es', city: 'madrid', category: 'tv', favs: ['Breaking Bad', 'Fleabag', 'Dark'], hero, rows });
+  assert.match(code, /^[\w-]+$/); assert.ok(`/?r=${code}`.length < 600, `${code.length}`);
+  const d = decodeShare(code, [madrid]);
+  assert.equal(d.city.id, 'madrid'); assert.equal(d.lang, 'es'); assert.equal(d.category, 'tv');
+  assert.deepEqual(d.favs, ['Breaking Bad', 'Fleabag', 'Dark']);
+  assert.equal(d.hero.title, 'Las chicas del cable'); assert.equal(d.hero.englishTitle, 'Cable Girls');
+  assert.equal(d.hero.image, 'https://image.tmdb.org/t/p/w342/abcD_1-x.jpg');
+  assert.equal(d.rows[2].image, null, 'only TMDB poster paths survive');
+  for (const bad of ['', 'x', '!!!', 'e30', encodeShare({ lang: 'es', city: 'atlantis', category: 'tv', favs: [], hero, rows: [] })]) assert.equal(decodeShare(bad, [madrid]), null, bad);
+  assert.equal(decodeShare('a'.repeat(3000), [madrid]), null);
+});
+
+test('HG-10 share: navigator.share with files, then url, then Copy link + Save image; postcard is type-only canvas', () => {
+  assert.match(app, /navigator\.canShare\?\.\(\{ files: \[file\] \}\)/);
+  assert.match(app, /navigator\.share\(\{ url, text \}\)/);
+  assert.match(app, /download: `homegrown-\$\{c\.id\}\.png`/);
+  assert.match(app, /document\.fonts\.load/); assert.match(app, /canvas/);
+  assert.doesNotMatch(app.slice(app.indexOf('async function postcard'), app.indexOf('function shareBlock')), /drawImage/, 'no posters on the canvas');
+  assert.match(html, /property="og:image" content="https:\/\/homegrown-beta\.vercel\.app\/og\.png"/);
+  assert.match(html, /property="og:url" content="https:\/\/homegrown-beta\.vercel\.app\/"/);
+  assert.match(app, /method: useFiles \? 'files' : 'link'/); assert.match(app, /event: 'share_open'/);
+  assert.match(app, /!fallback\.isConnected\) wrap\.append\(fallback\)/);
+  assert.match(app, /share\.prepare\?\.\(\)/, 'postcard is pre-rendered when the share block appears');
+});
+
+test('HG-10 share: send() calls navigator.share synchronously in the tap (iOS user activation)', async () => {
+  const src = app.slice(app.indexOf('  const send = (e) => {'), app.indexOf("  wrap.append(h('div', { class: 'cta' }"));
+  assert.ok(src.length > 50); assert.doesNotMatch(src.split('navigator.share(')[0], /await|\.then\(/, 'nothing async before share');
+  // Run the real send() body against mocks and check share was called before any microtask ran.
+  const calls = []; let ticked = false;
+  const env = { sparkle: () => calls.push('sparkle'), canShare: true, copy: () => calls.push('copy'), shareCode: () => 'abc', shareUrl: (c) => `https://x/?r=${c}`, text: 't', track: (e) => calls.push(e.method),
+    wrap: { prepare: () => calls.push('prepare'), append: () => calls.push('fallback') }, fallback: { isConnected: false },
+    navigator: { canShare: () => true, share: (d) => { calls.push(ticked ? 'share-late' : d.files ? 'share-files' : 'share-url'); return Promise.resolve(); } } };
+  const make = (cached) => new Function(...Object.keys(env), 'cached', `${src.replace('  const send = ', 'return ')}`)(...Object.values(env), cached);
+  Promise.resolve().then(() => { ticked = true; });
+  const p1 = make({ code: 'abc', file: { name: 'f.png' } })({ currentTarget: {} }); assert.deepEqual(calls.slice(0, 2), ['sparkle', 'share-files'], 'sparkle is synchronous DOM work, share still runs in the tap'); await p1;
+  ticked = false; Promise.resolve().then(() => { ticked = true; });
+  calls.length = 0; const p2 = make(null)(undefined); assert.equal(calls[0], 'share-url', 'no cached card yet: share the link now, draw for next time'); assert.ok(calls.includes('prepare')); await p2;
+  assert.ok(calls.includes('link'));
+});
+
+test('HG-10 feedback: share events are sanitised, not trusted', () => {
+  const v = validateFeedback({ event: 'share_open', city: 'atlantis', favourites: ['x'.repeat(100), 'Amélie'] });
+  assert.equal(v.ok, true); assert.equal(v.value.city, ''); assert.equal(v.value.favourites[0].length, 40); assert.equal(v.value.favourites[1], 'Amélie');
+  assert.equal(validateFeedback({ event: 'share', method: 'copy', city: 'toString' }).value.city, '', 'prototype keys are not cities');
+  assert.equal(validateFeedback({ event: 'share', method: 'copy', city: 'madrid' }).value.city, 'madrid');
+  assert.equal(validateFeedback({ event: 'share', method: 'link', city: 42, favourites: 'nope' }).value.favourites.length, 0);
+  assert.equal(validateFeedback({ event: 'rating', rating: 5, city: 'atlantis' }).ok, false, 'other events still reject unknown cities');
+  assert.equal(validateFeedback({ event: 'rating', rating: 5, favourites: ['y'.repeat(99)] }).value.favourites[0].length, 40, 'cap applies to all events');
+  assert.equal(journeyFor('music').plural, 'artists');
+  assert.ok(app.includes("`Because they love ${fj.single ? `the ${fj.plural} ` : ''}"));
+});
+
+test('HG-10 feedback: share events validated; old events and flag payloads unchanged', () => {
+  for (const m of ['files', 'link', 'copy', 'image']) assert.equal(validateFeedback({ event: 'share', method: m, city: 'madrid' }).ok, true, m);
+  assert.equal(validateFeedback({ event: 'share', method: 'fax' }).ok, false);
+  assert.equal(validateFeedback({ event: 'share_open', city: 'madrid' }).ok, true);
+  assert.equal(validateFeedback({ event: 'flag', flag: 'not_local' }).ok, true);
+  assert.equal(validateFeedback({ event: 'rating', rating: 5 }).ok, true);
+  for (const e of ["event: 'rating', rating: yes ? 5 : 1", "event: 'tap', action: 'watch'", "event: 'tap', action: 'listen'", "event: 'try_city'"]) assert.ok(app.includes(e), e);
+});
+
+test('HG-10 why fallback names no vendor', () => {
+  const w = whyLine([{ name: 'Breaking Bad', tags: [] }, { name: 'Radiohead', tags: [] }], { tags: [], category: 'tv' });
+  assert.equal(w.text, 'Taste-matched to Breaking Bad and Radiohead by Qloo.'); assert.equal(w.grounded, false);
+});
+
+test('HG-10 VS palette, type and tokens', () => {
+  for (const t of ['--paper:#F5F1EA', '--card:var(--paper)', '--ink:#161616', '--ink-2:#55585A', '--ink-3:#6A6D6F', '--line:#E2DED6', '--board:#17161A', '--board-2:#24232A', '--chalk:#F1E7D3', '--t-display:clamp(40px,10vw,56px)', '--t-body:18px', '--mono:ui-monospace', '--ease-reveal:cubic-bezier(.19,1,.22,1)', '--d-share-delay:1200ms', '--d-share:280ms']) assert.ok(css.includes(t), t);
+  assert.equal(JSON.parse(readFileSync(new URL("../config/cities.json", import.meta.url), "utf8")).cities.find((c) => c.id === "madrid").accent, "#C8102E");
+  assert.doesNotMatch(css, /#3aa655|#e0a100|#d0453a|feTurbulence/, 'no traffic lights, no grain');
+  assert.match(html, /family=Fraunces:opsz,wght@9\.\.144,400&family=Inter:wght@400;500&display=swap/);
+  assert.doesNotMatch(html, /Noto\+Serif\+KR/); assert.match(app, /if \(l\.id === 'ko'\) loadKorean\(\)/);
+});
+
+test('HG-10 motion: tokens in CSS, transform/opacity only, reduced motion honoured', () => {
+  const kf = [...css.matchAll(/@keyframes [\w-]+\{([^@]*?\})\}/g)].map((m) => m[1]);
+  assert.ok(kf.length >= 3);
+  for (const k of kf) for (const prop of k.matchAll(/([a-z-]+):/g)) assert.ok(['transform', 'opacity'].includes(prop[1]), `keyframe animates ${prop[1]}`);
+  // No hard-coded durations in JS animations: every duration/delay reads a CSS token.
+  for (const m of app.matchAll(/(duration|delay): ([^,}]+)/g)) assert.match(m[2], /T\(|^(ms|step|half)$/, m[0]);
+  assert.doesNotMatch(app, /wait\(\d/); assert.doesNotMatch(app, /EASE_|cubic-bezier/);
+  for (const t of ['d-flap', 'd-flap-stagger', 'd-row-gap', 'd-header', 'd-hold', 'd-shrink', 'd-share-delay', 'd-share', 'd-exit', 'd-enter', 'd-develop']) { assert.ok(css.includes(`--${t}:`), t); assert.ok(app.includes(`T('${t}')`), t); }
+  assert.match(css, /prefers-reduced-motion:reduce\)\{:root\{--d-hover:0ms;[^}]*--d-share-delay:0ms;--d-share:0ms\}\}/);
+  assert.match(app, /const motionMq = matchMedia\('\(prefers-reduced-motion: reduce\)'\);\nconst reduced = \(\) => motionMq\.matches;/); assert.ok(!/reduced(?!\(\)| = )\b/.test(app.replace(/prefers-reduced-motion/g, '')));
+  assert.match(app, /if \(reduced\(\)\) \{ row\.cells\.forEach/);
+  assert.match(app, /visibilitychange[\s\S]*?iterations === Infinity/);
+  assert.match(app, /flapSteps\(cell\.textContent, target\[k\], 7\)/);
+});
+
+test('HG-10 journey: back goes one step; 3 prompted favourites (up to 5); HG-5 data model intact', () => {
+  for (const s of ["nav('lang')", "nav('city')", "nav('fav', i)", "nav('reveal')", "addEventListener('popstate'", 'if (i >= MAX_FAVS) return morph();', 'const extra = i >= JOURNEY_FAVS;']) assert.ok(app.includes(s), s);
+  assert.equal(JOURNEY_FAVS, 3);
+  assert.match(app, /settleFavourites\(S\.favs, S\.pending, matches(, removedKeys)?\)/);
+  assert.match(app, /const key = `\$\{pick\}\|\$\{S\.pending\.length \+ S\.favs\.length\}`/);
+  assert.match(app, /results\.slice\(0, 3\)/);
+});
+
+test('HG-10 polish: purposeful animations, token-timed, reduced-motion safe', () => {
+  for (const f of ['const stamp = (el) => (reduced() ? fade(el)', 'function settle(cells', 'if (reduced()) return;', 'function sparkle(btn)', 'if (reduced() || sparking) return;', "h('div', { class: 'frames', 'aria-hidden': 'true' }", 'const preview = (blob) =>', 'stamp(shelf.lastElementChild)', 'sparkle(e.currentTarget)', "settle([...board.querySelectorAll('.flap')]"]) assert.ok(app.includes(f), f);
+  for (const t of ['d-press', 'd-stamp', 'd-settle', 'd-settle-stagger', 'd-frames', 'd-postcard', 'd-sparkle']) { assert.match(css, new RegExp(`--${t}:\\d+ms`)); assert.match(css, new RegExp(`prefers-reduced-motion:reduce\\)\\{:root\\{[^}]*--${t}:0ms`)); }
+  assert.match(css, /button:active:not\(:disabled\)\{transform:scale\(\.96\)\}/);
+  assert.match(css, /prefers-reduced-motion:reduce\)\{button:active:not\(:disabled\)\{transform:none\}\.frames>span\{animation:none\}/);
+});
+
+// Round 3: WCAG contrast of the colour tokens, for every city in config/cities.json.
+const lum = (hex) => { const v = hex.replace('#', '').match(/../g).map((x) => parseInt(x, 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+test('HG-10 contrast: text tokens meet AA; board header is chalk with an accent rule that reads on the board', () => {
+  const css = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+  const tok = (n) => css.match(new RegExp(`--${n}:(#[0-9A-Fa-f]{6})`))[1];
+  const paper = tok('paper'), board = tok('board');
+  for (const n of ['ink', 'ink-2', 'ink-3']) assert.ok(ratio(tok(n), paper) >= 4.5, `${n} on paper ${ratio(tok(n), paper).toFixed(2)}`);
+  assert.ok(ratio(tok('chalk'), board) >= 4.5);
+  assert.match(css, /\.board\.city \.hdr\{color:var\(--chalk\);text-decoration:underline;text-decoration-color:var\(--accent-rule\)/);
+  assert.ok(css.includes('--accent-rule:color-mix(in srgb,var(--accent) 80%,var(--chalk))'));
+  assert.ok(!/[{;]color:var\(--accent\)[;}]/.test(css.replace(/\.poster b\{[^}]*\}/, '')), 'accent is never body text on paper');
+  const cities = JSON.parse(readFileSync(new URL('../config/cities.json', import.meta.url), 'utf8')).cities;
+  // The exact set of cities, so a new one cannot skip this check.
+  assert.deepEqual(cities.map((c) => c.id).sort(), ['amritsar', 'bangkok', 'berlin', 'buenos_aires', 'cairo', 'chennai', 'dublin', 'hong_kong', 'hyderabad', 'istanbul', 'jakarta', 'kochi', 'kolkata', 'london', 'madrid', 'manila', 'mexico_city', 'moscow', 'mumbai', 'paris', 'rome', 'sao_paulo', 'seoul', 'taipei', 'tehran', 'tokyo']);
+  // cities.json is the single source of accents: no per-city CSS override.
+  assert.doesNotMatch(css, /\[data-city=[a-z_]+\]\{--accent/);
+  for (const c of cities) {
+    const acc = c.accent;
+    assert.match(acc, /^#[0-9A-Fa-f]{6}$/, c.id);
+    // The accent is used as a mark on paper (rules, underlines, the postcard bar): non-text contrast >= 3:1.
+    assert.ok(ratio(acc, paper) >= 3, `${c.id} accent on paper ${ratio(acc, paper).toFixed(2)}`);
+    const mix = (a, b, p) => '#' + [0, 2, 4].map((i) => Math.round(p * parseInt(a.slice(1 + i, 3 + i), 16) + (1 - p) * parseInt(b.slice(1 + i, 3 + i), 16)).toString(16).padStart(2, '0')).join('');
+    const rule = mix(acc, tok('chalk'), 0.8);
+    assert.ok(ratio(rule, board) >= 3, `${c.id} rule on board ${ratio(rule, board).toFixed(2)}`);
+  }
+});
+test('HG-10 runCats: the journey categories that are live, no fallback; empty means not ready', async () => {
+  const { runCatsFor, NOT_READY, journeyFor } = await import('../public/logic.js');
+  const J = journeyFor('movies');
+  assert.deepEqual(runCatsFor(J, { categories: ['movie', 'tv'] }), ['movie']);
+  assert.deepEqual(runCatsFor(J, { categories: ['tv'] }), []);
+  // Missing or empty categories mean not ready, never "run everything".
+  assert.deepEqual(runCatsFor(J, { categories: [] }), []);
+  assert.deepEqual(runCatsFor(J, {}), []);
+  assert.deepEqual(runCatsFor(J, null), []);
+  assert.deepEqual(runCatsFor(J, undefined), []);
+  assert.ok(NOT_READY.length);
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.ok(app.includes('const runCats = () => runCatsFor(J, S.catalogue);') && !/cats\.length \? cats : J\.order/.test(app));
+  assert.ok(app.includes("!cats.length ? h('p', { class: 'body not-ready' }, NOT_READY)"));
+});
+test('HG-10 acid layer: colour field behind a solid slab, static under reduced motion, two-column desktop reveal', () => {
+  const css = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.ok(html.includes('<div class="acid" aria-hidden="true">'));
+  assert.match(css, /\.acid\{position:fixed;inset:-25%;z-index:-1;pointer-events:none/);
+  assert.match(css, /main\{background:var\(--paper\);border-radius:var\(--r-lg\)/); // text sits on solid paper, never the gradient
+  assert.match(css, /prefers-reduced-motion:reduce\)\{:root\{--d-blob:0ms;--d-pour:0ms\}\.acid i\{animation:none\}\}/);
+  assert.match(css, /@media\(min-width:1024px\)\{[^@]*\.screen\.reveal\{display:grid;grid-template-columns:minmax\(0,5fr\) minmax\(0,6fr\)/);
+  assert.ok(app.includes("classList.add('reveal')") && app.includes('document.body.dataset.step = step;'));
+  assert.ok(app.includes('...(canShare ? [] : [fallback]), status)'), 'no stray "null" text in the share block');
+});
+test('HG-10 r4: blobs are smaller, contained and paused while the tab is hidden; Qloo credit always on the reveal', () => {
+  const css = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  const w = Number(css.match(/\.acid i\{position:absolute;width:(\d+)vmax;contain:strict;/)[1]);
+  assert.ok(w <= 50, `blob ${w}vmax`);
+  assert.ok(css.includes('[data-hidden] .acid i{animation-play-state:paused}'));
+  assert.ok(app.includes("document.documentElement.toggleAttribute('data-hidden', document.hidden)"));
+  assert.ok(app.includes("'Taste-matched by Qloo'") && app.includes('`Taste-matched by Qloo · Where-to-watch data:'));
+});
+
+// r5 (captain): language, city and favourites are one ARIA combobox each; favourites are removable tokens, 3 to 5.
+test('HG-10 r5 combobox: ARIA roles, keyboard, filtering, and every screen uses it', async () => {
+  const { matches } = await import('../public/combobox.js');
+  assert.ok(matches('espan', ['Spanish', 'Español'])); assert.ok(matches('', ['x'])); assert.ok(!matches('zz', ['Spanish']));
+  assert.ok(matches('cairo', ['Cairo', 'القاهرة'])); assert.ok(matches('القا', ['Cairo', 'القاهرة']));
+  const cb = readFileSync(new URL('../public/combobox.js', import.meta.url), 'utf8');
+  for (const s of ["role: 'combobox'", "'aria-autocomplete': 'list'", "'aria-expanded'", "'aria-controls'", "role: 'listbox'", "role: 'option'", "'aria-activedescendant'", "'ArrowDown'", "'ArrowUp'", "'Enter'", "'Escape'"]) assert.ok(cb.includes(s), s);
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.equal((app.match(/combobox\(\{ h,/g) || []).length, 3, 'language, city and favourites');
+  assert.ok(!app.includes("class: 'tile'") && !app.includes("class: 'chip'"), 'no chip spreads left');
+  // HG-12: the AI language path is still wired from the India section next to the language combobox.
+  assert.ok(app.includes("onSuggest: (l) => { S.ai = l; S.city = null; favourite(); }"));
+  // Favourites: removable tokens, 3 prompted, up to MAX_FAVS, explicit "Match" after 3.
+  assert.ok(app.includes("'aria-label': `Remove ${f.name}`") && app.includes('`Match my ${chosen.length} favourites`'));
+  const css = readFileSync(new URL('../public/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.cb-opt\{min-height:48px/); assert.match(css, /\.token-x\{min-width:44px/);
+});
+
+test('HG-10 r5: a removed favourite token ignores its late Qloo lookup; focus and resize wiring', async () => {
+  const { settleFavourites } = await import('../public/logic.js');
+  const pending = [{ key: 'a|0', pick: 'a', name: 'A' }, { key: 'b|1', pick: 'b', name: 'B' }, { key: 'c|2', pick: 'c', name: 'C' }];
+  const matches = new Map([['a|0', { id: 'qa' }], ['b|1', { id: 'qb' }], ['c|2', null]]);
+  const r = settleFavourites([], pending, matches, new Set(['b|1', 'c|2']));
+  assert.deepEqual(r.favs.map((f) => f.id), ['qa'], 'B resolved late but was removed');
+  assert.deepEqual(r.missed, [], 'a removed pick is never reported as a miss');
+  assert.deepEqual(settleFavourites([], pending, matches).favs.map((f) => f.id), ['qa', 'qb'], 'default: nothing removed');
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.ok(app.includes("focus: extra ? go.querySelector('button') : input"), 'One more? screen focuses Match');
+  assert.ok(app.includes('removedKeys.add(f.key)') && app.includes('removedKeys.delete(key)'));
+  assert.ok(app.includes('new ResizeObserver(') && app.includes('setTimeout(check, 120)'), 'more/less re-checked on resize');
+});

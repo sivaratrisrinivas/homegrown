@@ -11,6 +11,11 @@ export const canSkip = (n) => n >= MIN_FAVS && n < MAX_FAVS;
 export const QLOO_ORDER = ['tv', 'movie', 'music'];
 // HG-9 v1: the one list of categories the app runs, waits on and notes: the catalogue's live categories, in Qloo order.
 // A missing or empty list falls back to every category.
+// The categories to run: the journey's own, in order, that the catalogue says are live. No fallback:
+// an empty result means this city isn't ready, and the UI says so.
+// No categories in the catalogue (missing or empty) means not ready: never fall back to every category.
+export const runCatsFor = (J, catalogue) => { const cats = catalogue?.categories; if (!Array.isArray(cats) || !cats.length) return []; const live = liveCats(catalogue); return J.order.filter((c) => live.includes(c)); };
+export const NOT_READY = 'Picks for this city aren’t ready yet. Try another city.';
 export const liveCats = (catalogue) => { const live = catalogue?.categories; return QLOO_ORDER.filter((c) => (Array.isArray(live) && live.length ? live : QLOO_ORDER).includes(c)); };
 const CAT_WORD = { tv: 'TV', movie: 'movies', music: 'music' };
 export const categoryWords = (cats) => { const w = (Array.isArray(cats) && cats.length ? cats : QLOO_ORDER).map((c) => CAT_WORD[c] || c); return w.length > 1 ? `${w.slice(0, -1).join(', ')} and ${w.at(-1)}` : w[0]; };
@@ -140,9 +145,11 @@ export function lookupOutcome(r, sug) {
 }
 export const matchingProgress = (done, total) => `Matching ${Math.min(done + 1, total)} of ${total}`;
 
-export function settleFavourites(favs, pending, matches) {
+// `removed`: keys of picks the user removed (r5 tokens); a late lookup for one of them is ignored.
+export function settleFavourites(favs, pending, matches, removed = new Set()) {
   const out = [...favs]; const missed = []; const missedKeys = []; const failed = []; const ids = new Set(favouriteIds(favs));
   for (const f of pending) {
+    if (removed.has(f.key)) continue;
     const m = matches.get(f.key);
     if (m === LOOKUP_FAILED || m?.failed) { failed.push(f); continue; } // keep the pick; let the user retry
     if (!(m && typeof m.id === 'string' && m.id)) { missed.push(f.name); missedKeys.push(f.key); continue; }
@@ -153,3 +160,61 @@ export function settleFavourites(favs, pending, matches) {
   return { favs: out, missed, missedKeys, failed };
 }
 export const favouriteIds = (favs) => favs.map((f) => f.id).filter((id) => typeof id === 'string' && id);
+
+// HG-10: the single journey asks for exactly 3 favourites. `category` is config.js CATEGORY.
+// Single-category: three prompts of that kind, one Qloo category, header "Your TV self, in Madrid".
+// 'mixed' (default until HG-9): today's show / band / film prompts and every Qloo category.
+export const JOURNEY_FAVS = 3;
+const SINGLE = {
+  tv: { kind: 'show', noun: 'TV', plural: 'shows', labels: ["A show you'd rewatch", 'Another show you love', 'One more show'], examples: ['e.g. Breaking Bad', 'e.g. Fleabag', 'e.g. Dark'] },
+  movie: { kind: 'movie', noun: 'film', plural: 'films', labels: ['A film you could quote', 'Another film you love', 'One more film'], examples: ['e.g. Amélie', 'e.g. Parasite', 'e.g. Spirited Away'] },
+  music: { kind: 'band', noun: 'music', plural: 'artists', labels: ['A band you always come back to', 'Another artist you love', 'One more artist'], examples: ['e.g. Radiohead', 'e.g. Daft Punk', 'e.g. Bad Bunny'] },
+};
+const MIXED_EXAMPLES = ['e.g. Breaking Bad', 'e.g. Radiohead', 'e.g. Amélie'];
+const ALIAS = { movies: 'movie', film: 'movie', films: 'movie', shows: 'tv' };
+export function journeyFor(raw) {
+  const category = ALIAS[raw] || raw; const s = SINGLE[category];
+  if (!s) return { single: false, category: 'mixed', order: QLOO_ORDER, prompts: PROMPTS.slice(0, JOURNEY_FAVS).map((p, i) => ({ ...p, placeholder: MIXED_EXAMPLES[i] })) };
+  return { single: true, category, noun: s.noun, plural: s.plural, order: [category], prompts: s.labels.map((label, i) => ({ kind: s.kind, label, placeholder: s.examples[i] })) };
+}
+// Reveal header: single-category says what the list is; mixed keeps the city's own line.
+export const revealHeader = (j, city) => (j.single ? `Your ${j.noun} self, in ${city.name}` : city.header);
+// Reveal list: hero + up to 4 rows. Single-category: that category only. Mixed: all categories, one list.
+export const MAX_ROWS = 4;
+export function journeyPicks(byCat, j) {
+  const only = Object.fromEntries(Object.entries(byCat).filter(([c]) => j.order.includes(c)));
+  const { hero, rest } = rankPicks(only);
+  if (j.single) return { hero, rows: rest.slice(0, MAX_ROWS) };
+  // Mixed: take turns across categories so one list isn't all shows.
+  const queues = j.order.map((c) => rest.filter((p) => p.category === c)); const rows = [];
+  while (rows.length < MAX_ROWS && queues.some((q) => q.length)) for (const q of queues) if (q.length && rows.length < MAX_ROWS) rows.push(q.shift());
+  return { hero, rows };
+}
+
+// Share link (§S): the result itself rides in ?r= (base64url JSON), no storage.
+// Titles are encoded directly: Qloo results aren't deterministic, so IDs can't be re-resolved.
+const b64u = { enc: (s) => btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+  dec: (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))) };
+const posterPath = (url) => (String(url || '').match(/^https:\/\/image\.tmdb\.org\/t\/p\/[^/]+(\/[\w-]+\.(?:jpg|png))$/) || [])[1] || '';
+const clip = (s, n) => String(s || '').slice(0, n);
+export function encodeShare({ lang, city, category, favs, hero, rows }) {
+  const p = [hero, ...rows].filter(Boolean).slice(0, 1 + MAX_ROWS)
+    .map((x) => [clip(x.title, 60), x.englishTitle && x.englishTitle !== x.title ? clip(x.englishTitle, 60) : '', x.category || '', posterPath(x.image)]);
+  return b64u.enc(JSON.stringify({ v: 1, l: lang, c: city, cat: category, f: favs.slice(0, 3).map((f) => clip(f, 40)), p }));
+}
+// Returns null for anything malformed: a friend's link must never break the app.
+export function decodeShare(r, cities = []) {
+  try {
+    if (typeof r !== 'string' || r.length > 2000) return null;
+    const o = JSON.parse(b64u.dec(r));
+    if (!o || o.v !== 1 || typeof o.c !== 'string' || !Array.isArray(o.p) || !o.p.length) return null;
+    const city = cities.find((c) => c.id === o.c); if (!city) return null;
+    const str = (s, n) => (typeof s === 'string' ? s.slice(0, n) : '');
+    const picks = o.p.slice(0, 1 + MAX_ROWS).filter(Array.isArray).map(([title, en, category, img]) => ({
+      title: str(title, 60), englishTitle: str(en, 60) || null, category: ['tv', 'movie', 'music'].includes(category) ? category : null,
+      image: /^\/[\w-]+\.(jpg|png)$/.test(img || '') ? `https://image.tmdb.org/t/p/w342${img}` : null,
+    })).filter((p) => p.title);
+    if (!picks.length) return null;
+    return { city, lang: str(o.l, 8), category: str(o.cat, 8), favs: (Array.isArray(o.f) ? o.f : []).slice(0, 3).map((f) => str(f, 40)).filter(Boolean), hero: picks[0], rows: picks.slice(1) };
+  } catch { return null; }
+}

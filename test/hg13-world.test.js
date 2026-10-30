@@ -48,9 +48,10 @@ test('HG-13: every configured city is gated by its measured result; thin note fo
 
 test('HG-13 review: RTL-safe headers, provenance, no combining-dot aliases', () => {
   const app = readFileSync('public/app.js', 'utf8');
-  assert.match(app, /h\('h2', \{ class: serif\(c\.language\), dir: 'auto' \}/);
-  assert.match(app, /hdr\.textContent = c\.header; hdr\.dir = 'auto'/);
-  assert.match(app, /h\('p', \{ class: 'kind', dir: 'auto' \}, S\.city\.header\)/);
+  // HG-10 redesign: the city name, the board header and the reveal/friend headers all carry dir=auto.
+  assert.match(app, /h\('h2', \{ class: `city-name \$\{serif\(c\.language\)\}`, lang: c\.language, dir: 'auto'/);
+  assert.match(app, /hdr\.dir = 'auto'; await flipHeader\(hdr, revealHeader\(J, c\)/);
+  assert.match(app, /lang: J\.single \? 'en' : S\.city\.language, dir: 'auto' \}/);
   const raw = JSON.parse(readFileSync(gate.hg13.raw, 'utf8'));
   for (const c of NEW) {
     const r = raw.scout.results.find((x) => x.id === c.id);
@@ -102,3 +103,25 @@ test('English: never an auto-route, default or fallback for any other language',
   assert.doesNotMatch(readFileSync('public/india.js', 'utf8'), /English|london|dublin/i);
 });
 const c0 = (cat) => cat.cities.find((c) => c.live && c.language !== 'en').id;
+
+// Round 5: a native-script RTL header (Cairo, Tehran) keeps dir=auto everywhere a native header renders,
+// and the share board never forces lang="en" onto native-script text. v1's English single-category header is fine.
+test('HG-13 r5: RTL native city headers render with dir=auto; the share board keeps the city language', async () => {
+  const { revealHeader, journeyFor } = await import('../public/logic.js');
+  const app = readFileSync('public/app.js', 'utf8');
+  const RTL = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
+  for (const id of ['cairo', 'tehran']) {
+    const c = CITIES[id]; assert.ok(c, id);
+    const native = revealHeader(journeyFor('mixed'), c);
+    assert.equal(native, c.header, `${id}: mixed mode shows the native header`);
+    assert.match(native, RTL, `${id}: header is in an RTL script`);
+    assert.match(revealHeader(journeyFor('movies'), c), /^Your film self, in /, `${id}: v1 single-category header is English`);
+  }
+  // Every element that can show a native header carries dir=auto.
+  assert.match(app, /hdr\.dir = 'auto'; await flipHeader\(hdr, revealHeader\(J, c\)/, 'matching board header');
+  assert.match(app, /h\('h2', \{ class: `hdr \$\{ko \? 'ko' : ''\}`, lang: J\.single \? 'en' : S\.city\.language, dir: 'auto' \}, revealHeader\(J, S\.city\)\)/, 'share board header');
+  assert.match(app, /h\('h2', \{ class: `city-name \$\{serif\(c\.language\)\}`, lang: c\.language, dir: 'auto'/, 'city name');
+  // lang="en" is only ever used for English copy: never on revealHeader output unless the journey is single.
+  for (const m of app.matchAll(/h\('[a-z0-9]+', \{[^}]*lang: 'en'[^}]*\}, ([^)]*\)?)/g)) assert.doesNotMatch(m[1], /revealHeader|\.header\b|\.local\b/, `lang=en forced on native text: ${m[0].slice(0, 80)}`);
+});
+

@@ -218,7 +218,7 @@ test('client lookup (primary trigger) needs no eligibility; a keystroke aborts i
 const appSrc = async () => (await import('node:fs')).readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
 test('app integration: missed favourites get Try other names; verified match never goes through bestQlooMatch', async () => {
   const src = await appSrc();
-  assert.match(src, /We couldn't match \$\{missed\.join\(', '\)\}\. Pick \$\{3 - S\.favs\.length\} more\.`, missedPicks\)/);
+  assert.match(src, /favourite\(missNote\(S\.missed\) \|\| `Pick \$\{3 - S\.favs\.length\} more\.`\)/);
   assert.match(src, /Try other names for \$\{m\.name\}/);
   assert.match(src, /alt\.lookup\(m\.kind, m\.name\)/);
   const add = src.slice(src.indexOf('const addVerified'), src.indexOf('// Secondary trigger'));
@@ -249,8 +249,8 @@ test('R5.1: every favourite() re-render on the missed screen passes the missed l
   const src = await appSrc();
   const fav = src.slice(src.indexOf('function favourite('), src.indexOf('async function matchFavourites'));
   assert.ok(!/[^.\w]favourite\(\)/.test(fav), 'no bare favourite() re-render on this screen');
-  assert.equal((fav.match(/favourite\(missNote\(rest\), rest\)/g) || []).length, 1); // after a verified match
-  assert.equal((fav.match(/favourite\(missNote\(missed\), missed\)/g) || []).length, 1); // after picking a suggestion
+  assert.match(fav, /const missed = S\.missed;/); // every render reads the persistent list
+  assert.ok((fav.match(/favourite\(missNote\(S\.missed\)\)/g) || []).length >= 3); // match, suggestion pick, remove
 });
 test('R5.2: screenGen guards S.favs and every screen replace aborts the alt lookup', async () => {
   const src = await appSrc();
@@ -291,4 +291,32 @@ test('R5.7: per-IP map is capped; new IPs past the cap fail closed', async () =>
   assert.deepEqual(await f({ q: 'new', kind: 'show', ip: 'ip9' }), { results: [], capped: 'ips' });
   assert.equal((await f({ q: 'again', kind: 'show', ip: 'ip0' })).capped, undefined); // known IP still served
   assert.equal(claude.calls, 4); assert.equal(ALT_CAPS.maxIps, 10000);
+});
+
+// Round 6: persistent S.missed
+import { mergeMissed, resolveMissed } from '../public/altnames-client.js';
+test('R6: mergeMissed keeps earlier misses and de-duplicates by key', () => {
+  const a = { key: 'k1', pick: 'show|a|', name: 'A', kind: 'show' }, b = { key: 'k2', pick: 'band|b|', name: 'B', kind: 'band' };
+  assert.deepEqual(mergeMissed([a], [a, b]).map((m) => m.key), ['k1', 'k2']);
+  assert.deepEqual(mergeMissed([], [b, b]).map((m) => m.key), ['k2']);
+});
+test('R6: resolveMissed drops by key (alt match / removed) and by pick (later successful match)', () => {
+  const list = [{ key: 'k1', pick: 'p1' }, { key: 'k2', pick: 'p2' }, { key: 'k3', pick: 'p3' }];
+  assert.deepEqual(resolveMissed(list, { keys: ['k2'] }).map((m) => m.key), ['k1', 'k3']);
+  assert.deepEqual(resolveMissed(list, { picks: ['p3'] }).map((m) => m.key), ['k1', 'k2']);
+  assert.equal(resolveMissed(list).length, 3);
+});
+test('R6: app wires S.missed through every path and resets it on a new run', async () => {
+  const src = await appSrc();
+  assert.match(src, /const S = \{ favs: \[\], pending: \[\], missed: \[\],/);
+  assert.match(src, /const begin = \(\) => \{ S\.missed = \[\]; pickLanguage\(\); \};/);
+  assert.match(src, /start\.onclick = begin/);
+  const mf = src.slice(src.indexOf('async function matchFavourites'), src.indexOf('function flapRow'));
+  assert.match(mf, /S\.missed = resolveMissed\(mergeMissed\(S\.missed, missedPicks\), \{ picks: favs\.map\(\(f\) => f\.pick\) \}\);/);
+  assert.match(mf, /favourite\(S\.missed\.length \? missNote\(S\.missed\) : 'Pick at least 3 favourites\.'\)/); // 'Pick at least 3' path
+  assert.ok(mf.indexOf('S.missed = resolveMissed(mergeMissed') < mf.indexOf('if (failed.length)')); // merged before the retry path
+  const fav = src.slice(src.indexOf('function favourite('), src.indexOf('async function matchFavourites'));
+  assert.match(fav, /S\.missed = resolveMissed\(S\.missed, \{ keys: \[key\] \}\);/); // alt match
+  assert.match(fav, /onclick: \(\) => \{ S\.missed = resolveMissed\(S\.missed, \{ keys: \[m\.key\] \}\); favourite/); // user removes
+  assert.ok(!/favourite\([^)]*, (missed|rest|missedPicks)\)/.test(src)); // no per-call missed lists left
 });

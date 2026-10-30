@@ -47,3 +47,14 @@ export function missedNote(missed, chosen) {
   const n = 3 - chosen;
   return `We couldn't match ${missed.map((m) => m.name).join(', ')}.${n > 0 ? ` Pick ${n} more.` : ''}`;
 }
+
+// Persistent missed list (S.missed): earlier misses stay visible across matchFavourites rounds.
+// Items are {key, pick, name, kind}; de-duplicated by key.
+export function mergeMissed(prev, add) {
+  const seen = new Set(prev.map((m) => m.key));
+  return [...prev, ...add.filter((m) => !seen.has(m.key) && seen.add(m.key))];
+}
+// Drop items resolved by key (alt match / user removed) or by pick (a later successful match).
+export function resolveMissed(missed, { keys = [], picks = [] } = {}) {
+  return missed.filter((m) => !keys.includes(m.key) && !picks.includes(m.pick));
+}

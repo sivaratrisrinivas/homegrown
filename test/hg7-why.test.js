@@ -266,3 +266,35 @@ test('r4: negation words reject the line', () => {
   assert.equal(validateWhy('Like Breaking Bad, this crime drama never lets revenge go at all here.', g), null);
   assert.ok(validateWhy('Like Breaking Bad, this crime drama is about revenge at all here.', g));
 });
+
+test('r5: favourites with digits or punctuation are fine; the rest of the line is still checked', () => {
+  const src = ['Engineering students fight a rigid college system and pressure.'];
+  assert.ok(validateWhy('Fans of 3 Idiots will like these engineering students fighting a rigid college system.', { favourite: '3 Idiots', sources: src }));
+  assert.ok(validateWhy('Fans of Mr. Robot will like these engineering students fighting a rigid college system.', { favourite: 'Mr. Robot', sources: src }));
+  assert.ok(validateWhy('Fans of Airplane! will like these engineering students fighting a rigid college system.', { favourite: 'Airplane!', sources: src }));
+  assert.equal(validateWhy('Fans of 3 Idiots will like these 4 engineering students fighting a rigid college system.', { favourite: '3 Idiots', sources: src }), null);
+  assert.equal(validateWhy('Fans of Airplane! will like these engineering students fighting a rigid college system!', { favourite: 'Airplane!', sources: src }), null);
+});
+test('r5: -ing/-ed match with a dropped e or doubled consonant', async () => {
+  const { matchesSource } = await import('../lib/whyllm.js');
+  assert.equal(matchesSource('chasing', new Set(['chases'])), true);
+  assert.equal(matchesSource('consumed', new Set(['consumes'])), true);
+  assert.equal(matchesSource('planned', new Set(['plan'])), true);
+  assert.equal(matchesSource('missing', new Set(['mission'])), false);
+});
+test('r5: more negation words are rejected', () => {
+  const g = { favourite: 'Breaking Bad', sources: ['A crime drama about revenge.'] };
+  for (const w of ['cannot', 'nobody', 'nothing', 'none', 'neither'])
+    assert.equal(validateWhy(`Like Breaking Bad, this crime drama about revenge has ${w} here at all.`, g), null, w);
+});
+test("r5: curly apostrophes are normalised in the favourite and the line; 'll/'re/'ve are grammar", () => {
+  const g = { favourite: 'Schindler’s List', sources: ['A crime drama about revenge.'] };
+  assert.ok(validateWhy("Fans of Schindler's List will like this crime drama about revenge here.", g));
+  const g2 = { favourite: "Schindler's List", sources: ['A crime drama about revenge.'] };
+  assert.ok(validateWhy('Fans of Schindler’s List will like this crime drama about revenge here.', g2));
+  assert.ok(validateWhy("Fans of Breaking Bad'll like this crime drama, they're into revenge.", { favourite: 'Breaking Bad', sources: ['A crime drama about revenge.'] }));
+});
+test('r5: system prompt bans contractions and first person', async () => {
+  const { WHY_SYSTEM } = await import('../lib/anthropic.js');
+  assert.match(WHY_SYSTEM, /No contractions, no first person/);
+});

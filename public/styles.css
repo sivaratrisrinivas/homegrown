@@ -1,10 +1,16 @@
+/* Metric-matched fallbacks: Times-metric serifs scaled to Fraunces 700 (measured with fontTools on
+   Fraunces v38 vs Liberation Serif Bold), and a local Korean serif with Noto Serif KR's vertical metrics. */
+@font-face{font-family:"Fraunces Fallback";src:local("Times New Roman Bold"),local("TimesNewRomanPS-BoldMT"),local("Liberation Serif Bold"),local("Times New Roman"),local("Liberation Serif"),local("Times");font-weight:700;size-adjust:112.4%;ascent-override:87%;descent-override:22.7%;line-gap-override:0%}
+@font-face{font-family:"Fraunces Fallback";src:local("Times New Roman"),local("Liberation Serif"),local("Times");font-weight:400;size-adjust:112.4%;ascent-override:87%;descent-override:22.7%;line-gap-override:0%}
+@font-face{font-family:"Noto Serif KR Fallback";src:local("Noto Serif CJK KR"),local("AppleMyungjo"),local("Batang"),local("NanumMyeongjo");size-adjust:100%;ascent-override:115.1%;descent-override:28.6%;line-gap-override:0%}
 :root{--paper:#F6F3EE;--ink:#1B1B1B;--accent:#1B1B1B;--muted:#6b6660;--r:14px;font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--paper)}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:var(--paper)}
-body::before{content:"";position:fixed;inset:0;pointer-events:none;filter:url(#grain);background:#000;opacity:.5;mix-blend-mode:multiply;z-index:-1}
-main{max-width:640px;margin:0 auto;padding:48px 24px 96px;min-height:100vh;display:flex;flex-direction:column;justify-content:center;gap:24px}
-h1,h2,.serif{font-family:Fraunces,Georgia,serif;font-weight:700;line-height:1.1;margin:0}
+/* Grain is a small static tile: a full-screen SVG filter + blend layer was repainted on every frame. */
+body{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E")}
+main{max-width:640px;margin:0 auto;padding:48px 24px 96px;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;justify-content:center;gap:24px}
+h1,h2,.serif{font-family:Fraunces,"Fraunces Fallback",serif;font-weight:700;line-height:1.1;margin:0}
 h1{font-size:clamp(40px,8vw,64px)}h2{font-size:clamp(28px,5vw,40px)}
-.ko{font-family:"Noto Serif KR",Fraunces,serif}
+.ko{font-family:"Noto Serif KR","Noto Serif KR Fallback",Fraunces,"Fraunces Fallback",serif}
 p{margin:0;line-height:1.5}.muted{color:var(--muted)}
 button,.btn{font:600 16px Inter,sans-serif;border:0;border-radius:999px;padding:16px 32px;background:var(--ink);color:var(--paper);cursor:pointer;text-decoration:none;display:inline-block}
 button.ghost,.btn.ghost{background:transparent;color:var(--ink);text-decoration:underline;padding:8px}
@@ -20,7 +26,7 @@ input{font:400 20px Inter,sans-serif;padding:16px;border:2px solid var(--ink);bo
 .postcard{display:flex;justify-content:space-between;align-items:end;background:#fffdf9;color:var(--ink);border-radius:var(--r);padding:32px 24px;border-left:10px solid var(--c);box-shadow:0 8px 24px #0000001a;text-align:left;transition:transform .2s}
 .postcard:hover{transform:rotate(-1deg) translateY(-2px)}.postcard .serif{font-size:32px}
 .board{background:#161616;color:#f3e9d2;border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:8px}
-.board .hdr{font-family:Fraunces,serif;font-size:20px;color:var(--accent);padding:4px 8px}
+.board .hdr{font-family:Fraunces,"Fraunces Fallback",serif;font-size:20px;color:var(--accent);padding:4px 8px}
 .row{display:flex;gap:2px;overflow:hidden}
 .flap{width:1.1em;height:1.6em;display:inline-flex;align-items:center;justify-content:center;background:#262626;border-radius:3px;font:600 clamp(12px,3.2vw,18px) "Noto Serif KR",ui-monospace,monospace;position:relative}
 .flap::after{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px solid #000}
@@ -30,14 +36,34 @@ input{font:400 20px Inter,sans-serif;padding:16px;border:2px solid var(--ink);bo
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
 .dot.easy{background:#3aa655}.dot.medium{background:#e0a100}.dot.hard{background:#d0453a}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:520px){.grid{grid-template-columns:1fr}}
-.grid .card h3{font-family:Fraunces,serif;margin:4px 0;font-size:20px}
+.grid .card h3{font-family:Fraunces,"Fraunces Fallback",serif;margin:4px 0;font-size:20px}
 .kind{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:600}
 .note{font-style:italic;color:var(--muted);font-size:14px}
 .pick-actions{display:flex;gap:4px;margin-top:8px}.pick-actions button{font-size:12px;padding:4px 8px;background:transparent;color:var(--muted);border:1px solid #0002}
-.stamps{display:flex;gap:12px}.stamp{width:56px;height:64px;border-radius:4px;background:#fffdf9;color:var(--ink);border:2px dashed var(--accent);font:700 22px Fraunces,serif;padding:0}
+.stamps{display:flex;gap:12px}.stamp{width:56px;height:64px;border-radius:4px;background:#fffdf9;color:var(--ink);border:2px dashed var(--accent);font:700 22px Fraunces,"Fraunces Fallback",serif;padding:0}
 .stamp[aria-pressed=true]{background:var(--accent);color:#fff;transform:rotate(-6deg)}
 .sound{position:fixed;top:12px;right:12px;background:transparent;color:var(--ink);padding:8px;z-index:2}
 .error{border-left:6px solid #d0453a}
 img.thumb{width:100%;border-radius:10px;aspect-ratio:16/9;object-fit:cover;background:#eee}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:opacity .3s!important}}
-.lead{font-family:var(--serif,serif);font-size:18px;margin:4px 0}
+.lead{font-family:Fraunces,"Fraunces Fallback",serif;font-size:18px;margin:4px 0}
+button:disabled{opacity:.6;cursor:default}
+/* Watch link in cards: a full-width block that stays one line (ellipsis if the provider is long),
+   so it never wraps or overlaps the text above while posters load. */
+.card .btn{display:block;width:100%;box-sizing:border-box;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:10px 14px;font-size:14px;line-height:1.3;margin:8px 0 4px}
+.sound{font:600 12px Inter,system-ui,sans-serif;color:var(--muted);text-decoration:underline}
+/* HG-6 ?reveal=map prototype */
+.map-wrap{background:#0e1012;border-radius:var(--r);overflow:hidden;touch-action:none}
+.map{display:block;width:100%;height:auto;max-height:78vh;touch-action:none;user-select:none}
+.map .streets line{stroke:#2a2f35;stroke-width:.35}
+.map .fog{fill:#0e1012;opacity:.82}
+.map .lit path{fill:none;stroke:#f3e9d2;stroke-linecap:round;stroke-linejoin:round}
+.map .spot{cursor:pointer;outline:none}.map .spot .core{fill:#f3e9d2}.map .spot .halo{fill:none;stroke:#f3e9d2;stroke-width:.4;opacity:.5}
+.map .spot.border .core{fill:#e0a100}.map .spot:focus-visible .halo{stroke:#fff;stroke-width:1;opacity:1}
+.map .spot.pulse .halo{animation:pulse .6s ease-out}@keyframes pulse{from{transform:scale(.6);opacity:1}to{transform:scale(2.2);opacity:0}}
+.pull-sheet{position:fixed;inset:0;background:#0e1012ee;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:12px;padding:16px;z-index:5}
+.pull-sheet>.ghost{color:#f3e9d2;align-self:flex-start}
+.pull-handle{touch-action:none;background:#f3e9d2;color:#161616}
+.pull-sheet.heavy .pull-handle{box-shadow:0 0 0 3px #f3e9d255}
+.ground{width:100%;max-width:600px;max-height:70vh;overflow:hidden;border-top:3px solid #3b3127;border-radius:4px}
+.pull-sheet.open .ground{overflow:auto}

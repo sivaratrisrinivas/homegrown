@@ -1,4 +1,5 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { isMapReveal, mapFraming } from './maplogic.js';
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
 
 const app = document.getElementById('app');
@@ -13,20 +14,23 @@ async function qlooPost(body, isCurrent = () => true) {
   if (shouldMemoTwin(r)) twinMemo.set(k, r);
   return r;
 }
-const S = { favs: [], city: null, results: {}, sound: false, catalogue: null, lang: null };
+// S.favs holds only Qloo-matched favourites ({id,name,tags}); chosen-but-unmatched ones live in
+// S.pending with their match promise kept separately in pendingMatches.
+const pendingMatches = new Map();
+const S = { favs: [], pending: [], city: null, results: {}, sound: false, catalogue: null, lang: null };
 const h = (tag, attrs = {}, ...kids) => {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else if (v != null) el.setAttribute(k, v);
   for (const k of kids.flat()) if (k != null) el.append(k.nodeType ? k : document.createTextNode(String(k)));
   return el;
 };
-const show = (...els) => { app.replaceChildren(...els); window.scrollTo(0, 0); };
+const show = (...els) => { app.replaceChildren(...present(els)); window.scrollTo(0, 0); };
 const post = (url, body) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ ok: r.ok, body: await r.json().catch(() => ({})) }));
-const track = (body) => post('/api/feedback', { city: S.city?.id, favourites: S.favs.map((f) => f.id), ...body }).catch(() => {});
+const track = (body) => post('/api/feedback', { city: S.city?.id, favourites: favouriteIds(S.favs), ...body }).catch(() => {});
 
 // Sound: off by default; a quiet synthesised click per flap when enabled.
 let actx; const soundBtn = document.getElementById('sound');
-soundBtn.onclick = () => { S.sound = !S.sound; soundBtn.textContent = S.sound ? '🔈' : '🔇'; soundBtn.setAttribute('aria-pressed', S.sound); };
+soundBtn.onclick = () => { S.sound = !S.sound; soundBtn.textContent = S.sound ? 'Sound on' : 'Sound off'; soundBtn.setAttribute('aria-pressed', S.sound); };
 function click() {
   if (!S.sound) return;
   actx ||= new AudioContext();
@@ -35,15 +39,22 @@ function click() {
   o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.012);
 }
 
+// Fetch the catalogue while the hello screen is up, so Start never waits on the network.
+let cataloguePromise = null;
+const loadCatalogue = () => (cataloguePromise ||= fetch('/api/cities').then((x) => x.json()).catch(() => null).then((r) => { if (!r?.languages) cataloguePromise = null; return r; }));
 function hello() {
+  loadCatalogue();
   document.documentElement.style.setProperty('--accent', '#1B1B1B');
+  // The hello screen is already in index.html (so it paints before JS); just wire up Start.
+  const start = document.getElementById('start');
+  if (start) { start.disabled = false; start.onclick = () => pickLanguage(); return; }
   show(h('h1', {}, "What you'd love if you grew up there."), h('div', {}, h('button', { onclick: () => pickLanguage() }, 'Start')));
 }
 
 // Step 1: the language you're learning.
 async function pickLanguage() {
   if (!S.catalogue) {
-    const r = await fetch('/api/cities').then((x) => x.json()).catch(() => null);
+    const r = await loadCatalogue();
     if (!r?.languages) return show(h('p', { class: 'note' }, 'Cities are unavailable right now. Please try again in a minute.'));
     S.catalogue = r;
   }
@@ -76,43 +87,92 @@ function suggestCity() {
   pick(live);
 }
 
-function favourite() {
-  const i = S.favs.length;
+// Typing hits /api/suggest (TMDB / iTunes / Open Library, no Qloo, cached). Only a chosen
+// favourite is matched to Qloo, once, in the background through the 7 s gate.
+const suggestMemo = createMemo();
+function resolveFavourite(sug, kind) {
+  const sk = searchKey(kind, sug.name);
+  const fromMemo = searchMemo.get(sk);
+  const p = fromMemo ? Promise.resolve(fromMemo) : qlooGate(async () => {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), QLOO_LOOKUP_TIMEOUT_MS);
+    try {
+      const res = await fetch(`/api/search?kind=${kind}&q=${encodeURIComponent(sug.name)}`, { signal: ctl.signal });
+      const r = { ok: res.ok, body: await res.json().catch(() => ({})) };
+      if (r.ok) searchMemo.set(sk, r); // failures are never memoised
+      return r;
+    } finally { clearTimeout(t); }
+  });
+  // Failure (HTTP error, throw, timeout) -> LOOKUP_FAILED; Qloo answered but no name match -> null.
+  return p.then((r) => lookupOutcome(r, sug)).catch(() => LOOKUP_FAILED);
+}
+
+function favourite(note) {
+  const i = S.favs.length + S.pending.length;
   if (i >= MAX_FAVS) return morph();
   const p = PROMPTS[i];
   const input = h('input', { 'aria-label': p.label, placeholder: 'Start typing…', autocomplete: 'off' });
-  const sugs = h('ul', { class: 'sugs' }); const msg = h('p', { class: 'muted' });
-  let t, seq = 0;
+  const sugs = h('ul', { class: 'sugs' }); const msg = h('p', { class: 'muted', 'aria-live': 'polite' }, note || '');
+  let t, seq = 0, ctl;
   input.addEventListener('input', () => {
     clearTimeout(t);
     t = setTimeout(async () => {
       const q = input.value.trim(); const my = ++seq;
-      if (q.length < 2) return sugs.replaceChildren();
-      msg.textContent = 'Searching…';
+      if (q.length < 2) { sugs.replaceChildren(); msg.textContent = ''; return; }
       const sk = searchKey(p.kind, q);
-      let r = searchMemo.get(sk);
+      let r = suggestMemo.get(sk);
       if (!r) {
-        r = await qlooGate(async () => {
-          if (my !== seq) return SKIP; // superseded while waiting for the gate: don't spend a Qloo call
-          const res = await fetch(`/api/search?kind=${p.kind}&q=${encodeURIComponent(q)}`);
-          return { ok: res.ok, body: await res.json().catch(() => ({})) };
-        });
-        if (r === SKIP) return;
-        if (r?.ok) searchMemo.set(sk, r);
+        msg.textContent = 'Searching…';
+        ctl?.abort(); ctl = new AbortController();
+        try {
+          const res = await fetch(`/api/suggest?kind=${p.kind}&q=${encodeURIComponent(q)}`, { signal: ctl.signal });
+          r = { ok: res.ok, body: await res.json().catch(() => ({})) };
+        } catch { if (my === seq) msg.textContent = 'Search is unavailable right now.'; return; }
+        if (r.ok && !r.body.partial) suggestMemo.set(sk, r);
       }
-      if (!r || my !== seq) return;
-      const body = r.body;
-      if (!r.ok) { msg.textContent = body.message || 'Search is unavailable right now.'; return; }
-      msg.textContent = body.results.length ? '' : 'Nothing found. Try something like it.';
-      sugs.replaceChildren(...body.results.slice(0, 3).map((e) => h('li', {}, h('button', { onclick: () => { S.favs.push(e); favourite(); } }, e.name, e.year ? ` (${e.year})` : ''))));
-    }, 600);
+      if (my !== seq) return;
+      if (!r.ok) { msg.textContent = r.body.message || 'Search is unavailable right now.'; return; }
+      const results = r.body.results || [];
+      msg.textContent = results.length ? '' : 'Nothing found. Try something like it.';
+      sugs.replaceChildren(...results.slice(0, 5).map((e) => h('li', {}, h('button', { onclick: () => {
+        const kind = e.kind || p.kind; const pick = pickKey(kind, e.name, e.year);
+        if (isPicked(pick, S.favs, S.pending)) { msg.textContent = `${e.name} is already in your favourites.`; return; }
+        const key = `${pick}|${S.pending.length + S.favs.length}`;
+        pendingMatches.set(key, resolveFavourite(e, kind));
+        S.pending.push({ key, pick, name: e.name, sug: e, kind });
+        favourite();
+      } }, e.name, e.year ? ` (${e.year})` : ''))));
+    }, DEBOUNCE_MS);
   });
-  const shelf = h('div', { class: 'shelf', 'aria-label': 'Your favourites' }, S.favs.map((f) => h('span', { class: 'chip' }, f.name)));
+  const shelf = h('div', { class: 'shelf', 'aria-label': 'Your favourites' }, [...S.favs, ...S.pending].map((f) => h('span', { class: 'chip' }, f.name)));
   show(h('p', { class: 'muted' }, `Favourite ${i + 1} of ${MAX_FAVS}`), h('h2', {}, p.label), input, msg, sugs,
     canSkip(i) ? h('div', {}, h('button', { class: 'ghost', onclick: () => morph() }, 'Skip, that’s enough')) : null, shelf);
   input.focus();
 }
 
+// Wait for the background Qloo matches; favourites Qloo doesn't know are dropped with a note.
+async function matchFavourites() {
+  if (!S.pending.length) return S.favs.length >= 3 || (favourite('Pick at least 3 favourites.'), false);
+  const total = S.pending.length; let done = 0;
+  const progress = h('p', { class: 'muted', role: 'status', 'aria-live': 'polite' }, matchingProgress(done, total));
+  show(h('p', { class: 'muted' }, 'Matching your favourites…'), progress);
+  const matches = new Map(await Promise.all(S.pending.map(async (f) => {
+    const m = await pendingMatches.get(f.key);
+    progress.textContent = matchingProgress(++done, total);
+    return [f.key, m];
+  })));
+  const { favs, missed, failed } = settleFavourites(S.favs, S.pending, matches);
+  S.pending.forEach((f) => pendingMatches.delete(f.key));
+  S.favs = favs; S.pending = failed;
+  if (failed.length) {
+    // Couldn't reach Qloo: keep these picks and offer a retry; nothing is dropped or called a no-match.
+    const retry = () => { for (const f of S.pending) pendingMatches.set(f.key, resolveFavourite(f.sug, f.kind)); morph(); };
+    show(h('p', { role: 'status', 'aria-live': 'polite' }, `Couldn't reach our matcher for ${failed.map((f) => f.name).join(', ')}, try again.`),
+      h('button', { onclick: retry }, 'Try again'));
+    return false;
+  }
+  if (S.favs.length < 3) { favourite(`We couldn't match ${missed.join(', ')}. Pick ${3 - S.favs.length} more.`); return false; }
+  return true;
+}
 
 function flapRow(text, width) {
   const row = h('div', { class: 'row', 'aria-label': text });
@@ -134,7 +194,8 @@ function flapRow(text, width) {
 
 const runs = createRunGuard();
 async function morph() {
-  const current = runs.start(); revealEls = null;
+  if (!(await matchFavourites())) return;
+  const current = runs.start(); revealEls?.destroy?.(); revealEls = null;
   const c = S.city; document.documentElement.style.setProperty('--accent', c.accent);
   S.results = {};
   const width = Math.min(22, Math.max(12, ...S.favs.map((f) => f.name.length)));
@@ -201,9 +262,15 @@ function picksView() {
   ].flat().filter(Boolean);
 }
 // Only the picks region re-renders as categories land; the rating/note form keeps its state.
-function updateReveal() { revealEls.picks.replaceChildren(...picksView()); }
+function updateReveal() { if (revealEls.update) return revealEls.update(); revealEls.picks.replaceChildren(...picksView()); }
 function shownPicks() { const { hero, rest } = rankPicks(S.results); return [hero, ...rest].filter(Boolean); }
 
+// HG-6 prototype: ?reveal=map swaps the picks list for a walkable map. Without the flag nothing changes.
+async function mapPicks() {
+  const { createMapReveal } = await import('./map.js');
+  const m = createMapReveal({ h, city: S.city, getResults: () => S.results, picks: () => [...shownPicks(), ...scarcePicks(S.results)], pickCard, reduced, ping: click });
+  return m;
+}
 function reveal() {
   const picks = h('div', { style: 'display:flex;flex-direction:column;gap:16px' });
   revealEls = { picks };
@@ -223,6 +290,23 @@ function reveal() {
     h('section', { class: 'card postcard-summary' }, h('h3', { class: 'serif' }, `Keep your ${S.city.name} self`),
       h('button', { onclick: (e) => { e.target.replaceWith(h('p', { class: 'muted' }, 'Saving with an email link is coming soon.')); } }, `Save my ${S.city.name} self`),
       h('div', {}, others.map((c) => h('button', { class: 'ghost', onclick: () => { track({ event: 'try_city', to: c.id }); S.city = c; morph(); } }, `Try ${c.name}`)))));
+  if (isMapReveal(location.search)) {
+    updateReveal(); // the normal reveal shows first, so the area is never blank
+    const mine = revealEls;
+    mapPicks().then((m) => {
+      if (revealEls !== mine) return m.destroy();
+      // The map holds the picks; the postcard line, lead, notes and "still flipping in" stay beneath it.
+      const framing = h('div', { class: 'map-framing' });
+      const refresh = () => {
+        try { m.update(); framing.replaceChildren(...mapFraming(picksView())); }
+        catch { try { m.destroy(); } catch {} delete mine.update; delete mine.destroy; picks.replaceChildren(...picksView()); }
+      };
+      picks.replaceChildren(h('h2', {}, 'Territory you walk'), m.el, framing);
+      mine.update = refresh; mine.destroy = m.destroy; refresh();
+    })
+        .catch(() => { if (revealEls === mine) { delete mine.update; delete mine.destroy; picks.replaceChildren(...picksView()); } });
+    return;
+  }
   updateReveal();
 }
 

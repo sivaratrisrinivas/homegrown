@@ -484,6 +484,12 @@ function action(p) {
   return p.preview?.url ? player(p) : null;
 }
 const enTitle = (p) => (p.englishTitle && p.englishTitle !== p.title ? p.englishTitle : null);
+// HG-7, hero only: estimated difficulty (never stated as fact) and the subtitle tip share one quiet line.
+function heroMeta(p) {
+  const diff = p.difficulty ? h('span', { class: 'diff', title: 'Estimated difficulty for a language learner' }, h('span', { class: `dot ${p.difficulty}`, 'aria-hidden': 'true' }), `${p.difficulty} (estimated)`) : null;
+  if (!diff && !p.tip) return null;
+  return h('p', { class: 'tip' }, diff, diff && p.tip ? ' · ' : null, p.tip || null);
+}
 // Hero ticket: kind (mixed only) · title · English · poster · why · action · tip. Title sits above the
 // poster so the main action stays in the first phone viewport.
 function pickCard(p, city, readOnly) {
@@ -491,7 +497,7 @@ function pickCard(p, city, readOnly) {
   return h('article', { class: 'ticket', 'aria-label': `${kind}: ${p.title}, from ${city.name}` },
     !J.single && !readOnly ? h('p', { class: 'cap' }, kind) : null,
     h('div', {}, h('h2', { class: city.language === 'ko' ? 'ko' : '', lang: city.language }, p.title), enTitle(p) ? h('p', { class: 'en' }, enTitle(p)) : null),
-    readOnly ? null : action(p), art(p), readOnly ? null : whyLine(p), !readOnly && p.tip ? h('p', { class: 'tip' }, p.tip) : null);
+    readOnly ? null : action(p), art(p), readOnly ? null : whyLine(p), readOnly ? null : heroMeta(p));
 }
 // Rows 01–04: type only, one name (local title) plus the English line when it differs.
 const pickRow = (p, n, city) => h('article', { class: 'prow', 'aria-label': `${KIND[p.category] || 'Pick'}: ${p.title}, from ${city.name}` },

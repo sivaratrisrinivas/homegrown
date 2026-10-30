@@ -112,7 +112,7 @@ input::placeholder{color:var(--ink-3)}
 .poster b{font:400 var(--t-display)/1 var(--serif);color:var(--accent);opacity:.5}
 .poster img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0}
 .poster img.in{opacity:1}
-.tip{font:400 var(--t-cap)/1.5 var(--mono);letter-spacing:.06em;color:var(--ink-2)}
+.tip{font:400 var(--t-cap)/1.5 var(--mono);letter-spacing:.06em;color:var(--ink-2)}.tip .diff{white-space:nowrap;text-transform:capitalize}.tip .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:var(--s1);vertical-align:.05em;background:var(--ink-3)}.tip .dot.easy{background:var(--accent)}.tip .dot.hard{background:var(--ink)}
 .play{display:flex;align-items:center;gap:var(--s4);min-height:48px}
 .play .ring{position:relative;width:40px;height:40px;border-radius:50%;border:1.5px solid var(--ink);display:grid;place-items:center}
 .play svg.prog{position:absolute;inset:-3px;width:46px;height:46px;transform:rotate(-90deg)}

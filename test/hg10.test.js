@@ -15,7 +15,8 @@ const cat = (c, k) => ({ picks: Array.from({ length: k }, (_, i) => pick(c, i)) 
 test('HG-10 journey: cut copy and cut features are gone from the client journey', () => {
   const all = app + html;
   for (const s of ['Sound off', 'Coming soon', 'On your postcard', 'Availability:', 'made in', 'Save my', 'Skip, that', 'That’s enough', 'Where to watch ·', 'How did we do?', 'Start typing', 'Add a note', 'See it as a map', 'Not really local']) assert.ok(!all.includes(s), s);
-  assert.doesNotMatch(app, /\.lead\b|c\.lead|postcardCategories|AudioContext|flagMenu|stampIn|rateStrip|difficulty/);
+  assert.doesNotMatch(app, /\.lead\b|c\.lead|postcardCategories|AudioContext|flagMenu|stampIn|rateStrip/);
+  assert.ok(app.includes("`${p.difficulty} (estimated)`")); // HG-7: difficulty is back, hero only, always marked estimated
   assert.doesNotMatch(app, /👎/);
 });
 

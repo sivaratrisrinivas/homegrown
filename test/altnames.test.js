@@ -141,12 +141,6 @@ test('client trigger: only on explicit submit of a no-result query; typing abort
   assert.deepEqual((await p2).map((e) => e.id), ['q1']);
   assert.equal(urls.length, 2); assert.match(urls[0], /\/api\/altnames\?kind=show&q=foo/);
 });
-test('app wires altnames only through the Enter handler, outside qlooGate', async () => {
-  const { readFileSync } = await import('node:fs');
-  const src = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
-  assert.ok(!src.includes('/api/altnames')); // only altnames-client.js builds that URL
-  assert.match(src, /key !== 'Enter'/); assert.match(src, /alt\.onInput\(\)/);
-});
 
 // Review round 2
 test('deadline fixed at entry is passed to qloo.search; a deadline stop is incomplete and not cached', async () => {
@@ -180,13 +174,6 @@ test("Claude's names are cached per key: a retry after a Qloo failure skips Clau
   assert.deepEqual((await f({ q: 'foo', kind: 'show', ip: 'x' })).results.map((e) => e.id), ['q-a']);
   assert.equal(claude.calls, 1); assert.equal(qloo.calls, 2);
 });
-test('app: the lookup message is set only when eligible and restored when submit returns null', async () => {
-  const { readFileSync } = await import('node:fs');
-  const src = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
-  const body = src.slice(src.indexOf("key !== 'Enter'"), src.indexOf("input.addEventListener('input'"));
-  assert.ok(body.indexOf('!alt.eligible(q)') < body.indexOf("'Looking for other names…'"));
-  assert.match(body, /found === null\) \{ msg\.textContent = prev; return; \}/);
-});
 test('client eligible(): only the latest no-result query; cleared on input', () => {
   const t = createAltTrigger({ fetch: () => assert.fail() });
   assert.equal(t.eligible('foo'), false);
@@ -210,4 +197,47 @@ test('missing_key / notSent refund the per-IP counter; a sent failure does not',
     for (let i = 0; i < 5; i++) await f({ q: 'q' + i, kind: 'show', ip: 'x' });
     assert.equal(claude.calls, expected);
   }
+});
+
+// Review round 4 (HG-5 integration)
+import { verifiedFavourite } from '../public/altnames-client.js';
+import { pickKey } from '../public/logic.js';
+test('verifiedFavourite: pushes {id,name,pick,tags}; rejects already picked/pending or same id', () => {
+  const e = { id: 'q-mh', name: 'Money Heist', year: 2017, tags: [{ id: 't', name: 'heist' }] };
+  assert.deepEqual(verifiedFavourite(e, 'show', [], []).fav, { id: 'q-mh', name: 'Money Heist', pick: pickKey('show', 'Money Heist', 2017), tags: e.tags });
+  assert.equal(verifiedFavourite(e, 'show', [], [{ pick: pickKey('show', 'Money Heist', 2017) }]).dup, true);
+  assert.equal(verifiedFavourite(e, 'show', [{ id: 'q-mh', pick: 'other' }], []).dup, true);
+  assert.equal(verifiedFavourite({ name: 'x' }, 'show', [], []).invalid, true);
+});
+test('client lookup (primary trigger) needs no eligibility; a keystroke aborts it', async () => {
+  let resolve; const fetch = (u, { signal }) => new Promise((res, rej) => { resolve = () => res(json({ results: [{ id: 'q1', name: 'X' }] })); signal.addEventListener('abort', () => rej(new Error('a'))); });
+  const t = createAltTrigger({ fetch });
+  const p = t.lookup('show', 'Oscuro'); t.onInput(); assert.equal(await p, null);
+  const p2 = t.lookup('show', 'Oscuro'); resolve(); assert.deepEqual((await p2).map((e) => e.id), ['q1']);
+});
+const appSrc = async () => (await import('node:fs')).readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+test('app integration: missed favourites get Try other names; verified match never goes through bestQlooMatch', async () => {
+  const src = await appSrc();
+  assert.match(src, /We couldn't match \$\{missed\.join\(', '\)\}\. Pick \$\{3 - S\.favs\.length\} more\.`, missedPicks\)/);
+  assert.match(src, /Try other names for \$\{m\.name\}/);
+  assert.match(src, /alt\.lookup\(m\.kind, m\.name\)/);
+  const add = src.slice(src.indexOf('const addVerified'), src.indexOf('// Secondary trigger'));
+  assert.match(add, /verifiedFavourite\(e, kind, S\.favs, S\.pending\)/); assert.match(add, /S\.favs\.push\(v\.fav\)/);
+  assert.ok(!add.includes('bestQlooMatch') && !add.includes('pendingMatches'));
+  assert.match(src, /const i = S\.favs\.length \+ S\.pending\.length;/);
+  assert.ok(!src.includes('qlooGate(() => alt') && !src.includes('/api/altnames')); // outside the gate, URL only in client module
+});
+test('app integration: keeps /api/suggest + AbortController + DEBOUNCE_MS; seq bumped on keystroke; restore keeps main copy', async () => {
+  const src = await appSrc();
+  assert.match(src, /\/api\/suggest\?kind=/); assert.match(src, /\}, DEBOUNCE_MS\);/); assert.match(src, /'aria-live': 'polite' \}, note \|\| ''\)/);
+  const inp = src.slice(src.indexOf("input.addEventListener('input'"));
+  assert.match(inp, /^input\.addEventListener\('input', \(\) => \{\n(\s*\/\/.*\n)*\s*const my = \+\+seq; alt\.onInput\(\);/);
+  assert.match(inp.slice(0, inp.indexOf('DEBOUNCE_MS')), /if \(my !== seq\) return;\n\s*if \(q\.length < 2\)/);
+  const enter = src.slice(src.indexOf("key !== 'Enter'"), src.indexOf("input.addEventListener('input'"));
+  assert.match(enter, /found === null\) \{ msg\.textContent = prev; return; \}/);
+  assert.ok(enter.indexOf('!alt.eligible(q)') < enter.indexOf("'Looking for other names…'"));
+});
+test('server keeps /api/suggest, .ico and /api/altnames', async () => {
+  const src = (await import('node:fs')).readFileSync(new URL('../server.js', import.meta.url), 'utf8');
+  assert.match(src, /'\/api\/suggest': suggest/); assert.match(src, /'\/api\/altnames': altnames/); assert.match(src, /'\.ico': 'image\/x-icon'/);
 });

@@ -46,7 +46,8 @@ When a key is missing, the API returns `503 {"error":"missing_key","key":"..."}`
 
 ## Claude alternate-name fallback (HG-8)
 
-When `/api/search` returned nothing for a typed favourite and the user presses Enter, the client calls `GET /api/altnames?q=&kind=`.
+When a chosen favourite has no same-name Qloo entity ("We couldn't match X"), the user can press
+"Try other names for X"; Enter on a query with zero `/api/suggest` results is a secondary trigger. Either calls `GET /api/altnames?q=&kind=`.
 The server asks `claude-haiku-5-5` (max_tokens 100, thinking off) for up to 3 alternate/official names as JSON,
 re-resolves at most 2 with Qloo search (7 s throttle) and returns only an entity whose Qloo name equals one of them.
 Claude never sources picks. Needs `ANTHROPIC_API_KEY`; without it, or on any error, the endpoint returns `{ results: [] }`.

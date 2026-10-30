@@ -1,25 +1,40 @@
-// HG-8 client trigger: /api/altnames runs only when the user explicitly submits (Enter) a query that
-// came back with no Qloo results, never on typeahead keystrokes. It runs outside the shared Qloo gate
-// so it never blocks search, and any newer keystroke/submit aborts it.
+import { pickKey, isPicked } from './logic.js';
+
+// HG-8 client side. /api/altnames is called only on an explicit action, never on typeahead keystrokes:
+//  - primary: "Try other names" next to a favourite HG-5 couldn't match ("We couldn't match X");
+//  - secondary: Enter on a query whose /api/suggest came back empty.
+// Calls run outside the shared Qloo gate (the server throttles its own Qloo use), and a newer
+// keystroke or lookup aborts the one in flight.
 export function createAltTrigger({ fetch = globalThis.fetch } = {}) {
   let emptyQ = null, ctl = null;
   const abort = () => { ctl?.abort(); ctl = null; };
+  async function lookup(kind, q) {
+    if (!q) return null;
+    abort(); const my = ctl = new AbortController();
+    try {
+      const r = await fetch(`/api/altnames?kind=${encodeURIComponent(kind)}&q=${encodeURIComponent(q)}`, { signal: my.signal });
+      const b = await r.json();
+      return my.signal.aborted ? null : (Array.isArray(b.results) ? b.results : []);
+    } catch { return null; } finally { if (ctl === my) ctl = null; }
+  }
   return {
-    // Record the latest typeahead outcome: only an empty result makes the query eligible.
+    // Record the latest suggest outcome: only an empty result makes the query eligible for Enter.
     noteResults(q, count) { emptyQ = count === 0 ? q : null; },
-    // True only when q is the latest query that came back with no results (the UI sets its message on this).
     eligible(q) { return !!q && q === emptyQ; },
-    // Called on every keystroke: the query is superseded.
+    // Every keystroke supersedes the query.
     onInput() { abort(); emptyQ = null; },
-    // Explicit submit. Resolves to an array of Qloo-verified entities, or null when not eligible/aborted.
-    async submit(kind, q) {
-      if (!q || q !== emptyQ) return null;
-      abort(); const my = ctl = new AbortController();
-      try {
-        const r = await fetch(`/api/altnames?kind=${encodeURIComponent(kind)}&q=${encodeURIComponent(q)}`, { signal: my.signal });
-        const b = await r.json();
-        return my.signal.aborted ? null : (Array.isArray(b.results) ? b.results : []);
-      } catch { return null; } finally { if (ctl === my) ctl = null; }
-    },
+    // Secondary trigger: Enter on a zero-suggest query. null = not eligible / aborted / failed.
+    submit(kind, q) { return q && q === emptyQ ? lookup(kind, q) : Promise.resolve(null); },
+    // Primary trigger: a favourite HG-5 marked as missed.
+    lookup,
   };
+}
+
+// An alt-names match is already a verified Qloo entity: it goes straight into S.favs (never back
+// through bestQlooMatch). -> { fav } to push, or { dup: true } when it's already picked/pending.
+export function verifiedFavourite(e, kind, favs, pending) {
+  if (!e || typeof e.id !== 'string' || !e.id) return { invalid: true };
+  const pick = pickKey(kind, e.name, e.year);
+  if (isPicked(pick, favs, pending) || favs.some((f) => f.id === e.id)) return { dup: true };
+  return { fav: { id: e.id, name: e.name, pick, tags: Array.isArray(e.tags) ? e.tags : [] } };
 }

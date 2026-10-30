@@ -164,7 +164,11 @@ export const MAX_ROWS = 4;
 export function journeyPicks(byCat, j) {
   const only = Object.fromEntries(Object.entries(byCat).filter(([c]) => j.order.includes(c)));
   const { hero, rest } = rankPicks(only);
-  return { hero, rows: rest.slice(0, MAX_ROWS) };
+  if (j.single) return { hero, rows: rest.slice(0, MAX_ROWS) };
+  // Mixed: take turns across categories so one list isn't all shows.
+  const queues = j.order.map((c) => rest.filter((p) => p.category === c)); const rows = [];
+  while (rows.length < MAX_ROWS && queues.some((q) => q.length)) for (const q of queues) if (q.length && rows.length < MAX_ROWS) rows.push(q.shift());
+  return { hero, rows };
 }
 
 // Share link (§S): the result itself rides in ?r= (base64url JSON), no storage.

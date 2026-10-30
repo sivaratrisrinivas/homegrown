@@ -48,7 +48,7 @@ test('HG-10 category config: single-category renders "Your TV self, in Madrid" w
   assert.equal(r.hero.title, 'tv-0'); assert.deepEqual(r.rows.map((p) => p.category), ['tv', 'tv', 'tv', 'tv']);
   assert.equal(r.rows.length, MAX_ROWS);
   const m = journeyPicks({ tv: cat('tv', 3), movie: cat('movie', 3) }, journeyFor('mixed'));
-  assert.deepEqual(m.rows.map((p) => p.title), ['tv-1', 'tv-2', 'movie-0', 'movie-1'], 'extra categories are more rows in the same list');
+  assert.deepEqual(m.rows.map((p) => p.title), ['tv-1', 'movie-0', 'tv-2', 'movie-1'], 'mixed: categories take turns in one list');
 });
 
 test('HG-10 share link: result rides in ?r=, round-trips, stays short, rejects junk', () => {

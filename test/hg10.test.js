@@ -186,7 +186,7 @@ test('HG-10 contrast: text tokens meet AA; board header is chalk with an accent 
   assert.ok(css.includes('--accent-rule:color-mix(in srgb,var(--accent) 80%,var(--chalk))'));
   assert.ok(!/[{;]color:var\(--accent\)[;}]/.test(css.replace(/\.poster b\{[^}]*\}/, '')), 'accent is never body text on paper');
   const cities = JSON.parse(readFileSync(new URL('../config/cities.json', import.meta.url), 'utf8')).cities;
-  assert.equal(cities.length, 9);
+  assert.ok(cities.length >= 9); // every city, including HG-11 additions
   for (const c of cities) {
     const acc = css.match(new RegExp(`\\[data-city=${c.id}\\]\\{--accent:(#[0-9A-Fa-f]{6})\\}`))?.[1] || c.accent;
     const mix = (a, b, p) => '#' + [0, 2, 4].map((i) => Math.round(p * parseInt(a.slice(1 + i, 3 + i), 16) + (1 - p) * parseInt(b.slice(1 + i, 3 + i), 16)).toString(16).padStart(2, '0')).join('');

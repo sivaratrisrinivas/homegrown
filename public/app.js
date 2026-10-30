@@ -1,4 +1,5 @@
 import { JOURNEY_FAVS, journeyFor, revealHeader, journeyPicks, encodeShare, decodeShare, QLOO_ORDER, liveCats, pendingCats, runCatsFor, NOT_READY, flapSteps, padTo, userCountryFromLocale, createRunGuard, createSpacer, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { indiaSection } from './india.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { CATEGORY } from './config.js';
 // HG-10 v1 is one journey: hello → language → city → 3 favourites → morph board → reveal → share.
@@ -143,10 +144,13 @@ async function pickLanguage() {
     S.catalogue = r;
   }
   nav('lang'); setCity(null);
-  const { live } = languageGroups(S.catalogue);
+  // Indian languages (those with states) are listed language-first in their own section (HG-11, india.js).
+  const { live: all } = languageGroups(S.catalogue);
+  const live = all.filter((l) => !l.states);
   show(h('h2', {}, 'You’re learning…'),
     h('div', { class: 'tiles' }, live.map((l) => h('button', { class: 'tile', onclick: () => { chooseLanguage(l); suggestCity(); } },
-      h('span', { class: serif(l.id), lang: l.id }, l.local), h('span', { class: 'cap' }, l.name)))));
+      h('span', { class: serif(l.id), lang: l.id }, l.local), h('span', { class: 'cap' }, l.name)))),
+    indiaSection(S.catalogue, { h, onPick: (l) => { chooseLanguage(l); suggestCity(); } }));
 }
 function chooseLanguage(l) { S.lang = l; if (l.id === 'ko') loadKorean(); }
 

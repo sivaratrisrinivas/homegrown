@@ -1,8 +1,9 @@
 import { test, before, after } from 'node:test';
+import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { whyLine, phrase, plural } from '../lib/why.js';
 import { createSuggest, normaliseKind } from '../lib/suggest.js';
-import { present, bestQlooMatch, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked } from '../public/logic.js';
+import { present, bestQlooMatch, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, matchingProgress } from '../public/logic.js';
 import { createServer } from '../server.js';
 import { setSuggest, suggestCache } from '../api/suggest.js';
 
@@ -179,4 +180,35 @@ test('round 2 (2): a missing TMDB key is configuration, so results stay cacheabl
   assert.match(res.headers.get('cache-control'), /s-maxage=3600/);
   assert.ok(suggestCache.get('any|nokeyq'));
   setSuggest(undefined);
+});
+
+test('round 3 (a): a failed Qloo lookup is not a no-match; the pick stays pending for retry', () => {
+  const sug = { name: 'Dark', year: 2017 };
+  assert.equal(lookupOutcome({ ok: false, body: {} }, sug), LOOKUP_FAILED, 'HTTP error');
+  assert.equal(lookupOutcome(undefined, sug), LOOKUP_FAILED, 'throw/timeout leaves no response');
+  assert.equal(lookupOutcome({ ok: true, body: { results: [{ id: 'x', name: 'Other' }] } }, sug), null, 'true no-match');
+  assert.equal(lookupOutcome({ ok: true, body: { results: [{ id: 'd', name: 'Dark', year: 2017 }] } }, sug).id, 'd');
+  const pending = [{ key: 'k1', name: 'Dark' }, { key: 'k2', name: 'Nope' }, { key: 'k3', name: 'Ok' }];
+  const r = settleFavourites([], pending, new Map([['k1', LOOKUP_FAILED], ['k2', null], ['k3', { id: 'o', tags: [] }]]));
+  assert.deepEqual(r.failed.map((f) => f.name), ['Dark']);
+  assert.deepEqual(r.missed, ['Nope'], 'failed picks are never reported as could-not-match');
+  assert.deepEqual(r.favs.map((f) => f.id), ['o']);
+});
+
+test('round 3 (a): app.js never memoises a failed lookup and has a timeout + retry', async () => {
+  const src = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.match(src, /if \(r\.ok\) searchMemo\.set/);
+  assert.match(src, /\.catch\(\(\) => LOOKUP_FAILED\)/);
+  assert.match(src, /setTimeout\(\(\) => ctl\.abort\(\), QLOO_LOOKUP_TIMEOUT_MS\)/);
+  assert.match(src, /Couldn't reach our matcher for/);
+  assert.match(src, /'Try again'/);
+});
+
+test('round 3 (b): matching progress counts up as lookups settle, in a polite live region', async () => {
+  assert.equal(matchingProgress(0, 5), 'Matching 1 of 5');
+  assert.equal(matchingProgress(1, 5), 'Matching 2 of 5');
+  assert.equal(matchingProgress(5, 5), 'Matching 5 of 5');
+  const src = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.match(src, /'aria-live': 'polite' }, matchingProgress\(done, total\)/);
+  assert.match(src, /progress\.textContent = matchingProgress\(\+\+done, total\)/);
 });

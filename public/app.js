@@ -1,4 +1,4 @@
-import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
+import { PROMPTS, MAX_FAVS, canSkip, QLOO_ORDER, MORPH_BUDGET_MS, flapSteps, padTo, rankPicks, userCountryFromLocale, createRunGuard, createSpacer, SKIP, createMemo, searchKey, DEBOUNCE_MS, settleFavourites, favouriteIds, pickKey, isPicked, lookupOutcome, LOOKUP_FAILED, QLOO_LOOKUP_TIMEOUT_MS, matchingProgress, bestQlooMatch, present, twinClientKey, runCategories, gatedIfCurrent, shouldMemoTwin, postcardCategories, scarcePicks, cityForLanguage, liveCitiesForLanguage, languageGroups } from './logic.js';
 const serif = (lang) => `serif ${lang === 'ko' ? 'ko' : ''}`;
 
 const app = document.getElementById('app');
@@ -93,12 +93,16 @@ function resolveFavourite(sug, kind) {
   const sk = searchKey(kind, sug.name);
   const fromMemo = searchMemo.get(sk);
   const p = fromMemo ? Promise.resolve(fromMemo) : qlooGate(async () => {
-    const res = await fetch(`/api/search?kind=${kind}&q=${encodeURIComponent(sug.name)}`);
-    const r = { ok: res.ok, body: await res.json().catch(() => ({})) };
-    if (r.ok) searchMemo.set(sk, r);
-    return r;
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), QLOO_LOOKUP_TIMEOUT_MS);
+    try {
+      const res = await fetch(`/api/search?kind=${kind}&q=${encodeURIComponent(sug.name)}`, { signal: ctl.signal });
+      const r = { ok: res.ok, body: await res.json().catch(() => ({})) };
+      if (r.ok) searchMemo.set(sk, r); // failures are never memoised
+      return r;
+    } finally { clearTimeout(t); }
   });
-  return p.then((r) => (r?.ok ? bestQlooMatch(r.body.results || [], sug) : null)).catch(() => null);
+  // Failure (HTTP error, throw, timeout) -> LOOKUP_FAILED; Qloo answered but no name match -> null.
+  return p.then((r) => lookupOutcome(r, sug)).catch(() => LOOKUP_FAILED);
 }
 
 function favourite(note) {
@@ -133,7 +137,7 @@ function favourite(note) {
         if (isPicked(pick, S.favs, S.pending)) { msg.textContent = `${e.name} is already in your favourites.`; return; }
         const key = `${pick}|${S.pending.length + S.favs.length}`;
         pendingMatches.set(key, resolveFavourite(e, kind));
-        S.pending.push({ key, pick, name: e.name });
+        S.pending.push({ key, pick, name: e.name, sug: e, kind });
         favourite();
       } }, e.name, e.year ? ` (${e.year})` : ''))));
     }, DEBOUNCE_MS);
@@ -147,11 +151,24 @@ function favourite(note) {
 // Wait for the background Qloo matches; favourites Qloo doesn't know are dropped with a note.
 async function matchFavourites() {
   if (!S.pending.length) return S.favs.length >= 3 || (favourite('Pick at least 3 favourites.'), false);
-  show(h('p', { class: 'muted' }, 'Matching your favourites…'));
-  const matches = new Map(await Promise.all(S.pending.map(async (f) => [f.key, await pendingMatches.get(f.key)])));
-  const { favs, missed } = settleFavourites(S.favs, S.pending, matches);
+  const total = S.pending.length; let done = 0;
+  const progress = h('p', { class: 'muted', role: 'status', 'aria-live': 'polite' }, matchingProgress(done, total));
+  show(h('p', { class: 'muted' }, 'Matching your favourites…'), progress);
+  const matches = new Map(await Promise.all(S.pending.map(async (f) => {
+    const m = await pendingMatches.get(f.key);
+    progress.textContent = matchingProgress(++done, total);
+    return [f.key, m];
+  })));
+  const { favs, missed, failed } = settleFavourites(S.favs, S.pending, matches);
   S.pending.forEach((f) => pendingMatches.delete(f.key));
-  S.favs = favs; S.pending = [];
+  S.favs = favs; S.pending = failed;
+  if (failed.length) {
+    // Couldn't reach Qloo: keep these picks and offer a retry; nothing is dropped or called a no-match.
+    const retry = () => { for (const f of S.pending) pendingMatches.set(f.key, resolveFavourite(f.sug, f.kind)); morph(); };
+    show(h('p', { role: 'status', 'aria-live': 'polite' }, `Couldn't reach our matcher for ${failed.map((f) => f.name).join(', ')}, try again.`),
+      h('button', { onclick: retry }, 'Try again'));
+    return false;
+  }
   if (S.favs.length < 3) { favourite(`We couldn't match ${missed.join(', ')}. Pick ${3 - S.favs.length} more.`); return false; }
   return true;
 }

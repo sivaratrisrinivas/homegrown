@@ -1,0 +1,4 @@
+{
+  "source": "scripts/coverage.mjs: OpenSubtitles subtitle per film (TMDB id + language), tokenised with public/coverage.js, counted into 500-rank bands of data/freq/<lang>.txt. Only band counts are stored, never subtitle text.",
+  "films": {}
+}

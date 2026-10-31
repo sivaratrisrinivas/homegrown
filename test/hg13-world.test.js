@@ -42,8 +42,12 @@ test('HG-13: every configured city is gated by its measured result; thin note fo
     const thin = m.seen < THIN_SEEN || (m.languageShare ?? 1) < THIN_SHARE;
     assert.equal(!!thinNote(gate, c.id), thin, `${c.id} thin note`);
   }
+  // A language is live exactly when one of its cities passes the gate (HG-14: English is gated today).
   const cat = catalogue(gate);
-  for (const c of NEW) assert.ok(cat.languages.find((l) => l.id === c.language).live, c.language);
+  for (const c of NEW) {
+    const anyLive = Object.values(CITIES).some((x) => x.language === c.language && cityStatus(gate, x.id).live);
+    assert.equal(cat.languages.find((l) => l.id === c.language).live, anyLive, c.language);
+  }
 });
 
 test('HG-13 review: RTL-safe headers, provenance, no combining-dot aliases', () => {
@@ -53,10 +57,13 @@ test('HG-13 review: RTL-safe headers, provenance, no combining-dot aliases', () 
   assert.match(app, /hdr\.dir = 'auto'; await flipHeader\(hdr, revealHeader\(J, c\)/);
   assert.match(app, /lang: J\.single \? 'en' : S\.city\.language, dir: 'auto' \}/);
   const raw = JSON.parse(readFileSync(gate.hg13.raw, 'utf8'));
+  // HG-14 re-measured every city with the HG-14 origin rule; the gate carries those numbers (raw record below).
+  const hg14 = JSON.parse(readFileSync(gate.hg14.raw, 'utf8'));
   for (const c of NEW) {
     const r = raw.scout.results.find((x) => x.id === c.id);
-    assert.ok(r, c.id); assert.equal(gate.results[c.id].movie.seen, r.seen); assert.equal(gate.results[c.id].movie.accepted, r.accepted);
-    assert.equal(r.releaseCountry, c.releaseCountry, c.id);
+    assert.ok(r, c.id); assert.equal(r.releaseCountry, c.releaseCountry, c.id);
+    const m = hg14.cities[c.id].after;
+    assert.equal(gate.results[c.id].movie.seen, m.seen, c.id); assert.equal(gate.results[c.id].movie.accepted, m.accepted, c.id);
   }
   assert.ok(raw.retry.results.every((r) => r.seen === 0));
   assert.doesNotMatch(readFileSync('config/cities.json', 'utf8'), /\u0307/);
@@ -66,10 +73,26 @@ test('HG-13 review: RTL-safe headers, provenance, no combining-dot aliases', () 
 // Captain (HG-13): English is only for people who pick English to learn.
 import { cityForLanguage, liveCitiesForLanguage, otherCities, languageGroups } from '../public/logic.js';
 import { suggestCity } from '../lib/gate.js';
+import { liftCities } from './helpers.js';
 const EN_CITIES = Object.values(CITIES).filter((c) => c.language === 'en').map((c) => c.id);
+
+// HG-14: London and Dublin are below the gate today, so the English rule is checked on a fixture gate
+// where both just pass (what a future measuring run would bring back). The rule itself is unchanged.
+const enGate = liftCities(gate, ['london', 'dublin']);
+
+test('HG-14: English is gated today; London and Dublin stay in the catalogue, not served', () => {
+  const cat = catalogue(gate);
+  assert.equal(cat.languages.find((l) => l.id === 'en').live, false);
+  for (const id of EN_CITIES) {
+    const c = cat.cities.find((x) => x.id === id);
+    assert.ok(c, `${id} in catalogue`); assert.equal(c.live, false, id);
+  }
+  assert.equal(cityForLanguage(cat, 'en'), null, 'no English city offered');
+});
 
 test('English: learnable, London first, Dublin one tap away (best-score rule)', () => {
   assert.deepEqual(EN_CITIES, ['london', 'dublin']);
+  const gate = enGate;
   const cat = catalogue(gate);
   assert.ok(languageGroups(cat).live.some((l) => l.id === 'en'), 'English is a live, learnable language');
   assert.equal(suggestCity(gate, 'en').city, 'london');
@@ -81,6 +104,7 @@ test('English: learnable, London first, Dublin one tap away (best-score rule)', 
 });
 
 test('English: never an auto-route, default or fallback for any other language', () => {
+  const gate = enGate;
   const cat = catalogue(gate);
   assert.equal(cat.languages.find((l) => l.id === 'en').explicitOnly, true);
   for (const l of LANGUAGES.filter((x) => x.id !== 'en')) {

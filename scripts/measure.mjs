@@ -39,6 +39,6 @@ for (const cityId of Object.keys(CITIES)) {
     console.log(JSON.stringify({ city: cityId, category, seen: r.seen, accepted: r.accepted, pct: r.pct, errors: r.errors, filtered: r.filtered, languageShare: results[cityId][category].languageShare, reasons: r.rejected.reduce((m, x) => ({ ...m, [x]: (m[x] || 0) + 1 }), {}) }));
   }
 }
-const gate = { ...old, measuredAt: new Date().toISOString(), source: `npm run measure (HG-9 language-aware): Qloo pool of 50 filtered by language (TMDB original_language for tv/movie, Qloo genre tags for music), then top 15 per category, every candidate checked, MusicBrainz errors retried (1.1 s backoff) and excluded from the denominator; seeds ${SEEDS.map((s) => s[0]).join(', ')}`, results };
+const gate = { ...old, measuredAt: new Date().toISOString(), source: `npm run measure (scripts/measure.mjs, twin.measure per live category): Qloo pool of 50 filtered by TMDB original_language, top 15 checked, Qloo calls ~7 s apart; native = TMDB origin_country includes the city's country (production_countries only when origin_country is empty); seeds ${SEEDS.map((s) => s[0]).join(', ')}. measuredAt is when this run finished (UTC).`, results };
 writeFileSync(new URL('../config/gate.json', import.meta.url), JSON.stringify(gate, null, 2) + '\n');
 for (const id of Object.keys(CITIES)) console.log(JSON.stringify({ city: id, live: cityStatus(gate, id).live }));

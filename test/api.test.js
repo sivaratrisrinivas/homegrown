@@ -1,7 +1,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from '../server.js';
-import { FAVS } from './helpers.js';
+import { FAVS, liftCities, HG14_GATED } from './helpers.js';
+import { loadGate } from '../lib/gate.js';
 
 let srv, base;
 const saved = { q: process.env.QLOO_API_KEY, t: process.env.TMDB_API_KEY };
@@ -56,15 +57,47 @@ test('review 10: a non-string city never bypasses the live-city gate', async () 
   assert.equal((await post('/api/feedback', { event: 'try_city', city: 'seoul', to: ['madrid'] })).status, 400);
   assert.equal((await post('/api/feedback', { event: 'try_city', city: 'seoul', to: 'madrid' })).status, 200);
 });
+// HG-14: lifts gated cities in the server's own gate object (same process) for one test, then restores it.
+async function withLifted(ids, fn) {
+  const gate = loadGate(); const saved = structuredClone(gate.results);
+  gate.results = liftCities(gate, ids).results;
+  try { await fn(); } finally { gate.results = saved; }
+}
+
+test('HG-14: gated cities stay in /api/cities, are refused, and come back once their numbers pass', async () => {
+  const cat = async () => (await fetch(base + '/api/cities')).json();
+  const c0 = await cat();
+  assert.equal(c0.cities.length, 26, 'every configured city stays in the catalogue');
+  assert.equal(c0.cities.filter((c) => c.live).length, 23);
+  assert.deepEqual(c0.cities.filter((c) => !c.live).map((c) => c.id).sort(), [...HG14_GATED].sort());
+  for (const id of ['en', 'bn']) assert.equal(c0.languages.find((l) => l.id === id).live, false, id);
+  assert.equal((await post('/api/twin', { favourites: FAVS, city: 'kolkata', category: 'movie' })).status, 403);
+  await withLifted(HG14_GATED, async () => {
+    const c1 = await cat();
+    assert.equal(c1.cities.filter((c) => c.live).length, 26);
+    for (const id of ['en', 'bn']) assert.equal(c1.languages.find((l) => l.id === id).live, true, id);
+    // Passes the gate and reaches the (keyless) service.
+    assert.equal((await post('/api/twin', { favourites: FAVS, city: 'kolkata', category: 'movie' })).status, 503);
+  });
+  assert.equal((await cat()).cities.filter((c) => c.live).length, 23, 'restored');
+});
+
 test('HG-13: London/Dublin (explicit-only English) are served only to English learners', async () => {
-  for (const city of ['london', 'dublin']) {
-    for (const learnerLanguage of [undefined, 'ja', 'hi', 'EN', ['en']]) {
-      const r = await post('/api/twin', { favourites: FAVS, city, category: 'movie', learnerLanguage });
-      assert.equal(r.status, 403, `${city}/${JSON.stringify(learnerLanguage)}`);
-    }
-    // Picked English: passes the gate and reaches the (keyless) service.
-    assert.equal((await post('/api/twin', { favourites: FAVS, city, category: 'movie', learnerLanguage: 'en' })).status, 503);
+  // HG-14: gated today, so refused for everyone, English learners included.
+  for (const city of ['london', 'dublin']) for (const learnerLanguage of [undefined, 'en']) {
+    assert.equal((await post('/api/twin', { favourites: FAVS, city, category: 'movie', learnerLanguage })).status, 403, `gated ${city}`);
   }
+  // Once they pass the gate, the English-only rule applies.
+  await withLifted(['london', 'dublin'], async () => {
+    for (const city of ['london', 'dublin']) {
+      for (const learnerLanguage of [undefined, 'ja', 'hi', 'EN', ['en']]) {
+        const r = await post('/api/twin', { favourites: FAVS, city, category: 'movie', learnerLanguage });
+        assert.equal(r.status, 403, `${city}/${JSON.stringify(learnerLanguage)}`);
+      }
+      // Picked English: passes the gate and reaches the (keyless) service.
+      assert.equal((await post('/api/twin', { favourites: FAVS, city, category: 'movie', learnerLanguage: 'en' })).status, 503);
+    }
+  });
   // Other cities don't need the field (client contract unchanged for them).
   assert.equal((await post('/api/twin', { favourites: FAVS, city: 'tokyo', category: 'movie' })).status, 503);
   const app = (await import('node:fs')).readFileSync('public/app.js', 'utf8');

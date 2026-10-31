@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { bestSeedMatch } from '../lib/qloo.js';
 import { loadGate, catalogue, cityStatus, thinNote } from '../lib/gate.js';
+import { liftCities } from './helpers.js';
 import { indiaGroups, matchState, indiaLabel, meanwhileHint, matchStatus, indiaSection } from '../public/india.js';
 
 test('HG-11 seed: exact title beats a longer first result (Parasite, not Parasite Dolls)', () => {
@@ -28,10 +29,13 @@ test('HG-11 config: Kochi and Amritsar are live from the committed gate; Amritsa
 });
 
 const G = () => indiaGroups(catalogue(loadGate()));
+// HG-14: Kolkata (Bengali) is gated today; this fixture is the gate once it passes again.
+const GK = () => indiaGroups(catalogue(liftCities(loadGate(), ['kolkata'])));
 
 test('HG-11 India picker: live languages with states; coming soon vs not supported are separate', () => {
   const g = G();
-  assert.deepEqual(g.live.map((l) => l.id).sort(), ['bn', 'hi', 'ml', 'pa', 'ta', 'te']);
+  assert.deepEqual(g.live.map((l) => l.id).sort(), ['hi', 'ml', 'pa', 'ta', 'te'], 'HG-14: Bengali hidden while Kolkata is gated');
+  assert.deepEqual(GK().live.map((l) => l.id).sort(), ['bn', 'hi', 'ml', 'pa', 'ta', 'te'], 'Bengali returns once Kolkata passes');
   assert.equal(indiaLabel(g.live.find((l) => l.id === 'te')), 'Telugu, Andhra Pradesh & Telangana');
   assert.deepEqual(g.soon.map((l) => l.id).sort(), ['as', 'gu', 'kn', 'ks', 'mr', 'ne', 'or']);
   assert.deepEqual(g.unsupported.map((l) => l.id).sort(), ['bho', 'kha', 'kok', 'lus', 'mni', 'tcy']);
@@ -55,7 +59,9 @@ test('HG-11 India picker: state search, live status, one meanwhile hint with the
   assert.deepEqual([k.soon.map((l) => l.id), k.unsupported.map((l) => l.id)], [['kn'], ['tcy']]);
   assert.equal(matchStatus(k), '2 languages match');
   assert.equal(meanwhileHint(k), 'Try Hindi meanwhile.');
-  assert.equal(meanwhileHint(matchState(g, 'assam')), 'Try Bengali for Assamese, meanwhile.');
+  // Assamese points to Bengali only while Bengali is live (HG-14: Kolkata gated today -> Hindi).
+  assert.equal(meanwhileHint(matchState(g, 'assam')), 'Try Hindi meanwhile.');
+  assert.equal(meanwhileHint(matchState(GK(), 'assam')), 'Try Bengali for Assamese, meanwhile.');
   assert.equal(meanwhileHint(matchState(g, 'kerala')), null, 'no hint when everything shown is live');
   assert.equal(matchStatus(matchState(g, 'telangana')), '1 language matches');
 });
@@ -86,11 +92,12 @@ test('HG-11 India picker render: lang= on native names, no aria-disabled, polite
   const sec = indiaSection(catalogue(loadGate()), { h: stubH, onPick: (l) => picked.push(l.id) });
   const all = walk(sec);
   const natives = all.filter((e) => e.attrs.class === 'india-local');
-  assert.ok(natives.length >= 19 && natives.every((e) => e.attrs.lang));
+  // 5 live + 7 coming soon + 6 not supported (HG-14: Bengali hidden while Kolkata is gated).
+  assert.ok(natives.length >= 18 && natives.every((e) => e.attrs.lang));
   assert.ok(all.every((e) => !('aria-disabled' in e.attrs)));
   const status = all.find((e) => e.attrs.role === 'status');
   assert.equal(status.attrs['aria-live'], 'polite');
-  assert.equal(status.textContent, '19 languages match');
+  assert.equal(status.textContent, '18 languages match');
   assert.equal(all.filter((e) => e.attrs.class?.includes('india-hint')).length, 1);
   all.find((e) => e.tag === 'button').listeners.click();
   assert.equal(picked.length, 1);

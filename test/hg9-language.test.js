@@ -7,7 +7,7 @@ import { verifyShow, verifyMovie } from '../lib/tmdb.js';
 import { CITIES, LANGUAGES } from '../lib/cities.js';
 import { cityStatus, loadGate, liveCategories, requireLiveCategory, catalogue, suggestCity, thinNote } from '../lib/gate.js';
 import { retryable } from '../lib/qloo.js';
-import { FAVS } from './helpers.js';
+import { FAVS, liftCities } from './helpers.js';
 
 const g = (slug) => ({ id: `urn:tag:genre:music:${slug}`, name: slug });
 const KOL = { id: 'kolkata', name: 'Kolkata', localName: 'কলকাতা', country: 'IN', language: 'bn', countryNames: ['india'], musicLanguageTags: ['bengali', 'bangla'], musicConflictTags: ['hindi', 'bollywood', 'tamil'] };
@@ -90,7 +90,9 @@ test('HG-9 gate: a tiny language-filtered pool (2/2) is not enough to go live', 
 
 test('HG-9 measured gate: all 9 cities live on movies; each live category has >= minSeen and records languageShare', () => {
   const g = loadGate();
-  for (const id of ['mexico_city', 'madrid', 'buenos_aires', 'seoul', 'paris', 'chennai', 'mumbai', 'hyderabad', 'kolkata']) assert.equal(cityStatus(g, id).live, true, id);
+  for (const id of ['mexico_city', 'madrid', 'buenos_aires', 'seoul', 'paris', 'chennai', 'mumbai', 'hyderabad']) assert.equal(cityStatus(g, id).live, true, id);
+  // HG-14: Kolkata fell below 60% under the HG-14 origin rule (4/7); it is gated, not removed.
+  assert.equal(cityStatus(g, 'kolkata').live, false); assert.ok(CITIES.kolkata);
   for (const [id, res] of Object.entries(g.results)) for (const k of liveCategories(g)) {
     assert.ok(res[k].seen >= g.minSeen, `${id}.${k}`);
     assert.equal(res[k].languageShare, Math.round((100 * res[k].seen) / (res[k].seen + res[k].filtered)) / 100, `${id}.${k} share`);
@@ -175,7 +177,9 @@ test('v1 movies only: liveCategories switch, 403 guard, liveness judged on movie
   const bad = { ...g, results: { x: { movie: { seen: 10, accepted: 9 }, tv: { seen: 10, accepted: 0 }, music: { seen: 0, accepted: 0 } } } };
   assert.equal(cityStatus(bad, 'x').live, true, 'failing TV/music does not block a movie-live city');
   assert.equal(cityStatus({ ...bad, liveCategories: undefined }, 'x').live, false);
-  for (const id of ['hyderabad', 'kolkata']) assert.equal(cityStatus(g, id).live, true, id);
+  assert.equal(cityStatus(g, 'hyderabad').live, true);
+  assert.equal(cityStatus(g, 'kolkata').live, false, 'HG-14: gated on movies');
+  assert.equal(cityStatus(liftCities(g, ['kolkata']), 'kolkata').live, true, 'back once movies pass');
   assert.equal(CITIES.hyderabad.language, 'te'); assert.equal(CITIES.kolkata.language, 'bn');
 });
 

@@ -16,7 +16,7 @@ const k = (x) => x.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 function fakeTmdb(rows, { fail = new Set() } = {}) {
   const calls = { search: 0 };
   return { calls, searchMovie: async (q) => { calls.search++; if (fail.has(q)) throw new Error('tmdb down'); return rows.filter((r) => [r.title, r.original_title].some((t) => k(t) === k(q))); },
-    movieDetails: async (id) => ({ origin_country: rows.find((r) => r.id === id).countries }) };
+    movieDetails: async (id) => { const r = rows.find((x) => x.id === id); return { origin_country: r.countries, alternative_titles: { titles: (r.alt || []).map((title) => ({ iso_3166_1: 'IN', title })) } }; } };
 }
 function svc({ films, rows = [], budget = createClaudeBudget({ usdPerDay: 0.25 }), caps, fail, now, verifyDeadlineMs } = {}) {
   const calls = { claude: 0 };
@@ -44,7 +44,7 @@ test('HG-12 verify: year mismatch, ambiguity, wrong language and non-Indian are 
 });
 
 test('HG-12: wrong-language titles are dropped; cards use TMDB year and title; server sends label and note', async () => {
-  const { s } = svc({ films: F('K1', 'K2', { title: 'K-3', year: 2019 }, 'Hindi1'), rows: [row('K1', 'kn'), row('K2', 'kn', 2020, ['IN'], 'ಕೆ2'), row('K 3', 'kn', 2020), row('Hindi1', 'hi')] });
+  const { s } = svc({ films: F('K1', 'K2', { title: 'K-3', year: 2019 }, 'Hindi1'), rows: [row('K1', 'kn'), { ...row('K2', 'kn', 2020, ['IN'], 'ಕೆ2'), alt: ['ಕೆ2'] }, row('K 3', 'kn', 2020), row('Hindi1', 'hi')] });
   const r = await s({ language: 'kn', favourites: ['Parasite'], ip: '1' });
   assert.equal(r.status, 'ok'); assert.equal(r.label, AI_LABEL); assert.equal(r.note, AI_NOTE);
   assert.equal(AI_NOTE, 'Each title is checked against TMDB for language and country.');
@@ -182,4 +182,31 @@ test('HG-7 r2: a caller joining an in-flight run must also pass the budget check
   const joiner = await s({ language: 'kn', favourites: ['x'], ip: '2' });
   assert.equal(joiner.status, 'capped'); assert.equal(n, 1);
   release(); await first;
+});
+
+// HG-17: TMDB 397490 is 'U Turn' (kn, 2016) but its original_title is 'ಮಗಳು ಜಾನಕಿ' (a different work).
+// Native and English are paired only when the same record confirms both; otherwise just one title.
+test('HG-17: unconfirmed native/English pair shows only the matched title', async () => {
+  const uturn = { ...row('U Turn', 'kn', 2016, ['IN'], 'ಮಗಳು ಜಾನಕಿ'), alt: ['U Turn', '유턴'] };
+  const v = await verifySuggestedFilm(fakeTmdb([uturn]), { title: 'U Turn', year: 2016 }, IN);
+  assert.equal(v.ok, true); assert.equal(v.title, 'U Turn'); assert.equal(v.englishTitle, undefined); assert.equal(v.paired, 'unconfirmed');
+  // Matched on the native title and the English is confirmed by the record -> both, from the same record.
+  const ok = { ...row('Kirik Party', 'kn', 2016, ['IN'], 'ಕಿರಿಕ್ ಪಾರ್ಟಿ'), alt: ['Kirik Party'] };
+  const v2 = await verifySuggestedFilm(fakeTmdb([ok]), { title: 'ಕಿರಿಕ್ ಪಾರ್ಟಿ', year: 2016 }, IN);
+  assert.deepEqual([v2.title, v2.englishTitle, v2.paired], ['ಕಿರಿಕ್ ಪಾರ್ಟಿ', 'Kirik Party', 'confirmed']);
+  // Matched on the native title; a translated English title the record doesn't confirm -> native only.
+  const lone = row('Stars', 'kn', 2016, ['IN'], 'ತಾರೆ');
+  const v3 = await verifySuggestedFilm(fakeTmdb([lone]), { title: 'ತಾರೆ', year: 2016 }, IN);
+  assert.deepEqual([v3.title, v3.englishTitle], ['ತಾರೆ', undefined]);
+  // A transliterated pair is confirmed by sound even without TMDB alternative titles.
+  const kp = row('Kirik Party', 'kn', 2016, ['IN'], 'ಕಿರಿಕ್ ಪಾರ್ಟಿ');
+  const v4 = await verifySuggestedFilm(fakeTmdb([kp]), { title: 'Kirik Party', year: 2016 }, IN);
+  assert.deepEqual([v4.title, v4.englishTitle, v4.paired], ['ಕಿರಿಕ್ ಪಾರ್ಟಿ', 'Kirik Party', 'confirmed']);
+  // End to end through the AI-suggest service: the card never shows 'ಮಗಳು ಜಾನಕಿ' over 'U Turn'.
+  const { s } = svc({ films: F({ title: 'U Turn', year: 2016 }, 'K1', 'K2'), rows: [{ ...row('U Turn', 'kn', 2016, ['IN'], 'ಮಗಳು ಜಾನಕಿ'), alt: ['U Turn'] }, row('K1', 'kn'), row('K2', 'kn')] });
+  const r = await s({ language: 'kn', favourites: ['Parasite'], ip: '9' });
+  const card = r.films.find((f) => f.title === 'U Turn');
+  assert.ok(card); assert.equal(card.englishTitle, undefined); assert.equal(card.suggestedTitle, undefined);
+  assert.ok(r.films.every((f) => f.title !== 'ಮಗಳು ಜಾನಕಿ' && f.englishTitle !== 'U Turn'));
+  assert.deepEqual(filmHeading(card), { title: 'U Turn', sub: '' });
 });

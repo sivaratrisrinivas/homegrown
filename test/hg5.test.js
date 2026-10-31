@@ -218,7 +218,7 @@ test('round 4 (HG-10): the reveal lead line uses the app serif; the flap sound a
   const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
   assert.doesNotMatch(html, /id="sound"|Sound off/, 'the flap sound was removed in HG-10 (deliberate cut), so there is no toggle');
   assert.doesNotMatch(css, /\.sound\{/, 'no sound toggle styles left behind');
-  assert.match(css, /--serif:Fraunces,"Fraunces Fallback",serif/, '--serif is the app serif');
+  assert.match(css, /--serif:Fraunces,"Fraunces Fallback",var\(--indic-serif\),serif/, '--serif is the app serif');
   // The lead line of the reveal is the board header: it is set in the app serif.
   assert.match(css, /\.board \.hdr\{font:400 var\(--t-title\)\/1\.15 var\(--serif\)/, 'the reveal lead line uses the app serif');
   assert.match(css, /\.outline\{[^}]*white-space:nowrap;[^}]*text-overflow:ellipsis/);

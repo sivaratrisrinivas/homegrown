@@ -24,7 +24,7 @@ export async function aiReveal({ h, show, lang, favourites, onBack, fetch = glob
     h('p', { class: 'ai-label' }, v.label),
     h('div', { class: 'ai-films' }, v.films.map((f) => { const hd = filmHeading(f); return h('div', { class: 'card ai-film' },
       f.image ? h('img', { src: f.image, alt: '', loading: 'lazy' }) : null,
-      h('h3', { lang: lang.id }, hd.title), hd.sub ? h('p', { class: 'muted' }, hd.sub) : null,
+      h('h3', { lang: /[\u0900-\u0D7F]/.test(hd.title) ? lang.id : 'en' }, hd.title), hd.sub ? h('p', { class: 'muted' }, hd.sub) : null,
       h('p', { class: 'muted' }, [f.year, 'made in 🇮🇳'].filter(Boolean).join(' · '))); })),
     v.note ? h('p', { class: 'muted' }, v.note) : null,
     back);

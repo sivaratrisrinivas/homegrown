@@ -91,7 +91,7 @@ test('HG-9 gate: a tiny language-filtered pool (2/2) is not enough to go live', 
 test('HG-9 measured gate: all 9 cities live on movies; each live category has >= minSeen and records languageShare', () => {
   const g = loadGate();
   for (const id of ['mexico_city', 'madrid', 'buenos_aires', 'seoul', 'paris', 'chennai', 'mumbai', 'hyderabad']) assert.equal(cityStatus(g, id).live, true, id);
-  // HG-14: Kolkata fell below 60% under the primary-origin rule (3/7); it is gated, not removed.
+  // HG-14: Kolkata fell below 60% under the HG-14 origin rule (4/7); it is gated, not removed.
   assert.equal(cityStatus(g, 'kolkata').live, false); assert.ok(CITIES.kolkata);
   for (const [id, res] of Object.entries(g.results)) for (const k of liveCategories(g)) {
     assert.ok(res[k].seen >= g.minSeen, `${id}.${k}`);

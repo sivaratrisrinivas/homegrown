@@ -120,7 +120,7 @@ Rule: any motion that doesn't explain or make you feel something is cut. Everyth
 ## 11. Data plan (v1: music, TV, movies)
 
 **Strict native rule:** a pick passes only if every check below passes. A pick that fails any check is removed and never shown. There is no padding.
-- **TV/movies:** TMDB `original_language` equals the city's language (es / ko / fr), **and** TMDB `origin_country` includes the city's country (MX / KR / FR).
+- **TV/movies:** TMDB `original_language` equals the city's language (es / ko / fr), **and** TMDB `origin_country` includes the city's country (MX / KR / FR); for films with an empty `origin_country`, `production_countries` is used instead (HG-14).
 - **Music:** MusicBrainz artist `country` (or area) equals the city's country. Instrumental-only or mostly-English artists are dropped when the lyrics language can be checked.
 
 | Category | Discover (taste) | Locality filter | Verify (free) | HG-1 raw → expected after strict filtering |
@@ -150,7 +150,7 @@ Rule: any motion that doesn't explain or make you feel something is cut. Everyth
 8. **Is sound on by default?** *Default:* off, with a visible tap-to-enable on the city screen.
 9. **Can a reveal be shared?** *Default:* yes. A public read-only link with an OG image of the split-flap board.
 10. **Which LLM writes the why-lines?** *Default:* whatever free or cheapest tier is available through the existing gateway. The why-line must quote a real shared Qloo tag (no made-up reasons).
-11. **Do co-productions count as native (e.g. Lupin, France and US)?** *Default:* yes, only if TMDB `original_language` matches. Otherwise no.
+11. **Do co-productions count as native (e.g. Lupin, France and US)?** *Decided (HG-14):* yes, if TMDB `original_language` matches and `origin_country` includes the city's country (`production_countries` only when `origin_country` is empty). A film whose origin is only the US stays out even with a local co-producer.
 
 ## Captain decisions (2026-10-30)
 

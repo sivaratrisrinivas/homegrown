@@ -57,7 +57,7 @@ test('HG-13 review: RTL-safe headers, provenance, no combining-dot aliases', () 
   assert.match(app, /hdr\.dir = 'auto'; await flipHeader\(hdr, revealHeader\(J, c\)/);
   assert.match(app, /lang: J\.single \? 'en' : S\.city\.language, dir: 'auto' \}/);
   const raw = JSON.parse(readFileSync(gate.hg13.raw, 'utf8'));
-  // HG-14 re-measured every city with the primary-origin rule; the gate carries those numbers (raw record below).
+  // HG-14 re-measured every city with the HG-14 origin rule; the gate carries those numbers (raw record below).
   const hg14 = JSON.parse(readFileSync(gate.hg14.raw, 'utf8'));
   for (const c of NEW) {
     const r = raw.scout.results.find((x) => x.id === c.id);

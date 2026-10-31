@@ -25,5 +25,5 @@ export function liftCities(gate, ids) {
   for (const id of ids) for (const k of cats) { const r = g.results[id][k]; r.accepted = Math.max(r.accepted, Math.ceil(g.threshold * r.seen)); }
   return g;
 }
-// HG-14: the cities the primary-origin re-measure put below the gate (kept in the catalogue, not served).
+// HG-14: the cities the HG-14 origin re-measure (origin_country includes the country) put below the gate (kept in the catalogue, not served).
 export const HG14_GATED = ['kolkata', 'london', 'dublin'];

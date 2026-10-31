@@ -1,0 +1,486 @@
+{
+  "task": "HG-14 (origin includes)",
+  "rule": "native = TMDB origin_country includes the city's country; production_countries used only when origin_country is empty (US-only origin is never native outside the US); language check unchanged",
+  "method": "npm run measure (scripts/measure.mjs, twin.measure movie); seeds Breaking Bad, Radiohead, Parasite; Qloo pool 50 -> top 15; Qloo calls throttled 7 s apart",
+  "aiSuggestMethod": "node scripts/measure-aisuggest.mjs: one Claude suggestFilms call per coming-soon language (seeds Breaking Bad, Radiohead, Parasite), up to 8 titles each through verifySuggestedFilm (country IN); verifiedOldRule = same titles under the primary-origin rule",
+  "ranAt": "2026-10-31 (IST), with keys from the environment",
+  "baseCommit": "ad89d0e",
+  "threshold": 0.6,
+  "minSeen": 5,
+  "cities": {
+    "mexico_city": {
+      "before": {
+        "seen": 10,
+        "accepted": 7,
+        "pct": 70,
+        "live": true
+      },
+      "after": {
+        "seen": 10,
+        "accepted": 7,
+        "pct": 70,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "madrid": {
+      "before": {
+        "seen": 15,
+        "accepted": 13,
+        "pct": 87,
+        "live": true
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 13,
+        "pct": 87,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "buenos_aires": {
+      "before": {
+        "seen": 14,
+        "accepted": 9,
+        "pct": 64,
+        "live": true
+      },
+      "after": {
+        "seen": 14,
+        "accepted": 10,
+        "pct": 71,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "seoul": {
+      "before": {
+        "seen": 15,
+        "accepted": 15,
+        "pct": 100,
+        "live": true
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 15,
+        "pct": 100,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "paris": {
+      "before": {
+        "seen": 15,
+        "accepted": 12,
+        "pct": 80,
+        "live": true
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 14,
+        "pct": 93,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "chennai": {
+      "before": {
+        "seen": 15,
+        "accepted": 15,
+        "pct": 100,
+        "live": true
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 15,
+        "pct": 100,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "mumbai": {
+      "before": {
+        "seen": 15,
+        "accepted": 14,
+        "pct": 93,
+        "live": true
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 14,
+        "pct": 93,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "hyderabad": {
+      "before": {
+        "seen": 15,
+        "accepted": 13,
+        "pct": 87,
+        "live": true
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 13,
+        "pct": 87,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "kolkata": {
+      "before": {
+        "seen": 7,
+        "accepted": 3,
+        "pct": 43,
+        "live": false
+      },
+      "after": {
+        "seen": 7,
+        "accepted": 4,
+        "pct": 57,
+        "errors": 0,
+        "live": false
+      }
+    },
+    "kochi": {
+      "before": {
+        "seen": 15,
+        "accepted": 15,
+        "pct": 100,
+        "live": true
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 15,
+        "pct": 100,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "amritsar": {
+      "before": {
+        "seen": 9,
+        "accepted": 7,
+        "pct": 78,
+        "live": true
+      },
+      "after": {
+        "seen": 9,
+        "accepted": 7,
+        "pct": 78,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "tokyo": {
+      "before": {
+        "seen": 15,
+        "accepted": 12,
+        "pct": 80,
+        "live": true
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 12,
+        "pct": 80,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "hong_kong": {
+      "before": {
+        "seen": 11,
+        "accepted": 8,
+        "pct": 73,
+        "live": true
+      },
+      "after": {
+        "seen": 11,
+        "accepted": 10,
+        "pct": 91,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "taipei": {
+      "before": {
+        "seen": 11,
+        "accepted": 11,
+        "pct": 100,
+        "live": true
+      },
+      "after": {
+        "seen": 11,
+        "accepted": 11,
+        "pct": 100,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "bangkok": {
+      "before": {
+        "seen": 7,
+        "accepted": 6,
+        "pct": 86,
+        "live": true
+      },
+      "after": {
+        "seen": 7,
+        "accepted": 6,
+        "pct": 86,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "jakarta": {
+      "before": {
+        "seen": 15,
+        "accepted": 14,
+        "pct": 93,
+        "live": true
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 14,
+        "pct": 93,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "manila": {
+      "before": {
+        "seen": 10,
+        "accepted": 10,
+        "pct": 100,
+        "live": true
+      },
+      "after": {
+        "seen": 10,
+        "accepted": 10,
+        "pct": 100,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "istanbul": {
+      "before": {
+        "seen": 15,
+        "accepted": 14,
+        "pct": 93,
+        "live": true
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 14,
+        "pct": 93,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "tehran": {
+      "before": {
+        "seen": 8,
+        "accepted": 8,
+        "pct": 100,
+        "live": true
+      },
+      "after": {
+        "seen": 8,
+        "accepted": 8,
+        "pct": 100,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "rome": {
+      "before": {
+        "seen": 6,
+        "accepted": 5,
+        "pct": 83,
+        "live": true
+      },
+      "after": {
+        "seen": 6,
+        "accepted": 6,
+        "pct": 100,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "berlin": {
+      "before": {
+        "seen": 13,
+        "accepted": 9,
+        "pct": 69,
+        "live": true
+      },
+      "after": {
+        "seen": 13,
+        "accepted": 9,
+        "pct": 69,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "moscow": {
+      "before": {
+        "seen": 15,
+        "accepted": 11,
+        "pct": 73,
+        "live": true
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 12,
+        "pct": 80,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "london": {
+      "before": {
+        "seen": 15,
+        "accepted": 3,
+        "pct": 20,
+        "live": false
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 7,
+        "pct": 47,
+        "errors": 0,
+        "live": false
+      }
+    },
+    "dublin": {
+      "before": {
+        "seen": 15,
+        "accepted": 5,
+        "pct": 33,
+        "live": false
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 6,
+        "pct": 40,
+        "errors": 0,
+        "live": false
+      }
+    },
+    "cairo": {
+      "before": {
+        "seen": 12,
+        "accepted": 8,
+        "pct": 67,
+        "live": true
+      },
+      "after": {
+        "seen": 12,
+        "accepted": 8,
+        "pct": 67,
+        "errors": 0,
+        "live": true
+      }
+    },
+    "sao_paulo": {
+      "before": {
+        "seen": 15,
+        "accepted": 15,
+        "pct": 100,
+        "live": true
+      },
+      "after": {
+        "seen": 15,
+        "accepted": 15,
+        "pct": 100,
+        "errors": 0,
+        "live": true
+      }
+    }
+  },
+  "aiSuggest": {
+    "kn": {
+      "name": "Kannada",
+      "city": "Bengaluru",
+      "asked": 8,
+      "verified": 5,
+      "verifiedOldRule": 5,
+      "reasons": {
+        "no_tmdb_match": 3
+      }
+    },
+    "mr": {
+      "name": "Marathi",
+      "city": "Pune",
+      "asked": 8,
+      "verified": 5,
+      "verifiedOldRule": 5,
+      "reasons": {
+        "no_tmdb_match": 2,
+        "off_language": 1
+      }
+    },
+    "gu": {
+      "name": "Gujarati",
+      "city": "Ahmedabad",
+      "asked": 8,
+      "verified": 3,
+      "verifiedOldRule": 3,
+      "reasons": {
+        "no_tmdb_match": 4,
+        "year_mismatch": 1
+      }
+    },
+    "or": {
+      "name": "Odia",
+      "city": "Bhubaneswar",
+      "asked": 8,
+      "verified": 1,
+      "verifiedOldRule": 1,
+      "reasons": {
+        "off_language": 1,
+        "no_tmdb_match": 6
+      }
+    },
+    "as": {
+      "name": "Assamese",
+      "city": "Guwahati",
+      "asked": 8,
+      "verified": 0,
+      "verifiedOldRule": 0,
+      "reasons": {
+        "no_tmdb_match": 7,
+        "year_mismatch": 1
+      }
+    },
+    "ks": {
+      "name": "Kashmiri",
+      "city": "Srinagar",
+      "asked": 8,
+      "verified": 0,
+      "verifiedOldRule": 0,
+      "reasons": {
+        "off_language": 5,
+        "year_mismatch": 1,
+        "no_tmdb_match": 2
+      }
+    },
+    "ne": {
+      "name": "Nepali",
+      "city": "Gangtok",
+      "asked": 8,
+      "verified": 0,
+      "verifiedOldRule": 0,
+      "reasons": {
+        "year_mismatch": 6,
+        "no_tmdb_match": 2
+      }
+    }
+  },
+  "belowThreshold": [
+    "kolkata",
+    "london",
+    "dublin"
+  ]
+}

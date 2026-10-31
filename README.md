@@ -130,3 +130,7 @@ flowchart TB
   AN -.->|"asks before spending"| L
   AI -.->|"asks before spending"| L
 ```
+
+## Data licence and attribution
+
+Word frequency lists come from [hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords) (2018 release, from OpenSubtitles), licensed [CC-BY-SA-4.0](https://creativecommons.org/licenses/by-sa/4.0/). `data/freq/` and `public/vocab-test.json` are modified derivatives of those lists (re-tokenised, trimmed, filtered and sampled) and are shared under the same licence, CC-BY-SA-4.0.

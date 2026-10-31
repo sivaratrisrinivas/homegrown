@@ -2,7 +2,6 @@
   "task": "HG-14 (origin includes)",
   "rule": "native = TMDB origin_country includes the city's country; production_countries used only when origin_country is empty (US-only origin is never native outside the US); language check unchanged",
   "method": "npm run measure (scripts/measure.mjs, twin.measure movie); seeds Breaking Bad, Radiohead, Parasite; Qloo pool 50 -> top 15; Qloo calls throttled 7 s apart",
-  "aiSuggestMethod": "node scripts/measure-aisuggest.mjs: one Claude suggestFilms call per coming-soon language (seeds Breaking Bad, Radiohead, Parasite), up to 8 titles each through verifySuggestedFilm (country IN); verifiedOldRule = same titles under the primary-origin rule",
   "ranAt": "2026-10-31 (IST), with keys from the environment",
   "baseCommit": "ad89d0e",
   "threshold": 0.6,
@@ -400,81 +399,307 @@
     }
   },
   "aiSuggest": {
-    "kn": {
-      "name": "Kannada",
-      "city": "Bengaluru",
-      "asked": 8,
-      "verified": 5,
-      "verifiedOldRule": 5,
-      "reasons": {
-        "no_tmdb_match": 3
-      }
-    },
-    "mr": {
-      "name": "Marathi",
-      "city": "Pune",
-      "asked": 8,
-      "verified": 5,
-      "verifiedOldRule": 5,
-      "reasons": {
-        "no_tmdb_match": 2,
-        "off_language": 1
-      }
-    },
-    "gu": {
-      "name": "Gujarati",
-      "city": "Ahmedabad",
-      "asked": 8,
-      "verified": 3,
-      "verifiedOldRule": 3,
-      "reasons": {
-        "no_tmdb_match": 4,
-        "year_mismatch": 1
-      }
-    },
-    "or": {
-      "name": "Odia",
-      "city": "Bhubaneswar",
-      "asked": 8,
-      "verified": 1,
-      "verifiedOldRule": 1,
-      "reasons": {
-        "off_language": 1,
-        "no_tmdb_match": 6
-      }
-    },
-    "as": {
-      "name": "Assamese",
-      "city": "Guwahati",
-      "asked": 8,
-      "verified": 0,
-      "verifiedOldRule": 0,
-      "reasons": {
-        "no_tmdb_match": 7,
-        "year_mismatch": 1
-      }
-    },
-    "ks": {
-      "name": "Kashmiri",
-      "city": "Srinagar",
-      "asked": 8,
-      "verified": 0,
-      "verifiedOldRule": 0,
-      "reasons": {
-        "off_language": 5,
-        "year_mismatch": 1,
-        "no_tmdb_match": 2
-      }
-    },
-    "ne": {
-      "name": "Nepali",
-      "city": "Gangtok",
-      "asked": 8,
-      "verified": 0,
-      "verifiedOldRule": 0,
-      "reasons": {
-        "year_mismatch": 6,
-        "no_tmdb_match": 2
+    "measuredAt": "2026-10-31T04:28:23.447Z",
+    "method": "node scripts/measure-aisuggest.mjs: 3 Claude suggestFilms runs per coming-soon language (seeds Breaking Bad, Radiohead, Parasite), up to 8 titles per run; every title checked independently by verifySuggestedFilm (country IN) under the new rule and under main's rule (IN in origin_country or production_countries)",
+    "note": "Claude output varies between runs (different titles each call), so per-run counts differ; compare the means.",
+    "languages": {
+      "kn": {
+        "name": "Kannada",
+        "city": "Bengaluru",
+        "runs": [
+          {
+            "asked": 8,
+            "newRule": 6,
+            "mainRule": 6,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "no_tmdb_match": 2
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 6,
+            "mainRule": 6,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "no_tmdb_match": 2
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 6,
+            "mainRule": 6,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "no_tmdb_match": 2
+            }
+          }
+        ],
+        "mean": {
+          "asked": 8,
+          "newRule": 6,
+          "mainRule": 6,
+          "droppedByNewOnly": 0
+        }
+      },
+      "mr": {
+        "name": "Marathi",
+        "city": "Pune",
+        "runs": [
+          {
+            "asked": 8,
+            "newRule": 4,
+            "mainRule": 4,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "no_tmdb_match": 2,
+              "off_language": 2
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 5,
+            "mainRule": 5,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "off_language": 2,
+              "no_tmdb_match": 1
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 5,
+            "mainRule": 5,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "no_tmdb_match": 2,
+              "off_language": 1
+            }
+          }
+        ],
+        "mean": {
+          "asked": 8,
+          "newRule": 4.67,
+          "mainRule": 4.67,
+          "droppedByNewOnly": 0
+        }
+      },
+      "gu": {
+        "name": "Gujarati",
+        "city": "Ahmedabad",
+        "runs": [
+          {
+            "asked": 8,
+            "newRule": 3,
+            "mainRule": 3,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "no_tmdb_match": 3,
+              "off_language": 2
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 1,
+            "mainRule": 1,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "year_mismatch": 2,
+              "off_language": 2,
+              "no_tmdb_match": 3
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 3,
+            "mainRule": 3,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "no_tmdb_match": 5
+            }
+          }
+        ],
+        "mean": {
+          "asked": 8,
+          "newRule": 2.33,
+          "mainRule": 2.33,
+          "droppedByNewOnly": 0
+        }
+      },
+      "or": {
+        "name": "Odia",
+        "city": "Bhubaneswar",
+        "runs": [
+          {
+            "asked": 8,
+            "newRule": 0,
+            "mainRule": 0,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "year_mismatch": 1,
+              "no_tmdb_match": 5,
+              "off_language": 2
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 1,
+            "mainRule": 1,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "no_tmdb_match": 6,
+              "year_mismatch": 1
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 0,
+            "mainRule": 0,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "no_tmdb_match": 6,
+              "off_language": 1,
+              "year_mismatch": 1
+            }
+          }
+        ],
+        "mean": {
+          "asked": 8,
+          "newRule": 0.33,
+          "mainRule": 0.33,
+          "droppedByNewOnly": 0
+        }
+      },
+      "as": {
+        "name": "Assamese",
+        "city": "Guwahati",
+        "runs": [
+          {
+            "asked": 8,
+            "newRule": 0,
+            "mainRule": 0,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "off_language": 3,
+              "year_mismatch": 1,
+              "no_tmdb_match": 4
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 0,
+            "mainRule": 0,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "no_tmdb_match": 7,
+              "year_mismatch": 1
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 0,
+            "mainRule": 0,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "no_tmdb_match": 5,
+              "off_language": 2,
+              "year_mismatch": 1
+            }
+          }
+        ],
+        "mean": {
+          "asked": 8,
+          "newRule": 0,
+          "mainRule": 0,
+          "droppedByNewOnly": 0
+        }
+      },
+      "ks": {
+        "name": "Kashmiri",
+        "city": "Srinagar",
+        "runs": [
+          {
+            "asked": 8,
+            "newRule": 0,
+            "mainRule": 0,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "off_language": 7,
+              "year_mismatch": 1
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 0,
+            "mainRule": 0,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "off_language": 3,
+              "year_mismatch": 1,
+              "no_tmdb_match": 4
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 1,
+            "mainRule": 1,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "off_language": 7
+            }
+          }
+        ],
+        "mean": {
+          "asked": 8,
+          "newRule": 0.33,
+          "mainRule": 0.33,
+          "droppedByNewOnly": 0
+        }
+      },
+      "ne": {
+        "name": "Nepali",
+        "city": "Gangtok",
+        "runs": [
+          {
+            "asked": 8,
+            "newRule": 0,
+            "mainRule": 0,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "year_mismatch": 5,
+              "no_tmdb_match": 2,
+              "off_language": 1
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 0,
+            "mainRule": 0,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "year_mismatch": 5,
+              "no_tmdb_match": 2,
+              "not_native": 1
+            }
+          },
+          {
+            "asked": 8,
+            "newRule": 0,
+            "mainRule": 0,
+            "droppedByNewOnly": 0,
+            "reasonsNew": {
+              "year_mismatch": 5,
+              "not_native": 1,
+              "no_tmdb_match": 2
+            }
+          }
+        ],
+        "mean": {
+          "asked": 8,
+          "newRule": 0,
+          "mainRule": 0,
+          "droppedByNewOnly": 0
+        }
       }
     }
   },

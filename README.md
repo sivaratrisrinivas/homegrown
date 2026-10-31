@@ -71,6 +71,10 @@ Only films are live right now. The code can also handle TV shows and music, but 
 
 ## System architecture
 
+### High-level architecture
+
+The big picture: your browser talks to Homegrown, and Homegrown asks three outside services for help.
+
 ```mermaid
 flowchart LR
   U["You (browser)"] --> H["Homegrown on Vercel"]
@@ -78,4 +82,51 @@ flowchart LR
   H -->|"checks the film is local"| T["TMDB"]
   H -->|"writes why-lines and AI picks"| C["Claude"]
   H -->|"your city's picks"| U
+```
+
+### Low-level architecture
+
+The detailed view: each server route, the outside services it really calls, the local-film check, the AI fallback and the shared Claude budget.
+
+```mermaid
+flowchart TB
+  B["You (browser)"]
+
+  subgraph Routes["Homegrown server routes (Vercel)"]
+    SG["/api/suggest"]
+    SR["/api/search"]
+    TW["/api/twin"]
+    AN["/api/altnames"]
+    AI["/api/aisuggest"]
+  end
+
+  B -->|"as you type a favourite"| SG
+  B -->|"turns your favourite into a Qloo entity"| SR
+  B -->|"finds your local twin's picks"| TW
+  B -->|"a favourite didn't match: try other names"| AN
+  B -->|"language has no live city yet: AI fallback"| AI
+
+  SG -->|"film and TV titles"| TMDB[("TMDB")]
+  SG -->|"song and artist titles"| IT[("iTunes")]
+  SG -->|"book titles"| OL[("Open Library")]
+
+  SR -->|"looks up the entity"| Q[("Qloo")]
+
+  TW -->|"what people in that city also love"| Q
+  TW --> LC{"Local-film check: is it in the city's language and made in its country?"}
+  LC -->|"language, country and where to watch"| TMDB
+  TW -->|"is the artist local"| MB[("MusicBrainz")]
+  TW -->|"song preview"| IT
+  TW -->|"writes the why-line"| C[("Claude")]
+
+  AN -->|"suggests other names"| C
+  AN -->|"checks each name exists"| Q
+
+  AI -->|"suggests local films"| C
+  AI -->|"keeps only films TMDB confirms are in that language and made in India"| TMDB
+
+  L[["Claude budget ledger: $0.25 a day shared by why-lines, other names and AI picks"]]
+  TW -.->|"asks before spending"| L
+  AN -.->|"asks before spending"| L
+  AI -.->|"asks before spending"| L
 ```

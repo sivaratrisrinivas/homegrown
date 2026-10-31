@@ -7,7 +7,8 @@
   --paper:#F5F1EA;--card:var(--paper);--ink:#161616;--ink-2:#55585A;--ink-3:#6A6D6F;--line:#E2DED6;
   --board:#17161A;--board-2:#24232A;--chalk:#F1E7D3;
   --accent:var(--ink);/* The accent as a rule on the dark board: lifted toward chalk so every city clears 3:1 (non-text). */--accent-rule:color-mix(in srgb,var(--accent) 80%,var(--chalk));--accent-soft:color-mix(in oklab,var(--accent) 12%,var(--paper));
-  --serif:Fraunces,"Fraunces Fallback",serif;--sans:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --indic-serif:"Noto Serif Tamil","Noto Serif Telugu","Noto Serif Kannada","Noto Serif Malayalam","Noto Serif Bengali","Noto Serif Devanagari","Noto Serif Gurmukhi","Noto Serif Gujarati","Noto Serif Oriya";--indic-sans:"Noto Sans Tamil","Noto Sans Telugu","Noto Sans Kannada","Noto Sans Malayalam","Noto Sans Bengali","Noto Sans Devanagari","Noto Sans Gurmukhi","Noto Sans Gujarati","Noto Sans Oriya";
+  --serif:Fraunces,"Fraunces Fallback",var(--indic-serif),serif;--sans:Inter,var(--indic-sans),system-ui,-apple-system,"Segoe UI",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;
   /* Four sizes only: display, title, body, caption (VS-style). */--t-display:clamp(40px,10vw,56px);--t-title:28px;--t-body:18px;--t-ui:var(--t-body);--t-cap:12px;--t-flap:clamp(13px,3.4vw,18px);
   --lh-display:.92;--track-display:-.03em;--measure:30ch;
   /* 8px rhythm (s1 is a half-step for hairlines only) */--s1:4px;--s2:8px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:96px;
@@ -34,9 +35,13 @@ main{max-width:560px;margin:0 auto;padding:var(--top) var(--s5) var(--s8);min-he
 main:has(.board.compact){--top:var(--s5)}
 .screen{display:flex;flex-direction:column;gap:var(--s5)}
 .leaving{position:absolute;left:var(--s5);right:var(--s5);pointer-events:none}
-h1,h2,.serif{font-family:Fraunces,"Fraunces Fallback",serif;font-weight:400;line-height:1.15;margin:0;letter-spacing:-.01em}
+h1,h2,.serif{font-family:Fraunces,"Fraunces Fallback",var(--indic-serif),serif;font-weight:400;line-height:1.15;margin:0;letter-spacing:-.01em}
 h1,h2{font-size:var(--t-title)}h1:focus,h2:focus{outline:none}
 h1{font-size:var(--t-display);line-height:var(--lh-display);letter-spacing:var(--track-display)}
+/* HG-17: Indic titles at a normal weight. Fraunces has no Indic glyphs, and the generic serif/sans fallback
+   picked whatever system font covers the script (a heavy display face for Tamil). We now name Noto per
+   script, loaded at 400, and keep native-script headings at 400 even in h3. */
+:is(:lang(ta),:lang(te),:lang(kn),:lang(ml),:lang(bn),:lang(hi),:lang(mr),:lang(pa),:lang(gu),:lang(or)):is(h1,h2,h3,.serif){font-weight:400}
 .ko{font-family:"Noto Serif KR","Noto Serif KR Fallback",Fraunces,"Fraunces Fallback",serif;font-weight:500}
 p{margin:0;line-height:1.6}
 .sub,.body{font-size:var(--t-body);line-height:1.6;color:var(--ink-2);max-width:var(--measure)}

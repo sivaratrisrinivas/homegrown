@@ -89,9 +89,30 @@ export function coverage(p, vocab) {
 export const coveragePct = (c) => (c == null ? null : Math.min(99, Math.round((c * 100) / 5) * 5));
 export const MIN_TOKENS = 1500; // shorter subtitle files (partial / forced) give no line
 // Personal difficulty from coverage (around 95% of words known, films become comfortable).
+// Based on the same rounded number the learner sees, so "95%+" is never shown with a "medium" dot.
 export function coverageDifficulty(c) {
   if (c == null) return null;
-  return c >= 0.95 ? 'easy' : c >= 0.85 ? 'medium' : 'hard';
+  const r = Math.round((c * 100) / 5) * 5;
+  return r >= 95 ? 'easy' : r >= 85 ? 'medium' : 'hard';
+}
+// Display text: "<5%" and "95%+" at the ends, "~N%" in between (never a fake-exact ~0% or ~99%).
+export function coverageLabel(c) {
+  const r = c == null ? null : Math.round((c * 100) / 5) * 5;
+  return r == null ? null : r < 5 ? '<5%' : r >= 95 ? '95%+' : `~${r}%`;
+}
+// Fixed seeded shuffle (mulberry32 + Fisher-Yates): same order every time, bands mixed.
+export function seededShuffle(arr, seed = 22) {
+  const a = arr.slice(); let t = seed >>> 0;
+  const rnd = () => { t = (t + 0x6D2B79F5) >>> 0; let x = Math.imul(t ^ (t >>> 15), 1 | t); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+// Storage that may be blocked (privacy mode, sandboxed iframes): touching localStorage can throw.
+export function safeStorage(get = () => globalThis.localStorage) { try { return get() || null; } catch { return null; } }
+// Finishing the word check: nothing ticked means no estimate (never save 0). Returns whether saved.
+export function finishWordCheck(storage, lang, items, now = Date.now()) {
+  if (!storage || !items.some((x) => x.known)) return false;
+  return saveVocab(storage, lang, estimateVocab(items), now);
 }
 
 // Vocabulary check: 6 rank bands, 5 words each. Estimate = sum of band width x share ticked.

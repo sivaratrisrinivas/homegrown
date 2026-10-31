@@ -4,7 +4,7 @@ import { indiaSection } from './india.js';
 import { combobox } from './combobox.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { CATEGORY } from './config.js';
-import { coverage, coveragePct, coverageDifficulty, readVocab, saveVocab, estimateVocab } from './coverage.js';
+import { coverage, coveragePct, coverageDifficulty, coverageLabel, readVocab, seededShuffle, safeStorage, finishWordCheck } from './coverage.js';
 // HG-10 v1 is one journey: hello → language → city → 3 favourites → morph board → reveal → share.
 const J = journeyFor(CATEGORY);
 // HG-9: run, wait on and note only the catalogue's live categories (within this journey's category).
@@ -522,13 +522,18 @@ function heroMeta(p) {
   const pct = coverPct(p); const cd = pct != null ? coverageDifficulty(coverOf(p)) : null;
   const level = cd || p.difficulty;
   const diff = level ? h('span', { class: 'diff', title: cd ? 'From the words in its subtitles and your word check' : 'Estimated difficulty for a language learner' }, h('span', { class: `dot ${level}`, 'aria-hidden': 'true' }), cd ? `${cd} for you` : `${p.difficulty} (estimated)`) : null;
-  const cov = pct != null ? h('p', { class: 'tip cover' }, `You’d understand ~${pct}% of the words in this film`)
+  // Names and words beyond the list count as unknown, so this is a floor.
+  const cov = pct != null ? h('p', { class: 'tip cover' }, `You’d understand ${coverageLabel(coverOf(p)).replace(/^~/, 'at least ~')} of the words in this film `,
+    h('button', { class: 'quiet link retake', onclick: () => wordCheck(p.coverage.lang) }, 'Retake word check'))
+    : p.coverage && wordCheckOff.has(p.coverage.lang) ? null
     : p.coverage ? h('button', { class: 'quiet cover-ask', onclick: () => wordCheck(p.coverage.lang) }, 'How much would you understand? 1-minute word check') : null;
   if (!diff && !p.tip && !cov) return null;
   return h('div', {}, cov, diff || p.tip ? h('p', { class: 'tip clamp' }, p.tip || null, diff && p.tip ? ' · ' : null, diff) : null);
 }
 // HG-22: coverage needs both the film's subtitle profile and this browser's word-check estimate.
-const vocabFor = (lang) => { try { return readVocab(localStorage, lang); } catch { return null; } };
+const store = () => safeStorage();
+const vocabFor = (lang) => { const st = store(); return st ? readVocab(st, lang) : null; };
+const wordCheckOff = new Set(); // languages whose word list didn't load: hide the button
 function coverOf(p) { const v = p.coverage && vocabFor(p.coverage.lang); return v == null ? null : coverage(p.coverage, v); }
 const coverPct = (p) => coveragePct(coverOf(p));
 let vocabTest = null;
@@ -536,16 +541,17 @@ const loadVocabTest = () => (vocabTest ||= fetch('/vocab-test.json').then((r) =>
 // One screen, one action: tap the words you know, then Done. Skip leaves everything as it was.
 async function wordCheck(lang) {
   const lists = await loadVocabTest(); const bands = lists?.[lang];
-  if (!bands) return;
+  if (!bands) { wordCheckOff.add(lang); reveal(); return; }
   nav('words');
   const items = bands.flatMap((ws, band) => ws.map((w) => ({ w, band, known: false })));
   // Interleave bands so the screen doesn't read easy → hard.
-  const order = items.map((x, i) => [((i * 7) % items.length), x]).sort((a, b) => a[0] - b[0]).map(([, x]) => x);
+  const order = seededShuffle(items);
   const chip = (x) => { const b = h('button', { class: 'token word', 'aria-pressed': 'false', lang, onclick: () => { x.known = !x.known; b.setAttribute('aria-pressed', String(x.known)); } }, h('span', {}, x.w)); return b; };
-  const done = () => { saveVocab(localStorage, lang, estimateVocab(items)); track({ event: 'tap', action: 'word_check' }); reveal(); };
+  const done = () => { finishWordCheck(store(), lang, items); track({ event: 'tap', action: 'word_check' }); reveal(); };
   show(h('h2', { class: 'hdr' }, 'Which of these words do you know?'),
     h('p', { class: 'body' }, 'Tap the ones you’d understand in a film. Leave the rest. Nothing leaves this browser.'),
     h('div', { class: 'words', role: 'group', 'aria-label': 'Words' }, order.map(chip)),
+    h('p', { class: 'note-row' }, 'Word lists: modified from hermitdave/FrequencyWords (2018), CC-BY-SA-4.0.'),
     h('div', { class: 'cta' }, h('button', { class: 'primary', onclick: done }, 'Done'), h('button', { class: 'quiet', onclick: () => reveal() }, 'Skip')));
 }
 // Hero ticket: kind (mixed only) · title · English · poster · why · action · tip. Title sits above the
@@ -561,7 +567,7 @@ function pickCard(p, city, readOnly) {
 const pickRow = (p, n, city) => h('article', { class: 'prow', 'aria-label': `${KIND[p.category] || 'Pick'}: ${p.title}, from ${city.name}` },
   h('span', { class: 'n', 'aria-hidden': 'true' }, String(n).padStart(2, '0')),
   h('div', {}, h('span', { class: serif(city.language), lang: city.language }, p.title), enTitle(p) ? h('span', { class: 'en' }, enTitle(p)) : null),
-  coverPct(p) != null ? h('span', { class: 'cover-n', title: 'Share of its subtitle words you likely know' }, `~${coverPct(p)}%`) : null);
+  coverPct(p) != null ? h('span', { class: 'cover-n', title: 'Share of its subtitle words you likely know' }, coverageLabel(coverOf(p))) : null);
 // Rows rise in (opacity + --row-rise, --d-row-stagger apart), once each, late arrivals too.
 function riseIn(el, key, n) {
   const seen = revealEls?.seen; if (!seen || seen.has(key)) return el; seen.add(key);

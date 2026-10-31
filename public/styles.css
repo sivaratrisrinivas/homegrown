@@ -139,7 +139,7 @@ button{transition:transform var(--d-press) var(--ease-out)}button:active:not(:di
 @keyframes frames{0%{transform:translateX(0);opacity:1}20%{opacity:.7}23%{opacity:1}61%{opacity:.8}64%{opacity:1}100%{transform:translateX(-50%);opacity:1}}
 /* Rows 01–04: type + hairline only (V5, V6, V9). */
 .list{display:flex;flex-direction:column}
-.prow{display:grid;grid-template-columns:2.5em 1fr;gap:var(--s2);padding:var(--s4) 0;border-top:1px solid var(--line)}
+.prow{display:grid;grid-template-columns:2.5em 1fr auto;gap:var(--s2);padding:var(--s4) 0;border-top:1px solid var(--line)}
 .prow:last-child{border-bottom:1px solid var(--line)}
 .prow .n{font:400 var(--t-cap)/2 var(--mono);color:var(--ink-3)}
 .prow .serif{font-size:var(--t-title);line-height:1.2}

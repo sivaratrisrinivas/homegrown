@@ -9,7 +9,7 @@
   "liveCategories": [
     "movie"
   ],
-  "measuredAt": "2026-10-30T21:31:12.118Z",
+  "measuredAt": "2026-10-31T00:33:24.270Z",
   "source": "npm run measure (HG-9 language-aware): Qloo pool of 50 filtered by language (TMDB original_language for tv/movie, Qloo genre tags for music), then top 15 per category, every candidate checked, MusicBrainz errors retried (1.1 s backoff) and excluded from the denominator; seeds Breaking Bad, Radiohead, Parasite",
   "results": {
     "mexico_city": {
@@ -45,7 +45,7 @@
       },
       "movie": {
         "seen": 15,
-        "accepted": 14,
+        "accepted": 13,
         "errors": 0,
         "filtered": 3,
         "languageShare": 0.83
@@ -68,7 +68,7 @@
       },
       "movie": {
         "seen": 14,
-        "accepted": 14,
+        "accepted": 9,
         "errors": 0,
         "filtered": 2,
         "languageShare": 0.88
@@ -114,7 +114,7 @@
       },
       "movie": {
         "seen": 15,
-        "accepted": 14,
+        "accepted": 12,
         "errors": 0,
         "filtered": 2,
         "languageShare": 0.88
@@ -206,7 +206,7 @@
       },
       "movie": {
         "seen": 7,
-        "accepted": 6,
+        "accepted": 3,
         "errors": 0,
         "filtered": 43,
         "languageShare": 0.14
@@ -249,7 +249,7 @@
     "hong_kong": {
       "movie": {
         "seen": 11,
-        "accepted": 10,
+        "accepted": 8,
         "errors": 0,
         "filtered": 10,
         "languageShare": 0.52
@@ -312,7 +312,7 @@
     "rome": {
       "movie": {
         "seen": 6,
-        "accepted": 6,
+        "accepted": 5,
         "errors": 0,
         "filtered": 9,
         "languageShare": 0.4
@@ -330,7 +330,7 @@
     "moscow": {
       "movie": {
         "seen": 15,
-        "accepted": 12,
+        "accepted": 11,
         "errors": 0,
         "filtered": 5,
         "languageShare": 0.75
@@ -339,7 +339,7 @@
     "london": {
       "movie": {
         "seen": 15,
-        "accepted": 11,
+        "accepted": 3,
         "errors": 0,
         "filtered": 0,
         "languageShare": 1
@@ -348,7 +348,7 @@
     "dublin": {
       "movie": {
         "seen": 15,
-        "accepted": 11,
+        "accepted": 5,
         "errors": 0,
         "filtered": 0,
         "languageShare": 1
@@ -558,5 +558,15 @@
       ]
     },
     "raw": "config/hg13-measure.json"
+  },
+  "hg14": {
+    "measuredAt": "2026-10-31T00:33:24.270Z",
+    "rule": "native = TMDB primary origin country (origin_country[0], else production_countries[0]) equals the city country",
+    "belowThreshold": [
+      "kolkata",
+      "london",
+      "dublin"
+    ],
+    "raw": "config/hg14-measure.json"
   }
 }

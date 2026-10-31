@@ -491,5 +491,5 @@
     "london",
     "dublin"
   ],
-  "gateAfter": "measured gate.json not applied on this branch; see HG-14 report (London/Dublin conflict with captain's English rule)"
+  "gateAfter": "applied to config/gate.json (movie seen/accepted = after); kolkata, london, dublin are gated (kept in the catalogue, return automatically once a run passes)"
 }

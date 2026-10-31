@@ -100,6 +100,21 @@ export function coverageLabel(c) {
   const r = c == null ? null : Math.round((c * 100) / 5) * 5;
   return r == null ? null : r < 5 ? '<5%' : r >= 95 ? '95%+' : `~${r}%`;
 }
+// Sentence form for the hero line: the count is a floor (names and words past the list are unknown).
+export function coverageSentence(c) {
+  const r = c == null ? null : Math.round((c * 100) / 5) * 5;
+  return r == null ? null : r < 5 ? 'under 5%' : r >= 95 ? '95% or more' : `at least ~${r}%`;
+}
+// A profile is usable only if its counts add up and most words matched the list (a subtitle in the
+// wrong encoding or script lands almost entirely "beyond" and would show a fake ~0%).
+export const MAX_BEYOND = 0.4;
+export function profileProblem(p) {
+  if (!p || !Number.isFinite(p.tokens) || !Array.isArray(p.bands) || !Number.isFinite(p.beyond)) return 'malformed';
+  if (p.tokens < MIN_TOKENS) return 'too short';
+  if (p.bands.reduce((a, b) => a + b, 0) + p.beyond !== p.tokens) return 'counts do not add up';
+  if (p.beyond / p.tokens > MAX_BEYOND) return `too many unmatched words (${Math.round((100 * p.beyond) / p.tokens)}%)`;
+  return null;
+}
 // Fixed seeded shuffle (mulberry32 + Fisher-Yates): same order every time, bands mixed.
 export function seededShuffle(arr, seed = 22) {
   const a = arr.slice(); let t = seed >>> 0;

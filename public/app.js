@@ -4,7 +4,7 @@ import { indiaSection } from './india.js';
 import { combobox } from './combobox.js';
 import { createAltTrigger, verifiedFavourite, missedNote, mergeMissed, resolveMissed } from './altnames-client.js';
 import { CATEGORY } from './config.js';
-import { coverage, coveragePct, coverageDifficulty, coverageLabel, readVocab, seededShuffle, safeStorage, finishWordCheck } from './coverage.js';
+import { coverage, coverageDifficulty, coverageLabel, coverageSentence, readVocab, seededShuffle, safeStorage, finishWordCheck } from './coverage.js';
 // HG-10 v1 is one journey: hello → language → city → 3 favourites → morph board → reveal → share.
 const J = journeyFor(CATEGORY);
 // HG-9: run, wait on and note only the catalogue's live categories (within this journey's category).
@@ -519,11 +519,11 @@ const enTitle = (p) => (p.englishTitle && p.englishTitle !== p.title ? p.english
 // HG-7, hero only: estimated difficulty (never stated as fact) and the subtitle tip share one quiet line.
 function heroMeta(p) {
   // HG-22: with a subtitle profile and a word check, the dot is personal (from coverage), not genre-based.
-  const pct = coverPct(p); const cd = pct != null ? coverageDifficulty(coverOf(p)) : null;
+  const c = coverOf(p); const cd = coverageDifficulty(c);
   const level = cd || p.difficulty;
   const diff = level ? h('span', { class: 'diff', title: cd ? 'From the words in its subtitles and your word check' : 'Estimated difficulty for a language learner' }, h('span', { class: `dot ${level}`, 'aria-hidden': 'true' }), cd ? `${cd} for you` : `${p.difficulty} (estimated)`) : null;
   // Names and words beyond the list count as unknown, so this is a floor.
-  const cov = pct != null ? h('p', { class: 'tip cover' }, `You’d understand ${coverageLabel(coverOf(p)).replace(/^~/, 'at least ~')} of the words in this film `,
+  const cov = c != null ? h('p', { class: 'tip cover' }, `You’d understand ${coverageSentence(c)} of the words in this film `,
     h('button', { class: 'quiet link retake', onclick: () => wordCheck(p.coverage.lang) }, 'Retake word check'))
     : p.coverage && wordCheckOff.has(p.coverage.lang) ? null
     : p.coverage ? h('button', { class: 'quiet cover-ask', onclick: () => wordCheck(p.coverage.lang) }, 'How much would you understand? 1-minute word check') : null;
@@ -535,7 +535,6 @@ const store = () => safeStorage();
 const vocabFor = (lang) => { const st = store(); return st ? readVocab(st, lang) : null; };
 const wordCheckOff = new Set(); // languages whose word list didn't load: hide the button
 function coverOf(p) { const v = p.coverage && vocabFor(p.coverage.lang); return v == null ? null : coverage(p.coverage, v); }
-const coverPct = (p) => coveragePct(coverOf(p));
 let vocabTest = null;
 const loadVocabTest = () => (vocabTest ||= fetch('/vocab-test.json').then((r) => r.json()).catch(() => { vocabTest = null; return null; }));
 // One screen, one action: tap the words you know, then Done. Skip leaves everything as it was.
@@ -564,10 +563,10 @@ function pickCard(p, city, readOnly) {
     readOnly ? null : action(p), art(p), readOnly ? null : expandable(whyLine(p), heroMeta(p)));
 }
 // Rows 01–04: type only, one name (local title) plus the English line when it differs.
-const pickRow = (p, n, city) => h('article', { class: 'prow', 'aria-label': `${KIND[p.category] || 'Pick'}: ${p.title}, from ${city.name}` },
+const pickRow = (p, n, city, c = coverOf(p)) => h('article', { class: 'prow', 'aria-label': `${KIND[p.category] || 'Pick'}: ${p.title}, from ${city.name}` },
   h('span', { class: 'n', 'aria-hidden': 'true' }, String(n).padStart(2, '0')),
   h('div', {}, h('span', { class: serif(city.language), lang: city.language }, p.title), enTitle(p) ? h('span', { class: 'en' }, enTitle(p)) : null),
-  coverPct(p) != null ? h('span', { class: 'cover-n', title: 'Share of its subtitle words you likely know' }, coverageLabel(coverOf(p))) : null);
+  c != null ? h('span', { class: 'cover-n', title: 'Share of its subtitle words you likely know' }, coverageLabel(c)) : null);
 // Rows rise in (opacity + --row-rise, --d-row-stagger apart), once each, late arrivals too.
 function riseIn(el, key, n) {
   const seen = revealEls?.seen; if (!seen || seen.has(key)) return el; seen.add(key);

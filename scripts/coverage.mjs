@@ -7,7 +7,7 @@
 // Films already in the file are skipped; a 406 (quota) stops the run and keeps what was saved.
 // Only band counts are written; subtitle text is never stored.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { LANGS, supported, tokenize, subtitleText, profile, MIN_TOKENS } from '../public/coverage.js';
+import { LANGS, supported, tokenize, subtitleText, profile, profileProblem } from '../public/coverage.js';
 
 const OS = 'https://api.opensubtitles.com/api/v1';
 const UA = 'Homegrown v0.1.0';
@@ -68,7 +68,8 @@ async function main(argv) {
       }
     }
     const p = profileOf(srt, lang);
-    if (p.tokens < MIN_TOKENS) { console.log(key, `too short (${p.tokens} tokens), not saved`); continue; }
+    const bad = profileProblem(p);
+    if (bad) { console.log(key, `${bad} (${p.tokens} tokens), not saved`); continue; }
     data.films[key] = { ...p, at: new Date().toISOString().slice(0, 10) };
     writeFileSync(FILE, JSON.stringify(data, null, 1) + '\n');
     console.log(key, 'saved', p.tokens, 'tokens');
